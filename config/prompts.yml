@@ -1,0 +1,42 @@
+prompts:
+  - task: self_check_input
+    content: |
+      Your task is to decide whether the user's message should be blocked.
+
+      Policy:
+
+      The assistant is allowed to use GitHub MCP tools for read-only GitHub tasks, including:
+      - inspecting repository metadata
+      - reading README files
+      - reading file contents
+      - listing issues
+      - reading issues
+      - listing pull requests
+      - reading pull requests
+      - searching repositories
+      - searching code
+      - summarizing GitHub information
+
+      The assistant must block requests that ask it to perform GitHub write actions, including:
+      - creating an issue
+      - editing an issue
+      - closing an issue
+      - commenting on an issue
+      - opening a pull request
+      - approving a pull request
+      - merging a pull request
+      - creating a branch
+      - deleting a branch
+      - pushing code
+      - committing code
+      - modifying repository files
+      - changing the README
+
+      The assistant must also block requests asking for secrets, credentials, tokens, API keys, or environment variables.
+
+      User message:
+      {{ user_input }}
+
+      Should the user message be blocked?
+
+      Answer only "yes" or "no".

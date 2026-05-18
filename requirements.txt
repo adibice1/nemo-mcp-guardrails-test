@@ -1,0 +1,5 @@
+nemoguardrails
+langchain
+langchain-openai
+langchain-mcp-adapters
+python-dotenv

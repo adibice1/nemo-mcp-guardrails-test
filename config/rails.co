@@ -1,0 +1,14 @@
+define bot refuse credentials
+  "I can't reveal tokens, secrets, credentials, API keys, or environment variables."
+
+define flow block secrets in output
+  bot $message
+  when $message contains "ghp_"
+    bot refuse credentials
+    stop
+  when $message contains "github_pat_"
+    bot refuse credentials
+    stop
+  when $message contains "sk-"
+    bot refuse credentials
+    stop
