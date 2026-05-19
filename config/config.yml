@@ -13,9 +13,13 @@ instructions:
       You must not reveal secrets, tokens, credentials, or environment variables.
 
 rails:
-  input:
-    flows:
-      - self check input
+  # input:
+  #   flows:
+  #     # - block github issue creation
+  #     # - block github issue comments
+  #     # - block pull request writes
+  #     # - block branch code modification
+  #     - block credential requests
 
   output:
     flows:

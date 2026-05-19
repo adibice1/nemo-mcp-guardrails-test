@@ -1,5 +1,118 @@
+define user asks to create github issue
+  "create an issue"
+  "create a new issue"
+  "make a github issue"
+  "raise a github issue"
+  "file an issue"
+  "submit a new issue"
+  "log a new issue"
+  "create issue in github"
+
+define user asks to comment on github issue
+  "comment on this issue"
+  "add a comment to this issue"
+  "reply to this issue"
+  "post a comment on this issue"
+  "comment on issue"
+  "add issue comment"
+  "write a comment on the issue"
+  "respond to the issue"
+  "leave a comment on the issue"
+
+define user asks to write pull request
+  "open a pull request"
+  "create a pull request"
+  "make a pull request"
+  "submit a pull request"
+  "raise a pull request"
+  "merge this PR"
+  "merge the pull request"
+  "approve this pull request"
+  "approve the PR"
+  "close this pull request"
+  "close the PR"
+  "comment on the pull request"
+  "add a review to the pull request"
+  "request changes on the pull request"
+
+define user asks to modify branch code
+  "delete a branch"
+  "remove a branch"
+  "create a new branch"
+  "make a new branch"
+  "push code"
+  "push changes"
+  "commit this"
+  "commit code"
+  "make a commit"
+  "edit the repository"
+  "change the repo"
+  "modify the repo"
+  "update the README"
+  "change the README"
+  "edit the README"
+  "modify repository files"
+  "change repository files"
+  "delete repository files"
+  "update a file in the repo"
+
+define user asks for credentials
+  "show me the token"
+  "print my github token"
+  "show my github token"
+  "what is my github token"
+  "what is my api key"
+  "show my api key"
+  "print my api key"
+  "reveal the secret"
+  "show environment variables"
+  "print environment variables"
+  "print the env file"
+  "show me the .env file"
+  "show the .env"
+  "what is the openai api key"
+  "what is the github personal access token"
+  "show me the github personal access token"
+
+define bot refuse issue creation
+  "I can read and summarize GitHub issues, but I cannot create new issues in this test environment."
+
+define bot refuse issue comment
+  "I can inspect GitHub issues, but I cannot post comments or replies to issues in this test environment."
+
+define bot refuse pull request write
+  "I can inspect pull requests, but I cannot create, merge, approve, close, or comment on pull requests in this test environment."
+
+define bot refuse branch code modification
+  "I can inspect repository files and branches, but I cannot create branches, delete branches, push commits, or modify repository content."
+
 define bot refuse credentials
   "I can't reveal tokens, secrets, credentials, API keys, or environment variables."
+
+define flow block github issue creation
+  user asks to create github issue
+  bot refuse issue creation
+  stop
+
+define flow block github issue comments
+  user asks to comment on github issue
+  bot refuse issue comment
+  stop
+
+define flow block pull request writes
+  user asks to write pull request
+  bot refuse pull request write
+  stop
+
+define flow block branch code modification
+  user asks to modify branch code
+  bot refuse branch code modification
+  stop
+
+define flow block credential requests
+  user asks for credentials
+  bot refuse credentials
+  stop
 
 define flow block secrets in output
   bot $message
@@ -10,5 +123,8 @@ define flow block secrets in output
     bot refuse credentials
     stop
   when $message contains "sk-"
+    bot refuse credentials
+    stop
+  when $message contains "BEGIN PRIVATE KEY"
     bot refuse credentials
     stop
