@@ -16,15 +16,15 @@ instructions:
       deleting branches, merging pull requests, pushing commits, or modifying repository content.
       You must not reveal secrets, tokens, credentials, or environment variables.
 
-# rails:
-#   # input:
-#   #   flows:
-#   #     # - block github issue creation
-#   #     # - block github issue comments
-#   #     # - block pull request writes
-#   #     # - block branch code modification
-#   #     - block credential requests
+rails:
+  # input:
+  #   flows:
+  #     # - block github issue creation
+  #     # - block github issue comments
+  #     # - block pull request writes
+  #     # - block branch code modification
+  #     - block credential requests
 
-#   output:
-#     flows:
-#       - block secrets in output
+  output:
+    flows:
+      - block secrets in output
