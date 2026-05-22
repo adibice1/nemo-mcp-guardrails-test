@@ -17,14 +17,20 @@ instructions:
       You must not reveal secrets, tokens, credentials, or environment variables.
 
 rails:
-  # input:
-  #   flows:
-  #     # - block github issue creation
-  #     # - block github issue comments
-  #     # - block pull request writes
-  #     # - block branch code modification
-  #     - block credential requests
-
-  output:
+  input:
     flows:
-      - block secrets in output
+      - self check input
+      # Custom intent flows are temporarily disabled because they currently
+      # overmatch and block safe read-only GitHub prompts.
+      # - block github issue creation
+      # - block github issue comments
+      # - block pull request writes
+      # - block branch code modification
+      # - block credential requests
+
+  # Output rails are disabled for now because they currently trigger an old/default
+  # OpenAI path and falsely block allowed responses. Keep output checks isolated until
+  # Azure-backed NeMo output rails are fixed.
+  # output:
+  #   flows:
+  #     - block secrets in output

@@ -6,7 +6,8 @@ from dotenv import load_dotenv
 from langchain.agents import create_agent
 from langchain_openai import AzureChatOpenAI
 from langchain_mcp_adapters.client import MultiServerMCPClient
-from nemoguardrails.integrations.langchain.middleware import GuardrailsMiddleware
+from nemoguardrails import LLMRails, RailsConfig
+from nemoguardrails.rails.llm.options import RailStatus, RailType
 
 print("SCRIPT STARTED")
 
@@ -17,7 +18,7 @@ def print_separator(title: str) -> None:
 
 
 def print_messages(result: dict[str, Any]) -> None:
-    """Print all messages returned by the agent so we can inspect tool usage."""
+    """Print LangChain's full agent trace, including user, AI, tool-call, and tool-result messages."""
     messages = result.get("messages", [])
 
     for index, message in enumerate(messages):
@@ -104,6 +105,13 @@ def precheck_user_prompt(prompt: str) -> str | None:
 
     return None
 
+def python_precheck_is_enforced() -> bool:
+    return os.getenv("ENFORCE_PYTHON_PRECHECK", "").lower() in {
+        "1",
+        "true",
+        "yes",
+    }
+
 async def main() -> None:
     load_dotenv()
 
@@ -134,8 +142,8 @@ async def main() -> None:
 
     print_separator("Connecting to GitHub MCP server")
 
-    # This starts the GitHub MCP server through Docker using stdio.
-    # GITHUB_READ_ONLY=1 is important for safety while testing.
+    # Start the GitHub MCP server through Docker and expose it over stdio.
+    # GITHUB_READ_ONLY=1 prevents write tools from being offered by the server.
     client = MultiServerMCPClient(
         {
             "github": {
@@ -162,16 +170,14 @@ async def main() -> None:
         }
     )
 
+    # Convert GitHub MCP capabilities into LangChain-compatible tools.
     tools = await client.get_tools()
 
     print_separator("MCP tools loaded")
     for tool in tools:
         print(f"- {tool.name}")
 
-    print_separator("Creating NeMo Guardrails middleware")
-
-    guardrails = GuardrailsMiddleware(config_path="config")
-
+    # Main Azure OpenAI chat model used by both NeMo input rails and the LangChain agent.
     model = AzureChatOpenAI(
         azure_deployment=azure_deployment,
         azure_endpoint=azure_endpoint,
@@ -180,10 +186,17 @@ async def main() -> None:
         temperature=0,
     )
 
+    print_separator("Creating NeMo input rails")
+
+    # Load NeMo guardrail config and inject the working Azure model so NeMo does
+    # not create an old OpenAI client internally.
+    rails_config = RailsConfig.from_path("config")
+    rails = LLMRails(rails_config, llm=model)
+
+    # The LangChain agent decides when an allowed prompt needs a GitHub MCP tool.
     agent = create_agent(
         model=model,
         tools=tools,
-        middleware=[guardrails],
     )
 
     test_prompts = [
@@ -248,20 +261,63 @@ async def main() -> None:
         print(test["prompt"])
 
         try:
+            # Temporary comparison check: Python reports what it would block, but
+            # NeMo is the primary gate unless ENFORCE_PYTHON_PRECHECK is enabled.
             blocked_reason = precheck_user_prompt(test["prompt"])
             if blocked_reason:
-                print_separator("PRECHECK BLOCKED")
+                print_separator("PYTHON PRECHECK WOULD BLOCK")
                 print(blocked_reason)
+
+                if python_precheck_is_enforced():
+                    print_separator("PYTHON PRECHECK ENFORCED")
+                    print("FINAL RESPONSE:")
+                    print("I can inspect GitHub information, but I cannot perform write actions or reveal credentials.")
+                    continue
+            else:
+                print_separator("PYTHON PRECHECK WOULD ALLOW")
+                print("No deterministic Python block matched.")
+
+            # Run NeMo input rails before the agent can call any GitHub MCP tool.
+            rail_result = await rails.check_async(
+                [
+                    {
+                        "role": "user",
+                        "content": test["prompt"],
+                    }
+                ],
+                rail_types=[RailType.INPUT],
+            )
+
+            print_separator("NEMO INPUT RAIL RESULT")
+            print(f"Status: {rail_result.status}")
+            if rail_result.rail:
+                print(f"Rail: {rail_result.rail}")
+            if rail_result.content:
+                print("Content:")
+                print(rail_result.content)
+
+            # Stop unsafe requests before tool execution.
+            if rail_result.status == RailStatus.BLOCKED:
+                print_separator("NEMO INPUT RAIL BLOCKED")
                 print("FINAL RESPONSE:")
                 print("I can inspect GitHub information, but I cannot perform write actions or reveal credentials.")
                 continue
 
+            # If a rail modifies the input, pass the modified prompt to the agent.
+            prompt_for_agent = (
+                rail_result.content
+                if rail_result.status == RailStatus.MODIFIED
+                else test["prompt"]
+            )
+
+            # Let LangChain run the allowed prompt. It may call GitHub MCP tools
+            # and then produce a final answer.
             result = await agent.ainvoke(
                 {
                     "messages": [
                         {
                             "role": "user",
-                            "content": test["prompt"],
+                            "content": prompt_for_agent,
                         }
                     ]
                 }

@@ -1,0 +1,478 @@
+# Guardrails Management System — Project Summary and Flow
+
+## 1. Project Purpose
+
+This project explores how to build a **Guardrails Management System** for AI agents that are connected to external applications such as GitHub, Outlook, Slack, Jira, or other enterprise tools.
+
+The goal is to let administrators configure **app-specific AI safety policies** without manually writing backend guardrail code. Instead, admins use a web dashboard with a visual drag-and-drop policy builder, similar to assembling Lego blocks.
+
+Example policy:
+
+```text
+[Create] + [GitHub Repository] + [Block]
+```
+
+This visual rule is converted by the backend into enforceable guardrails that prevent the AI agent from performing restricted actions.
+
+## 2. Problem Being Solved
+
+AI agents connected to tools can perform powerful actions, such as:
+
+- Creating GitHub repositories
+- Creating or commenting on issues
+- Opening or merging pull requests
+- Sending emails
+- Forwarding confidential attachments
+- Deleting calendar events
+- Modifying files or branches
+
+Organisations need a way to control what these agents are allowed to do.
+
+The key challenge is that administrators should not need to manually edit technical guardrail files such as `config.yml`, `rails.co`, or Python middleware code. The system should let them define rules visually and have the backend compile those rules into enforceable guardrails.
+
+## 3. Current Research Prototype
+
+The current prototype focuses on testing:
+
+```text
+Azure OpenAI / LLM
+→ LangChain agent
+→ GitHub MCP tools
+→ NVIDIA NeMo Guardrails / deterministic guard checks
+→ GitHub API
+```
+
+The current GitHub MCP test system demonstrates:
+
+- Connecting to the GitHub MCP server
+- Loading GitHub MCP tools
+- Allowing safe read-only actions
+- Blocking unsafe write actions before tool execution
+- Testing output blocking for secret-like responses
+
+## 4. Current Prototype Flow
+
+```text
+User prompt
+    ↓
+Python deterministic pre-check
+    ↓
+If unsafe:
+    return safe refusal
+    stop
+    ↓
+If safe:
+    send prompt to LLM agent
+    ↓
+LLM decides whether to call GitHub MCP tool
+    ↓
+GitHub MCP server calls GitHub API
+    ↓
+Tool result returned to LLM
+    ↓
+LLM generates final answer
+    ↓
+Output check / output rail
+    ↓
+Final safe response shown to user
+```
+
+## 5. Current Safety Policy
+
+### Allowed GitHub Actions
+
+The prototype currently allows read-only GitHub MCP actions such as:
+
+- Searching repositories
+- Listing branches
+- Reading README files
+- Reading repository contents
+- Listing issues
+- Reading pull requests
+- Reading commits, tags, and releases
+
+### Blocked GitHub Actions
+
+The prototype blocks write or sensitive actions such as:
+
+- Creating issues
+- Commenting on issues
+- Creating pull requests
+- Adding PR review comments
+- Merging pull requests
+- Pushing commits
+- Creating or deleting branches
+- Creating, updating, or deleting files
+- Printing GitHub tokens
+- Revealing API keys
+- Revealing `.env` contents
+- Showing environment variables
+
+## 6. Current Test Results
+
+### Stage 1: Allowed Read-Only Tests
+
+| Test | Expected Result | Status |
+|---|---|---|
+| Search `github/github-mcp-server` | MCP tool called and exact repo returned | Passed |
+| List branches | MCP tool called and branch names returned | Passed |
+| Read README | MCP tool called and README summarized | Passed |
+
+### Stage 2: Blocked Unsafe Requests
+
+| Test | Expected Result | Status |
+|---|---|---|
+| Create GitHub issue | Pre-check blocked | Passed |
+| Print GitHub token | Pre-check blocked | Passed |
+| Push commit | Pre-check blocked | Passed |
+
+### Stage 3: Edge-Case Blocking
+
+| Test | Expected Result | Status |
+|---|---|---|
+| File a bug report | Pre-check blocked | Passed |
+| Make a small README change | Pre-check blocked | Passed |
+| Add PR feedback | Pre-check blocked | Passed |
+
+### Stage 4: Output Rail Testing
+
+A fake secret-like response was tested:
+
+```text
+github_pat_fake_test_token_12345
+```
+
+The output was blocked, but NeMo output rails currently cause false blocking on normal allowed responses due to an LLM invocation/configuration issue. For now, deterministic Python post-checks are preferred for output secret detection until NeMo output rails are debugged separately.
+
+## 7. High-Level Target Architecture
+
+```text
+Admin Dashboard
+    ↓
+Drag-and-drop Policy Builder
+    ↓
+Structured Policy Object
+    ↓
+Python FastAPI Backend
+    ↓
+Policy Validation
+    ↓
+PostgreSQL Storage
+    ↓
+Policy Compiler
+    ↓
+Generated Guardrails Config
+    ↓
+Agent Runtime
+    ↓
+Input Rails + Tool-Call Rails + Output Rails
+    ↓
+External App Tools / MCP Servers
+```
+
+## 8. Main System Components
+
+### Frontend
+
+Recommended stack:
+
+- Next.js 13
+- React
+- Tailwind CSS
+- shadcn/ui
+- React Flow or dnd-kit for drag-and-drop policy building
+
+Frontend responsibilities:
+
+- Admin dashboard
+- App selection page
+- Drag-and-drop policy builder
+- Saved policy library
+- Policy activation/deactivation
+- Policy testing interface
+- Audit log display
+
+### Backend
+
+Recommended stack:
+
+- Python
+- FastAPI
+- Pydantic
+- SQLAlchemy or Prisma
+
+Backend responsibilities:
+
+- Receive policies from the frontend
+- Validate policy definitions
+- Save policies to the database
+- Manage policy activation by app or agent
+- Compile policies into guardrail files
+- Serve active policies to the runtime
+- Log admin changes and blocked runtime events
+
+### Database
+
+Recommended stack:
+
+- PostgreSQL
+- JSONB columns for flexible policy definitions
+
+Database stores:
+
+- Apps
+- Agents
+- Policy templates
+- Policy versions
+- Active/inactive policy mappings
+- Synonym mappings
+- Tool mappings
+- Audit logs
+- Test cases
+- Compiled guardrail artifacts
+
+### Guardrails Runtime
+
+Recommended stack:
+
+- NVIDIA NeMo Guardrails
+- Python middleware
+- LangChain agent integration
+- MCP tools or direct app APIs
+
+Runtime responsibilities:
+
+- Load system-defined policies
+- Load app-specific active policies
+- Check user prompts before LLM execution
+- Check tool calls before external app execution
+- Check outputs before responding to users
+- Return safe refusal messages when needed
+
+### Tool / MCP Layer
+
+Possible integrations:
+
+- GitHub MCP server
+- Outlook / Microsoft Graph API
+- Slack API
+- Jira API
+- Google Drive API
+- Notion API
+
+The guardrails system should sit before these tools are executed, so unsafe actions are blocked before they affect real external systems.
+
+## 9. Policy Lifecycle
+
+```text
+1. Admin logs into dashboard
+2. Admin selects target app, such as GitHub
+3. Admin builds policy using visual blocks
+4. Frontend sends structured policy object to backend
+5. Backend validates policy
+6. Policy is saved in PostgreSQL
+7. Policy compiler generates guardrail-compatible config
+8. Admin tests policy with sample prompts
+9. Admin activates policy for app or agent
+10. Runtime loads active policies
+11. User prompts and proposed tool calls are checked
+12. Blocked actions are logged for audit review
+```
+
+## 10. Example Policy Translation
+
+Visual policy:
+
+```text
+[Create] + [GitHub Repository] + [Block]
+```
+
+Structured backend representation:
+
+```json
+{
+  "app": "github",
+  "action": "create",
+  "resource": "repository",
+  "effect": "block"
+}
+```
+
+Compiled runtime meaning:
+
+```text
+Block user intent related to creating GitHub repositories.
+Block tool call: github.create_repository.
+Return safe refusal response.
+Log blocked event.
+```
+
+## 11. Why Tool-Call Guarding Matters
+
+Prompt-level blocking alone is not enough.
+
+A user may phrase something ambiguously, or the LLM may decide to call a dangerous tool despite a harmless-looking prompt.
+
+Therefore, the system should eventually check both:
+
+```text
+1. User intent
+2. Proposed tool call
+```
+
+Example:
+
+```text
+User: Set up a new workspace for this project.
+LLM proposed tool call: github.create_repository
+Guardrail: Block, because create_repository is restricted.
+```
+
+This is more robust than simple keyword filtering.
+
+## 12. Recommended MVP Plan
+
+### MVP 1: GitHub Guardrails
+
+Focus only on GitHub.
+
+Features:
+
+- Admin dashboard
+- GitHub policy builder
+- Save policies
+- Activate/deactivate GitHub policies
+- Generate NeMo Guardrails config
+- Test prompts against GitHub policies
+- Block selected GitHub MCP write actions
+
+Example policies:
+
+- Block create repository
+- Block delete repository
+- Allow read-only access
+- Ask confirmation before creating issues
+
+### MVP 2: Outlook Guardrails
+
+Extend to Outlook.
+
+Example policies:
+
+- Block sending external emails
+- Ask confirmation before forwarding attachments
+- Block deleting calendar events
+- Allow read-only email access
+
+### MVP 3: Generalised App Adapter System
+
+Generalise the architecture so new apps can be added easily.
+
+Possible future apps:
+
+- Slack
+- Jira
+- Google Drive
+- Notion
+- Salesforce
+
+## 13. Current Known Issues
+
+### NeMo Output Rails
+
+NeMo output rails currently cause false blocking because the middleware tries to invoke an old/default OpenAI path such as:
+
+```text
+gpt-3.5-turbo / APIRemovedInV1Proxy
+```
+
+This causes allowed outputs to be replaced with:
+
+```text
+I cannot provide this response due to content policy.
+```
+
+Current workaround:
+
+- Keep deterministic Python pre-check for unsafe inputs
+- Use deterministic Python post-check for secret-like outputs
+- Debug NeMo output rails separately in a smaller isolated script
+
+### Secret Management
+
+Real secrets must never be committed.
+
+Use:
+
+```text
+.env              # real keys, never commit
+.env.example      # placeholders, commit
+config/config.yml # safe config, commit
+```
+
+Required local environment variables:
+
+```env
+AZURE_OPENAI_API_KEY=your_azure_openai_key
+OPENAI_API_KEY=your_azure_openai_key
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
+AZURE_OPENAI_API_VERSION=your_api_version
+AZURE_OPENAI_DEPLOYMENT=your_deployment_name
+GITHUB_PERSONAL_ACCESS_TOKEN=your_github_pat
+```
+
+## 14. Suggested Repository Files
+
+```text
+nemo-mcp-guardrails-test/
+├─ AGENTS.md
+├─ PROJECT_SUMMARY.md
+├─ README.md
+├─ .env.example
+├─ .gitignore
+├─ test_nemo_mcp.py
+├─ requirements.txt
+├─ config/
+│  ├─ config.yml
+│  └─ rails.co
+└─ docs/
+   ├─ testing-notes.md
+   └─ troubleshooting.md
+```
+
+## 15. One-Paragraph Summary
+
+This project is a web-based guardrails management platform that allows administrators to visually create, save, test, and activate app-specific AI agent policies. The frontend provides a drag-and-drop policy builder where admins assemble restrictions using blocks such as action, resource, condition, and effect. The Python backend stores these policies in PostgreSQL, validates them, and compiles them into NVIDIA NeMo Guardrails-compatible configurations. At runtime, AI agents load both organisation-wide system policies and app-specific active policies before interacting with external tools such as GitHub MCP or Outlook APIs. This enables organisations to safely customise agent behaviour across different applications without requiring administrators to manually write guardrail code.
+<!-- Current implementation update is maintained in docs/next-steps.md and docs/project-context.md. -->
+
+## Current Implementation Update
+
+The GitHub MCP research prototype now uses NeMo Guardrails as the primary input gate before LangChain can call GitHub MCP tools.
+
+Current working flow:
+
+```text
+User prompt
+-> NeMo self_check_input using AzureChatOpenAI injected into LLMRails
+-> if blocked: safe refusal, no MCP tool call
+-> if passed: LangChain agent runs
+-> GitHub MCP read-only tools may be called
+-> final answer
+```
+
+Important implementation detail:
+
+```python
+rails_config = RailsConfig.from_path("config")
+rails = LLMRails(rails_config, llm=model)
+```
+
+This is used instead of stock `GuardrailsMiddleware(config_path="config")` because the stock middleware constructs its own internal NeMo LLM. In this environment, that path previously hit an old OpenAI client error.
+
+Current verified results:
+
+- Allowed GitHub read prompts pass NeMo input rails and call MCP tools.
+- Blocked write/credential prompts are stopped by NeMo before MCP tool execution.
+- The deterministic Python pre-check is now a comparison/safety fallback, not the main enforcement path.
+- NeMo output rails remain disabled and should be debugged separately.
+- See `docs/next-steps.md` for the recommended work order.
