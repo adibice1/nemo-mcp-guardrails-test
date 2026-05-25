@@ -123,3 +123,24 @@ I cannot provide this response due to content policy.
 ```
 
 or logs mention the old OpenAI path, treat output rails as not yet fixed. Debug output rails separately after input rails and tool-call rails are stable.
+
+## Policy Compiler / Tool Guard Sanity Checks
+
+If the next machine needs to verify the current policy-object prototype, run:
+
+```powershell
+python policy_compiler.py
+python debug_tool_guard.py
+python -m py_compile policy_compiler.py test_nemo_mcp.py tool_guard.py debug_tool_guard.py debug_nemo_self_check.py
+python test_nemo_mcp.py
+```
+
+Expected:
+
+- `policy_compiler.py` prints the default `github + create + issue + block` policy object.
+- The generated tool denylist preview includes `issue_write`.
+- The generated tests include `Blocked: create issue`, `Blocked: open bug report`, `Blocked: file issue`, `Blocked: submit bug report`, `Blocked: raise issue`, and `Blocked: log bug report`.
+- `debug_tool_guard.py` reports that `issue_write` was blocked before execution.
+- `test_nemo_mcp.py` blocks all generated issue-creation variants through NeMo input rails.
+
+If `test_nemo_mcp.py` passes allowed read prompts but generated issue prompts are not present, check that it imports `compile_policy_test_prompts()` from `policy_compiler.py`.

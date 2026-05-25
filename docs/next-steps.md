@@ -2,15 +2,17 @@
 
 ## Current Milestone
 
-The GitHub MCP prototype now has a working NeMo input-rail gate.
+The GitHub MCP prototype now has a working NeMo input-rail gate, a tool-call guard prototype, compact test output, and a first structured policy-object compiler.
 
 Current successful flow:
 
 ```text
 User prompt
+-> deterministic Python pre-check reports what it would block
 -> NeMo self_check_input using injected AzureChatOpenAI
 -> if blocked: safe refusal, no MCP tool call
 -> if passed: LangChain agent runs
+-> tool_guard.py checks MCP tool names before execution
 -> GitHub MCP read-only tools may be called
 -> final answer
 ```
@@ -24,17 +26,17 @@ rails = LLMRails(rails_config, llm=model)
 
 This avoids NeMo constructing an old OpenAI client internally.
 
-## Immediate Next Step: Reduce Test Output Noise
+## Completed: Reduced Test Output Noise
 
-`test_nemo_mcp.py` currently prints full LangChain message traces and full GitHub MCP tool payloads.
+`test_nemo_mcp.py` now defaults to compact output instead of printing full LangChain message traces and full GitHub MCP tool payloads.
 
-Add a compact/verbose mode:
+Verbose mode is controlled with:
 
 ```text
-VERBOSE_TRACE=false
+VERBOSE_TRACE=true
 ```
 
-Default compact output should show:
+Default compact output shows:
 
 - Test name
 - Python pre-check would-block/allow result
@@ -42,13 +44,13 @@ Default compact output should show:
 - Tool names called
 - Final response
 
-Verbose output should keep the current full message trace.
+Verbose output keeps the full message trace.
 
-## Next Safety Step: Tool-Call Guarding
+## Completed: Tool-Call Guard Prototype
 
-Input rails are useful but not sufficient for the final product.
+Input rails are useful but not sufficient for the final product. The project now has a first tool-call guard prototype in `tool_guard.py`.
 
-Next major feature:
+Current behavior:
 
 ```text
 Before executing any MCP tool call, inspect the proposed tool name and arguments.
@@ -61,7 +63,7 @@ Why:
 - The LLM may choose a write tool even if the input was not obviously unsafe.
 - Future MCP toolsets may include write tools if read-only mode is disabled for testing.
 
-Initial GitHub tool-call denylist should include:
+The initial GitHub tool-call denylist includes:
 
 - `issue_write`
 - `add_issue_comment`
@@ -76,9 +78,11 @@ Initial GitHub tool-call denylist should include:
 - `create_repository`
 - `fork_repository` if policy forbids repo creation/forking
 
-## Next Architecture Step: Policy Object Prototype
+`debug_tool_guard.py` verifies the guard without Docker, GitHub MCP, Azure OpenAI, or real credentials.
 
-Start moving from hand-written policy prompts toward structured policy objects.
+## Completed: Policy Object Compiler Prototype
+
+The project has started moving from hand-written policy prompts and Python denylist rules toward structured policy objects.
 
 Example structured policy:
 
@@ -91,14 +95,48 @@ Example structured policy:
 }
 ```
 
-Prototype compiler output:
+Implemented in `policy_compiler.py`.
 
-- Input self-check policy text in `config/prompts.yml`
-- Tool-call denylist entry for `issue_write`
-- Refusal message
-- Test case
+Current compiler output:
 
-Keep this small at first. One policy object, one generated prompt section, one tool-call rule.
+- NeMo self-check policy text preview
+- Tool-call denylist preview containing `issue_write`
+- Generated blocked test cases consumed by `test_nemo_mcp.py`
+
+The compiler uses GitHub adapter-style metadata:
+
+- action synonyms: `create`, `open`, `file`, `submit`, `raise`, `log`
+- resource synonyms: `issue`, `bug report`
+- tool mapping: `create + issue -> issue_write`
+- reusable test prompt templates
+
+The generated issue-creation tests are verified in the full `test_nemo_mcp.py` run.
+
+Do not add a custom `config/policies.yml` yet unless the project explicitly decides to prototype the future admin/backend policy store. `policies.yml` is not a standard NeMo Guardrails file. For now, keep NeMo input policy in `config/prompts.yml` and execution-level guard logic in `tool_guard.py`.
+
+## Immediate Next Step: Connect Compiler Output To Tool Guard
+
+`tool_guard.py` still has a static denylist that includes `issue_write`.
+
+Next implementation goal:
+
+```text
+policy_compiler.py
+-> compiled blocked tool names
+-> tool_guard.py
+```
+
+Recommended small change:
+
+1. Add a helper in `policy_compiler.py`, for example `compile_blocked_tools()`, that returns blocked tool names from `DEFAULT_POLICY_OBJECTS`.
+2. In `tool_guard.py`, keep a static denylist for policy not yet represented as objects, but remove `issue_write` from that static set.
+3. Combine the static denylist with compiler-generated blocked tools.
+4. Verify `debug_tool_guard.py` still blocks `issue_write`.
+5. Verify `test_nemo_mcp.py` still passes.
+
+This proves the policy object can drive both generated tests and execution-level tool blocking.
+
+Do not connect compiler output directly into `config/prompts.yml` yet. Keep generated NeMo prompt text as preview output until the compiler structure is more stable.
 
 ## Output Rails Later
 
@@ -112,11 +150,11 @@ Output rails previously hit old OpenAI client/configuration problems and caused 
 
 ## Recommended Work Order
 
-1. Add compact/verbose trace mode to `test_nemo_mcp.py`.
-2. Rename the fake token test from `Output rail: fake GitHub token` to `Input rail: fake token request`.
-3. Add tool-call guard prototype around GitHub MCP tool execution.
-4. Add tests proving restricted tool calls are blocked even if input rail passes.
-5. Prototype a structured GitHub policy object and a tiny compiler.
+1. Connect compiler-generated blocked tool names into `tool_guard.py`.
+2. Keep static guard entries for policy areas not yet represented by policy objects.
+3. Add one more GitHub policy object only after the first generated-tool path is verified.
+4. Later, generate a NeMo self-check prompt section or preview file from policy objects.
+5. Keep the generated/manual boundary explicit while this is still a research prototype.
 6. Only then revisit output rails.
 
 ## Files To Read First On Another Machine
@@ -129,6 +167,9 @@ Start with:
 - `docs/troubleshooting.md`
 - `docs/next-steps.md`
 - `test_nemo_mcp.py`
+- `policy_compiler.py`
+- `tool_guard.py`
+- `debug_tool_guard.py`
 - `debug_nemo_self_check.py`
 - `config/prompts.yml`
 - `config/config.yml`

@@ -254,3 +254,70 @@ subgraph ExampleFlow["Example Policy Flow"]
     X1 --> X2 --> X3 --> X4 --> X5 --> X6 --> X7 --> X8 --> X9 --> X10
 end
 ```
+
+## Current Prototype Overlay - 2026-05-26
+
+The full architecture above is still the target direction. The current research prototype is a smaller GitHub-only slice.
+
+Current implemented path:
+
+```text
+User prompt
+-> deterministic Python pre-check report only
+-> NeMo self_check_input using injected AzureChatOpenAI
+-> LangChain agent
+-> tool_guard.py MCP tool wrapper
+-> GitHub MCP server in Docker with GITHUB_READ_ONLY=1
+-> final answer
+```
+
+Current policy-object compiler prototype:
+
+```text
+Admin-style policy object
+-> policy_compiler.py
+-> generated NeMo self-check rule preview
+-> generated tool denylist preview
+-> generated test prompts consumed by test_nemo_mcp.py
+```
+
+Current default policy object:
+
+```json
+{
+  "app": "github",
+  "action": "create",
+  "resource": "issue",
+  "effect": "block"
+}
+```
+
+Current compiler metadata:
+
+- action synonyms: `create`, `open`, `file`, `submit`, `raise`, `log`
+- resource synonyms: `issue`, `bug report`
+- tool mapping: `create + issue -> issue_write`
+- generated blocked test prompts for issue creation variants
+
+Near-term next architecture step:
+
+```text
+policy_compiler.py generated blocked tool names
+-> tool_guard.py runtime denylist
+```
+
+Longer-term target:
+
+```text
+PostgreSQL policy/template/tool/synonym tables
+-> backend compiler
+-> generated NeMo prompt/config artifacts
+-> runtime tool-call guard rules
+-> generated tests
+```
+
+Important current decision:
+
+- No custom `config/policies.yml` is being used yet.
+- `policies.yml` is not a standard NeMo Guardrails file.
+- The future database-backed policy store should replace the current in-Python prototype when the backend/admin system is built.

@@ -24,6 +24,8 @@ TEST_PROMPTS = [
 
 
 async def main() -> None:
+    """Run isolated NeMo self-check diagnostics without GitHub MCP or LangChain tools."""
+
     load_dotenv()
 
     azure_api_key = os.getenv("AZURE_OPENAI_API_KEY")
