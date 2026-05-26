@@ -2,7 +2,13 @@
 
 ## Current Milestone
 
-The GitHub MCP prototype now has a working NeMo input-rail gate, a tool-call guard prototype, compact test output, and a first structured policy-object compiler.
+The GitHub MCP prototype now has:
+
+- A working NeMo input-rail gate using `self check input`.
+- A compiler-driven tool-call guard in `src/nemo_mcp_guardrails/tool_guard.py`.
+- A structured policy-object prototype in `src/nemo_mcp_guardrails/policy_compiler.py`.
+- Curated generated policy tests consumed by `scripts/test_nemo_mcp.py`.
+- Compact test output by default, with verbose LangChain traces controlled by `VERBOSE_TRACE=true`.
 
 Current successful flow:
 
@@ -26,136 +32,140 @@ rails = LLMRails(rails_config, llm=model)
 
 This avoids NeMo constructing an old OpenAI client internally.
 
-## Completed: Reduced Test Output Noise
+## Completed: Repository Structure Cleanup
 
-`scripts/test_nemo_mcp.py` now defaults to compact output instead of printing full LangChain message traces and full GitHub MCP tool payloads.
+Project code has been moved out of the repository root.
 
-Verbose mode is controlled with:
-
-```text
-VERBOSE_TRACE=true
-```
-
-Default compact output shows:
-
-- Test name
-- Python pre-check would-block/allow result
-- NeMo input rail status
-- Tool names called
-- Final response
-
-Verbose output keeps the full message trace.
-
-## Completed: Tool-Call Guard Prototype
-
-Input rails are useful but not sufficient for the final product. The project now has a first tool-call guard prototype in `src/nemo_mcp_guardrails/tool_guard.py`.
-
-Current behavior:
+Current layout:
 
 ```text
-Before executing any MCP tool call, inspect the proposed tool name and arguments.
-If the tool is restricted, block it before execution.
+config/                              NeMo Guardrails config
+docs/                                handoff and architecture docs
+scripts/                             runnable debug/test scripts
+src/nemo_mcp_guardrails/             application/library code
+src/nemo_mcp_guardrails/database/    future database code location
+src/nemo_mcp_guardrails/helper/      helper package
+logs/                                local logs
 ```
 
-Why:
+Run scripts from the repository root, for example:
 
-- A user prompt may be ambiguous.
-- The LLM may choose a write tool even if the input was not obviously unsafe.
-- Future MCP toolsets may include write tools if read-only mode is disabled for testing.
-
-The initial GitHub tool-call denylist includes:
-
-- `issue_write`
-- `add_issue_comment`
-- `create_pull_request`
-- `update_pull_request`
-- `merge_pull_request`
-- `pull_request_review_write`
-- `create_branch`
-- `create_or_update_file`
-- `delete_file`
-- `push_files`
-- `create_repository`
-- `fork_repository` if policy forbids repo creation/forking
-
-`scripts/debug_tool_guard.py` verifies the guard without Docker, GitHub MCP, Azure OpenAI, or real credentials.
-
-## Completed: Policy Object Compiler Prototype
-
-The project has started moving from hand-written policy prompts and Python denylist rules toward structured policy objects.
-
-Example structured policy:
-
-```json
-{
-  "app": "github",
-  "action": "create",
-  "resource": "issue",
-  "effect": "block"
-}
+```powershell
+python scripts/test_nemo_mcp.py
+python scripts/debug_tool_guard.py
+python src/nemo_mcp_guardrails/policy_compiler.py
 ```
 
-Implemented in `src/nemo_mcp_guardrails/policy_compiler.py`.
+## Completed: Compiler-Driven Tool Guard
 
-Current compiler output:
+The static GitHub write-tool denylist has been moved into policy objects.
 
-- NeMo self-check policy text preview
-- Tool-call denylist preview containing `issue_write`
-- Generated blocked test cases consumed by `scripts/test_nemo_mcp.py`
+`src/nemo_mcp_guardrails/policy_compiler.py` now maps policy objects to blocked MCP tools for:
 
-The compiler uses GitHub adapter-style metadata:
+- Creating/updating/commenting on issues
+- Creating/updating/merging/reviewing pull requests
+- Creating branches
+- Creating/updating/deleting/pushing files
+- Creating repositories
+- Forking repositories
 
-- action synonyms: `create`, `open`, `file`, `submit`, `raise`, `log`
-- resource synonyms: `issue`, `bug report`
-- tool mapping: `create + issue -> issue_write`
-- reusable test prompt templates
+`src/nemo_mcp_guardrails/tool_guard.py` now uses:
 
-The generated issue-creation tests are verified in the full `scripts/test_nemo_mcp.py` run.
+```python
+BLOCKED_GITHUB_MCP_TOOLS = STATIC_BLOCKED_GITHUB_MCP_TOOLS | compile_blocked_tools()
+```
 
-Do not add a custom `config/policies.yml` yet unless the project explicitly decides to prototype the future admin/backend policy store. `policies.yml` is not a standard NeMo Guardrails file. For now, keep NeMo input policy in `config/prompts.yml` and execution-level guard logic in `src/nemo_mcp_guardrails/tool_guard.py`.
+`STATIC_BLOCKED_GITHUB_MCP_TOOLS` is currently an empty reserved hook for emergency/manual blocks.
 
-## Immediate Next Step: Connect Compiler Output To Tool Guard
+`scripts/debug_tool_guard.py` verifies every compiler-generated blocked tool is intercepted before execution.
 
-`src/nemo_mcp_guardrails/tool_guard.py` still has a static denylist that includes `issue_write`.
+## Completed: Curated Policy Tests
 
-Next implementation goal:
+`compile_policy_test_prompts()` now returns one generated test per policy object by default.
+
+The full MCP test runner currently includes:
+
+- 3 allowed GitHub read tests
+- 14 generated GitHub write-policy tests
+- 2 credential/token tests
+
+Latest observed full run:
+
+- Allowed read tests passed and called only read tools.
+- All 14 generated policy tests were blocked by NeMo input rails.
+- Credential/token tests were blocked by NeMo input rails.
+- The previous ambiguous `review pull request` generated test was changed to `approve pull request`, which now blocks correctly.
+
+## Current Safety Layers
 
 ```text
-src/nemo_mcp_guardrails/policy_compiler.py
--> compiled blocked tool names
--> src/nemo_mcp_guardrails/tool_guard.py
+NeMo input rail
+-> checks prompt-level user intent through config/prompts.yml
+
+tool_guard.py
+-> checks actual MCP tool names before execution
+
+GitHub MCP read-only mode
+-> GITHUB_READ_ONLY=1 prevents write tools from being exposed in normal tests
 ```
 
-Recommended small change:
+The deterministic Python pre-check remains comparison/report-only unless `ENFORCE_PYTHON_PRECHECK=true`.
 
-1. Add a helper in `src/nemo_mcp_guardrails/policy_compiler.py`, for example `compile_blocked_tools()`, that returns blocked tool names from `DEFAULT_POLICY_OBJECTS`.
-2. In `src/nemo_mcp_guardrails/tool_guard.py`, keep a static denylist for policy not yet represented as objects, but remove `issue_write` from that static set.
-3. Combine the static denylist with compiler-generated blocked tools.
-4. Verify `scripts/debug_tool_guard.py` still blocks `issue_write`.
-5. Verify `scripts/test_nemo_mcp.py` still passes.
+## Immediate Next Step: Fix Output Rails In Isolation
 
-This proves the policy object can drive both generated tests and execution-level tool blocking.
+Before starting the database/API phase, debug NeMo output rails separately.
 
-Do not connect compiler output directly into `config/prompts.yml` yet. Keep generated NeMo prompt text as preview output until the compiler structure is more stable.
+Do not enable output rails directly in the full GitHub MCP runner first. Earlier output rail attempts caused false blocking and old OpenAI client errors.
 
-## Output Rails Later
+Recommended small milestone:
 
-Do not prioritize NeMo output rails yet.
+```text
+scripts/debug_nemo_output_check.py
+-> load config with RailsConfig.from_path("config")
+-> inject the same AzureChatOpenAI model into LLMRails
+-> test a normal safe assistant response
+-> test a fake token/secret-like assistant response
+-> verify no APIRemovedInV1 or old openai.ChatCompletion path
+-> verify safe output passes and secret-like output blocks
+```
 
-Output rails previously hit old OpenAI client/configuration problems and caused false blocking. Revisit them after:
+After that works, add optional output checking after the LangChain agent response in `scripts/test_nemo_mcp.py`.
 
-1. Input rails remain stable.
-2. Tool-call guarding works.
-3. The test output is easier to read.
+## Database/API Phase After Output Rails
 
-## Recommended Work Order
+After output rails are stable, start the backend foundation.
 
-1. Connect compiler-generated blocked tool names into `src/nemo_mcp_guardrails/tool_guard.py`.
-2. Keep static guard entries for policy areas not yet represented by policy objects.
-3. Add one more GitHub policy object only after the first generated-tool path is verified.
-4. Later, generate a NeMo self-check prompt section or preview file from policy objects.
-5. Keep the generated/manual boundary explicit while this is still a research prototype.
-6. Only then revisit output rails.
+Supervisor guidance:
+
+- Use MySQL or Oracle because those align with the organisation.
+- Prefer MySQL first for local Docker prototyping unless Oracle is explicitly required immediately.
+- Use DBeaver for database inspection and manual debugging.
+- Plan for containerisation and later OpenShift deployment.
+
+Recommended database/API path:
+
+```text
+MySQL Docker container
+-> DBeaver connection
+-> FastAPI app skeleton
+-> SQLAlchemy policy model
+-> policy CRUD endpoints
+-> compiler loads active DB policies
+```
+
+Initial API endpoints:
+
+```text
+GET    /health
+POST   /policies
+GET    /policies
+GET    /policies/{policy_id}
+PATCH  /policies/{policy_id}
+DELETE /policies/{policy_id}
+POST   /policies/compile-preview
+```
+
+Keep the DB schema portable enough that Oracle support remains realistic later.
 
 ## Files To Read First On Another Machine
 

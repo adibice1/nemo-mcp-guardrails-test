@@ -53,7 +53,7 @@ end
 %% DATABASE
 %% =========================
 
-subgraph DatabaseLayer["PostgreSQL Database"]
+subgraph DatabaseLayer["MySQL / Oracle Database"]
     C1[("Apps Table<br/>GitHub, Outlook, Slack, Jira")]
     C2[("Agents Table")]
     C3[("Policy Templates")]
@@ -121,7 +121,7 @@ subgraph RuntimeLayer["Runtime Guardrails Enforcement Layer"]
     F3["Agent Backend"]
     F4["NeMo Guardrails Runtime"]
     F5["System-Defined Policies<br/>Uniform across all apps"]
-    F6["App-Specific Active Policies<br/>Loaded from PostgreSQL"]
+    F6["App-Specific Active Policies<br/>Loaded from MySQL / Oracle"]
     F7["Input Rails<br/>Check user prompt"]
     F8["Dialog / Flow Rails<br/>Control conversation path"]
     F9["Tool-Call Rails<br/>Check proposed tool execution"]
@@ -243,7 +243,7 @@ subgraph ExampleFlow["Example Policy Flow"]
     X1["Admin creates policy:<br/>Block Create GitHub Repo"]
     X2["Frontend sends policy blocks"]
     X3["Backend validates policy"]
-    X4["Policy saved in PostgreSQL"]
+    X4["Policy saved in MySQL / Oracle"]
     X5["Policy compiler generates NeMo files"]
     X6["Policy activated for GitHub Agent"]
     X7["User asks agent:<br/>Set up a new GitHub repo"]
@@ -309,11 +309,22 @@ src/nemo_mcp_guardrails/policy_compiler.py generated blocked tool names
 Longer-term target:
 
 ```text
-PostgreSQL policy/template/tool/synonym tables
+MySQL or Oracle policy/template/tool/synonym tables
 -> backend compiler
 -> generated NeMo prompt/config artifacts
 -> runtime tool-call guard rules
 -> generated tests
+```
+
+Near-term implementation order:
+
+```text
+Fix NeMo output rails in isolation
+-> MySQL Docker container for local development
+-> DBeaver inspection/debugging
+-> FastAPI policy CRUD endpoints
+-> compiler loads active DB policies
+-> later OpenShift deployment
 ```
 
 Important current decision:

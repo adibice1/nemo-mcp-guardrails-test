@@ -122,7 +122,19 @@ If allowed read requests return:
 I cannot provide this response due to content policy.
 ```
 
-or logs mention the old OpenAI path, treat output rails as not yet fixed. Debug output rails separately after input rails and tool-call rails are stable.
+or logs mention the old OpenAI path, treat output rails as not yet fixed. The next planned task is to debug output rails separately in an isolated script before wiring them into the full GitHub MCP runner.
+
+Recommended next script:
+
+```text
+scripts/debug_nemo_output_check.py
+```
+
+It should inject the same `AzureChatOpenAI` model into `LLMRails`, then verify:
+
+- safe normal assistant output passes
+- fake token/secret-like assistant output blocks
+- NeMo does not use the old `openai.ChatCompletion` path
 
 ## Policy Compiler / Tool Guard Sanity Checks
 
@@ -137,10 +149,14 @@ python scripts/test_nemo_mcp.py
 
 Expected:
 
-- `src/nemo_mcp_guardrails/policy_compiler.py` prints the default `github + create + issue + block` policy object.
-- The generated tool denylist preview includes `issue_write`.
-- The generated tests include `Blocked: create issue`, `Blocked: open bug report`, `Blocked: file issue`, `Blocked: submit bug report`, `Blocked: raise issue`, and `Blocked: log bug report`.
-- `scripts/debug_tool_guard.py` reports that `issue_write` was blocked before execution.
-- `scripts/test_nemo_mcp.py` blocks all generated issue-creation variants through NeMo input rails.
+- `src/nemo_mcp_guardrails/policy_compiler.py` prints all default GitHub write-policy objects and a combined generated tool denylist.
+- `scripts/debug_tool_guard.py` reports every compiler-generated blocked tool was blocked before execution.
+- `scripts/test_nemo_mcp.py` blocks all curated generated write-policy prompts through NeMo input rails.
 
-If `scripts/test_nemo_mcp.py` passes allowed read prompts but generated issue prompts are not present, check that it imports `compile_policy_test_prompts()` from `src/nemo_mcp_guardrails/policy_compiler.py`.
+If `scripts/test_nemo_mcp.py` passes allowed read prompts but generated policy prompts are not present, check that it imports `compile_policy_test_prompts()` from `src/nemo_mcp_guardrails/policy_compiler.py`.
+
+## Database Tooling Direction
+
+The organisation prefers MySQL or Oracle. For the first local backend prototype, use MySQL in Docker unless Oracle is explicitly required.
+
+DBeaver is the recommended local database management tool for inspecting policy rows, running manual queries, and debugging FastAPI CRUD behavior.

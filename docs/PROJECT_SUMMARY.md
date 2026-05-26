@@ -157,7 +157,7 @@ Python FastAPI Backend
     ↓
 Policy Validation
     ↓
-PostgreSQL Storage
+MySQL / Oracle Storage
     ↓
 Policy Compiler
     ↓
@@ -215,8 +215,8 @@ Backend responsibilities:
 
 Recommended stack:
 
-- PostgreSQL
-- JSONB columns for flexible policy definitions
+- MySQL or Oracle, matching organisation database standards
+- JSON columns where available for flexible policy definitions
 
 Database stores:
 
@@ -270,7 +270,7 @@ The guardrails system should sit before these tools are executed, so unsafe acti
 3. Admin builds policy using visual blocks
 4. Frontend sends structured policy object to backend
 5. Backend validates policy
-6. Policy is saved in PostgreSQL
+6. Policy is saved in MySQL or Oracle
 7. Policy compiler generates guardrail-compatible config
 8. Admin tests policy with sample prompts
 9. Admin activates policy for app or agent
@@ -447,7 +447,7 @@ nemo-mcp-guardrails-test/
 
 ## 15. One-Paragraph Summary
 
-This project is a web-based guardrails management platform that allows administrators to visually create, save, test, and activate app-specific AI agent policies. The frontend provides a drag-and-drop policy builder where admins assemble restrictions using blocks such as action, resource, condition, and effect. The Python backend stores these policies in PostgreSQL, validates them, and compiles them into NVIDIA NeMo Guardrails-compatible configurations. At runtime, AI agents load both organisation-wide system policies and app-specific active policies before interacting with external tools such as GitHub MCP or Outlook APIs. This enables organisations to safely customise agent behaviour across different applications without requiring administrators to manually write guardrail code.
+This project is a web-based guardrails management platform that allows administrators to visually create, save, test, and activate app-specific AI agent policies. The frontend provides a drag-and-drop policy builder where admins assemble restrictions using blocks such as action, resource, condition, and effect. The Python backend stores these policies in MySQL or Oracle, validates them, and compiles them into NVIDIA NeMo Guardrails-compatible configurations. At runtime, AI agents load both organisation-wide system policies and app-specific active policies before interacting with external tools such as GitHub MCP or Outlook APIs. This enables organisations to safely customise agent behaviour across different applications without requiring administrators to manually write guardrail code.
 <!-- Current implementation update is maintained in docs/next-steps.md and docs/project-context.md. -->
 
 ## Current Implementation Update
@@ -484,7 +484,7 @@ Current verified results:
 
 ## Current Implementation Update - 2026-05-26 Handoff
 
-The prototype has progressed beyond the original NeMo input-rail milestone.
+The prototype has progressed beyond the original NeMo input-rail milestone and beyond the first compiler-to-tool-guard milestone.
 
 Current runtime safety layers:
 
@@ -499,67 +499,89 @@ User prompt
 -> final answer
 ```
 
-Key files added or changed:
+Current repository layout:
 
-- `src/nemo_mcp_guardrails/tool_guard.py`: wraps MCP tools and blocks restricted GitHub write-tool names before execution.
-- `scripts/debug_tool_guard.py`: isolated guard test that does not use Docker, GitHub MCP, Azure OpenAI, or real credentials.
-- `src/nemo_mcp_guardrails/policy_compiler.py`: first structured policy-object compiler prototype.
-- `scripts/test_nemo_mcp.py`: now imports policy-generated tests with `compile_policy_test_prompts()`.
-
-Current policy compiler prototype:
-
-```json
-{
-  "app": "github",
-  "action": "create",
-  "resource": "issue",
-  "effect": "block"
-}
+```text
+config/                              NeMo Guardrails config
+docs/                                handoff and architecture docs
+scripts/                             runnable debug/test scripts
+src/nemo_mcp_guardrails/             application/library code
+src/nemo_mcp_guardrails/database/    future database code location
+logs/                                local logs
 ```
 
-The compiler uses reusable GitHub adapter-style metadata:
+Key files:
 
-- action synonyms: `create`, `open`, `file`, `submit`, `raise`, `log`
-- resource synonyms: `issue`, `bug report`
-- tool mapping: `create + issue -> issue_write`
-- prompt templates for generated blocked tests
+- `config/prompts.yml`: current NeMo `self_check_input` policy prompt.
+- `config/config.yml`: active NeMo config; input rail enabled, output rail disabled.
+- `src/nemo_mcp_guardrails/policy_compiler.py`: structured policy-object compiler prototype.
+- `src/nemo_mcp_guardrails/tool_guard.py`: execution-level MCP tool guard.
+- `scripts/test_nemo_mcp.py`: full GitHub MCP + NeMo input rail test runner.
+- `scripts/debug_tool_guard.py`: isolated tool guard diagnostic.
+- `scripts/debug_nemo_self_check.py`: isolated input rail diagnostic.
 
-Verified generated tests:
+Current policy compiler coverage:
 
-- `Blocked: create issue`
-- `Blocked: open bug report`
-- `Blocked: file issue`
-- `Blocked: submit bug report`
-- `Blocked: raise issue`
-- `Blocked: log bug report`
+- Create/update/comment on GitHub issues
+- Create/update/merge/approve GitHub pull requests
+- Create GitHub branches
+- Create/update/delete/push GitHub files
+- Create GitHub repositories
+- Fork GitHub repositories
 
-Important test observation:
+The compiler now drives:
 
-- The deterministic Python pre-check misses several generated issue-creation variants.
-- NeMo input rails still block all of them.
-- This confirms that NeMo `self_check_input` is the main semantic prompt-level enforcement path.
+- Generated NeMo self-check rule previews
+- Generated blocked MCP tool names for `tool_guard.py`
+- Curated generated tests for `scripts/test_nemo_mcp.py`
 
-Important architectural decision:
+Latest verified full test result:
+
+- Allowed read-only GitHub prompts passed and called read tools only.
+- All 14 compiler-generated GitHub write-policy prompts were blocked by NeMo input rails.
+- Credential/token prompts were blocked by NeMo input rails.
+- `scripts/debug_tool_guard.py` confirmed every compiler-generated blocked tool is blocked before execution.
+
+Important architectural decisions:
 
 - Do not add `config/policies.yml` yet. It is not a standard NeMo Guardrails file.
 - Keep `config/prompts.yml` as the NeMo input-rail policy source for now.
 - Keep `src/nemo_mcp_guardrails/tool_guard.py` as the execution-level tool guard.
 - Use `src/nemo_mcp_guardrails/policy_compiler.py` as a prototype of the future backend/admin policy compiler.
-- In the final system, policy objects, tool mappings, synonyms, templates, versions, active mappings, and audit logs should move into PostgreSQL.
+- In the final system, policy objects, tool mappings, synonyms, templates, versions, active mappings, and audit logs should move into MySQL or Oracle.
+- The organisation prefers MySQL or Oracle. Use MySQL in Docker first for local development unless Oracle is explicitly required.
+- Use DBeaver to inspect and manage the local database.
+- Plan for later containerisation/OpenShift deployment.
 
 Recommended next step for the next Codex session:
 
 ```text
-Connect compiler-generated blocked tool names into src/nemo_mcp_guardrails/tool_guard.py.
+Fix NeMo output rails in isolation before starting MySQL/FastAPI.
 ```
 
 Suggested implementation:
 
-1. Add a helper in `src/nemo_mcp_guardrails/policy_compiler.py` that compiles blocked tool names from `DEFAULT_POLICY_OBJECTS`.
-2. Remove `issue_write` from the static set in `src/nemo_mcp_guardrails/tool_guard.py`.
-3. Combine static guard entries with compiler-generated blocked tools in `src/nemo_mcp_guardrails/tool_guard.py`.
-4. Keep static entries for restricted actions that are not yet represented as policy objects.
-5. Verify with:
+1. Create `scripts/debug_nemo_output_check.py`.
+2. Load `RailsConfig.from_path("config")`.
+3. Inject the same `AzureChatOpenAI` model into `LLMRails`.
+4. Test a normal safe assistant response.
+5. Test a fake token/secret-like assistant response.
+6. Verify safe output passes and secret-like output blocks.
+7. Verify NeMo does not use the old `openai.ChatCompletion` path.
+8. Only after this works, add optional output checking to `scripts/test_nemo_mcp.py`.
+
+After output rails are stable, start:
+
+```text
+MySQL Docker container
+-> DBeaver connection
+-> FastAPI app skeleton
+-> SQLAlchemy policy model
+-> policy CRUD endpoints
+-> compiler loads active DB policies
+```
+
+Useful verification commands:
 
 ```powershell
 python src/nemo_mcp_guardrails/policy_compiler.py
