@@ -266,7 +266,7 @@ User prompt
 -> deterministic Python pre-check report only
 -> NeMo self_check_input using injected AzureChatOpenAI
 -> LangChain agent
--> tool_guard.py MCP tool wrapper
+-> src/nemo_mcp_guardrails/tool_guard.py MCP tool wrapper
 -> GitHub MCP server in Docker with GITHUB_READ_ONLY=1
 -> final answer
 ```
@@ -275,10 +275,10 @@ Current policy-object compiler prototype:
 
 ```text
 Admin-style policy object
--> policy_compiler.py
+-> src/nemo_mcp_guardrails/policy_compiler.py
 -> generated NeMo self-check rule preview
 -> generated tool denylist preview
--> generated test prompts consumed by test_nemo_mcp.py
+-> generated test prompts consumed by scripts/test_nemo_mcp.py
 ```
 
 Current default policy object:
@@ -302,8 +302,8 @@ Current compiler metadata:
 Near-term next architecture step:
 
 ```text
-policy_compiler.py generated blocked tool names
--> tool_guard.py runtime denylist
+src/nemo_mcp_guardrails/policy_compiler.py generated blocked tool names
+-> src/nemo_mcp_guardrails/tool_guard.py runtime denylist
 ```
 
 Longer-term target:

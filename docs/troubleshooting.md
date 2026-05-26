@@ -88,7 +88,7 @@ Current parser-compatible convention:
 
 ## NeMo Input Rail Blocks Safe GitHub Reads
 
-If read-only prompts like "list branches" are blocked, inspect the raw self-check response with `debug_nemo_self_check.py`.
+If read-only prompts like "list branches" are blocked, inspect the raw self-check response with `scripts/debug_nemo_self_check.py`.
 
 Expected for read-only prompt:
 
@@ -129,18 +129,18 @@ or logs mention the old OpenAI path, treat output rails as not yet fixed. Debug 
 If the next machine needs to verify the current policy-object prototype, run:
 
 ```powershell
-python policy_compiler.py
-python debug_tool_guard.py
-python -m py_compile policy_compiler.py test_nemo_mcp.py tool_guard.py debug_tool_guard.py debug_nemo_self_check.py
-python test_nemo_mcp.py
+python src/nemo_mcp_guardrails/policy_compiler.py
+python scripts/debug_tool_guard.py
+python -m py_compile src/nemo_mcp_guardrails/policy_compiler.py src/nemo_mcp_guardrails/tool_guard.py scripts/test_nemo_mcp.py scripts/debug_tool_guard.py scripts/debug_nemo_self_check.py
+python scripts/test_nemo_mcp.py
 ```
 
 Expected:
 
-- `policy_compiler.py` prints the default `github + create + issue + block` policy object.
+- `src/nemo_mcp_guardrails/policy_compiler.py` prints the default `github + create + issue + block` policy object.
 - The generated tool denylist preview includes `issue_write`.
 - The generated tests include `Blocked: create issue`, `Blocked: open bug report`, `Blocked: file issue`, `Blocked: submit bug report`, `Blocked: raise issue`, and `Blocked: log bug report`.
-- `debug_tool_guard.py` reports that `issue_write` was blocked before execution.
-- `test_nemo_mcp.py` blocks all generated issue-creation variants through NeMo input rails.
+- `scripts/debug_tool_guard.py` reports that `issue_write` was blocked before execution.
+- `scripts/test_nemo_mcp.py` blocks all generated issue-creation variants through NeMo input rails.
 
-If `test_nemo_mcp.py` passes allowed read prompts but generated issue prompts are not present, check that it imports `compile_policy_test_prompts()` from `policy_compiler.py`.
+If `scripts/test_nemo_mcp.py` passes allowed read prompts but generated issue prompts are not present, check that it imports `compile_policy_test_prompts()` from `src/nemo_mcp_guardrails/policy_compiler.py`.

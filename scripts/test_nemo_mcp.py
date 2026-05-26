@@ -2,6 +2,7 @@ import asyncio
 import os
 from typing import Any
 
+from _bootstrap import bootstrap_src
 from dotenv import load_dotenv
 from langchain.agents import create_agent
 from langchain_openai import AzureChatOpenAI
@@ -9,8 +10,10 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 from nemoguardrails import LLMRails, RailsConfig
 from nemoguardrails.rails.llm.options import RailStatus, RailType
 
-from policy_compiler import compile_policy_test_prompts
-from tool_guard import guard_mcp_tool
+bootstrap_src()
+
+from nemo_mcp_guardrails.policy_compiler import compile_policy_test_prompts
+from nemo_mcp_guardrails.tool_guard import guard_mcp_tool
 
 
 def print_separator(title: str) -> None:

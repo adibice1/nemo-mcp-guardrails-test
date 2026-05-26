@@ -12,12 +12,12 @@ User prompt
 -> NeMo self_check_input using injected AzureChatOpenAI
 -> if blocked: safe refusal, no MCP tool call
 -> if passed: LangChain agent runs
--> tool_guard.py checks MCP tool names before execution
+-> src/nemo_mcp_guardrails/tool_guard.py checks MCP tool names before execution
 -> GitHub MCP read-only tools may be called
 -> final answer
 ```
 
-The key implementation choice is that `test_nemo_mcp.py` does not use stock `GuardrailsMiddleware`. Instead, it manually creates:
+The key implementation choice is that `scripts/test_nemo_mcp.py` does not use stock `GuardrailsMiddleware`. Instead, it manually creates:
 
 ```python
 rails_config = RailsConfig.from_path("config")
@@ -28,7 +28,7 @@ This avoids NeMo constructing an old OpenAI client internally.
 
 ## Completed: Reduced Test Output Noise
 
-`test_nemo_mcp.py` now defaults to compact output instead of printing full LangChain message traces and full GitHub MCP tool payloads.
+`scripts/test_nemo_mcp.py` now defaults to compact output instead of printing full LangChain message traces and full GitHub MCP tool payloads.
 
 Verbose mode is controlled with:
 
@@ -48,7 +48,7 @@ Verbose output keeps the full message trace.
 
 ## Completed: Tool-Call Guard Prototype
 
-Input rails are useful but not sufficient for the final product. The project now has a first tool-call guard prototype in `tool_guard.py`.
+Input rails are useful but not sufficient for the final product. The project now has a first tool-call guard prototype in `src/nemo_mcp_guardrails/tool_guard.py`.
 
 Current behavior:
 
@@ -78,7 +78,7 @@ The initial GitHub tool-call denylist includes:
 - `create_repository`
 - `fork_repository` if policy forbids repo creation/forking
 
-`debug_tool_guard.py` verifies the guard without Docker, GitHub MCP, Azure OpenAI, or real credentials.
+`scripts/debug_tool_guard.py` verifies the guard without Docker, GitHub MCP, Azure OpenAI, or real credentials.
 
 ## Completed: Policy Object Compiler Prototype
 
@@ -95,13 +95,13 @@ Example structured policy:
 }
 ```
 
-Implemented in `policy_compiler.py`.
+Implemented in `src/nemo_mcp_guardrails/policy_compiler.py`.
 
 Current compiler output:
 
 - NeMo self-check policy text preview
 - Tool-call denylist preview containing `issue_write`
-- Generated blocked test cases consumed by `test_nemo_mcp.py`
+- Generated blocked test cases consumed by `scripts/test_nemo_mcp.py`
 
 The compiler uses GitHub adapter-style metadata:
 
@@ -110,29 +110,29 @@ The compiler uses GitHub adapter-style metadata:
 - tool mapping: `create + issue -> issue_write`
 - reusable test prompt templates
 
-The generated issue-creation tests are verified in the full `test_nemo_mcp.py` run.
+The generated issue-creation tests are verified in the full `scripts/test_nemo_mcp.py` run.
 
-Do not add a custom `config/policies.yml` yet unless the project explicitly decides to prototype the future admin/backend policy store. `policies.yml` is not a standard NeMo Guardrails file. For now, keep NeMo input policy in `config/prompts.yml` and execution-level guard logic in `tool_guard.py`.
+Do not add a custom `config/policies.yml` yet unless the project explicitly decides to prototype the future admin/backend policy store. `policies.yml` is not a standard NeMo Guardrails file. For now, keep NeMo input policy in `config/prompts.yml` and execution-level guard logic in `src/nemo_mcp_guardrails/tool_guard.py`.
 
 ## Immediate Next Step: Connect Compiler Output To Tool Guard
 
-`tool_guard.py` still has a static denylist that includes `issue_write`.
+`src/nemo_mcp_guardrails/tool_guard.py` still has a static denylist that includes `issue_write`.
 
 Next implementation goal:
 
 ```text
-policy_compiler.py
+src/nemo_mcp_guardrails/policy_compiler.py
 -> compiled blocked tool names
--> tool_guard.py
+-> src/nemo_mcp_guardrails/tool_guard.py
 ```
 
 Recommended small change:
 
-1. Add a helper in `policy_compiler.py`, for example `compile_blocked_tools()`, that returns blocked tool names from `DEFAULT_POLICY_OBJECTS`.
-2. In `tool_guard.py`, keep a static denylist for policy not yet represented as objects, but remove `issue_write` from that static set.
+1. Add a helper in `src/nemo_mcp_guardrails/policy_compiler.py`, for example `compile_blocked_tools()`, that returns blocked tool names from `DEFAULT_POLICY_OBJECTS`.
+2. In `src/nemo_mcp_guardrails/tool_guard.py`, keep a static denylist for policy not yet represented as objects, but remove `issue_write` from that static set.
 3. Combine the static denylist with compiler-generated blocked tools.
-4. Verify `debug_tool_guard.py` still blocks `issue_write`.
-5. Verify `test_nemo_mcp.py` still passes.
+4. Verify `scripts/debug_tool_guard.py` still blocks `issue_write`.
+5. Verify `scripts/test_nemo_mcp.py` still passes.
 
 This proves the policy object can drive both generated tests and execution-level tool blocking.
 
@@ -150,7 +150,7 @@ Output rails previously hit old OpenAI client/configuration problems and caused 
 
 ## Recommended Work Order
 
-1. Connect compiler-generated blocked tool names into `tool_guard.py`.
+1. Connect compiler-generated blocked tool names into `src/nemo_mcp_guardrails/tool_guard.py`.
 2. Keep static guard entries for policy areas not yet represented by policy objects.
 3. Add one more GitHub policy object only after the first generated-tool path is verified.
 4. Later, generate a NeMo self-check prompt section or preview file from policy objects.
@@ -166,10 +166,10 @@ Start with:
 - `docs/testing-notes.md`
 - `docs/troubleshooting.md`
 - `docs/next-steps.md`
-- `test_nemo_mcp.py`
-- `policy_compiler.py`
-- `tool_guard.py`
-- `debug_tool_guard.py`
-- `debug_nemo_self_check.py`
+- `scripts/test_nemo_mcp.py`
+- `src/nemo_mcp_guardrails/policy_compiler.py`
+- `src/nemo_mcp_guardrails/tool_guard.py`
+- `scripts/debug_tool_guard.py`
+- `scripts/debug_nemo_self_check.py`
 - `config/prompts.yml`
 - `config/config.yml`

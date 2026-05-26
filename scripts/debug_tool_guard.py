@@ -1,7 +1,11 @@
 import asyncio
 from typing import Any
 
-from tool_guard import TOOL_GUARD_REFUSAL, guard_mcp_tool
+from _bootstrap import bootstrap_src
+
+bootstrap_src()
+
+from nemo_mcp_guardrails.tool_guard import TOOL_GUARD_REFUSAL, guard_mcp_tool
 
 
 class FakeTool:

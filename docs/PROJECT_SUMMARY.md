@@ -430,7 +430,12 @@ nemo-mcp-guardrails-test/
 ├─ README.md
 ├─ .env.example
 ├─ .gitignore
-├─ test_nemo_mcp.py
+├─ scripts/
+│  └─ test_nemo_mcp.py
+├─ src/
+│  └─ nemo_mcp_guardrails/
+│     ├─ policy_compiler.py
+│     └─ tool_guard.py
 ├─ requirements.txt
 ├─ config/
 │  ├─ config.yml
@@ -489,17 +494,17 @@ User prompt
 -> NeMo self_check_input using injected AzureChatOpenAI
 -> if blocked: safe refusal, no MCP tool call
 -> if passed: LangChain agent runs
--> tool_guard.py checks proposed MCP tool names before execution
+-> src/nemo_mcp_guardrails/tool_guard.py checks proposed MCP tool names before execution
 -> GitHub MCP read-only tools may be called
 -> final answer
 ```
 
 Key files added or changed:
 
-- `tool_guard.py`: wraps MCP tools and blocks restricted GitHub write-tool names before execution.
-- `debug_tool_guard.py`: isolated guard test that does not use Docker, GitHub MCP, Azure OpenAI, or real credentials.
-- `policy_compiler.py`: first structured policy-object compiler prototype.
-- `test_nemo_mcp.py`: now imports policy-generated tests with `compile_policy_test_prompts()`.
+- `src/nemo_mcp_guardrails/tool_guard.py`: wraps MCP tools and blocks restricted GitHub write-tool names before execution.
+- `scripts/debug_tool_guard.py`: isolated guard test that does not use Docker, GitHub MCP, Azure OpenAI, or real credentials.
+- `src/nemo_mcp_guardrails/policy_compiler.py`: first structured policy-object compiler prototype.
+- `scripts/test_nemo_mcp.py`: now imports policy-generated tests with `compile_policy_test_prompts()`.
 
 Current policy compiler prototype:
 
@@ -538,27 +543,27 @@ Important architectural decision:
 
 - Do not add `config/policies.yml` yet. It is not a standard NeMo Guardrails file.
 - Keep `config/prompts.yml` as the NeMo input-rail policy source for now.
-- Keep `tool_guard.py` as the execution-level tool guard.
-- Use `policy_compiler.py` as a prototype of the future backend/admin policy compiler.
+- Keep `src/nemo_mcp_guardrails/tool_guard.py` as the execution-level tool guard.
+- Use `src/nemo_mcp_guardrails/policy_compiler.py` as a prototype of the future backend/admin policy compiler.
 - In the final system, policy objects, tool mappings, synonyms, templates, versions, active mappings, and audit logs should move into PostgreSQL.
 
 Recommended next step for the next Codex session:
 
 ```text
-Connect compiler-generated blocked tool names into tool_guard.py.
+Connect compiler-generated blocked tool names into src/nemo_mcp_guardrails/tool_guard.py.
 ```
 
 Suggested implementation:
 
-1. Add a helper in `policy_compiler.py` that compiles blocked tool names from `DEFAULT_POLICY_OBJECTS`.
-2. Remove `issue_write` from the static set in `tool_guard.py`.
-3. Combine static guard entries with compiler-generated blocked tools in `tool_guard.py`.
+1. Add a helper in `src/nemo_mcp_guardrails/policy_compiler.py` that compiles blocked tool names from `DEFAULT_POLICY_OBJECTS`.
+2. Remove `issue_write` from the static set in `src/nemo_mcp_guardrails/tool_guard.py`.
+3. Combine static guard entries with compiler-generated blocked tools in `src/nemo_mcp_guardrails/tool_guard.py`.
 4. Keep static entries for restricted actions that are not yet represented as policy objects.
 5. Verify with:
 
 ```powershell
-python policy_compiler.py
-python debug_tool_guard.py
-python -m py_compile policy_compiler.py test_nemo_mcp.py tool_guard.py debug_tool_guard.py debug_nemo_self_check.py
-python test_nemo_mcp.py
+python src/nemo_mcp_guardrails/policy_compiler.py
+python scripts/debug_tool_guard.py
+python -m py_compile src/nemo_mcp_guardrails/policy_compiler.py src/nemo_mcp_guardrails/tool_guard.py scripts/test_nemo_mcp.py scripts/debug_tool_guard.py scripts/debug_nemo_self_check.py
+python scripts/test_nemo_mcp.py
 ```

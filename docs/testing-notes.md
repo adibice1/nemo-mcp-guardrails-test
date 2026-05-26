@@ -11,17 +11,17 @@ rails = LLMRails(rails_config, llm=model)
 
 The deterministic Python pre-check still exists, but by default it only reports what it would block. It does not stop execution unless `ENFORCE_PYTHON_PRECHECK=true`.
 
-The runtime now also wraps MCP tools with `tool_guard.py`. This is an execution-level safety layer that blocks restricted GitHub MCP tool names before the underlying MCP tool can run. Normal tests still keep GitHub MCP in read-only mode with `GITHUB_READ_ONLY=1`, so write tools should not be exposed by the server in the first place.
+The runtime now also wraps MCP tools with `src/nemo_mcp_guardrails/tool_guard.py`. This is an execution-level safety layer that blocks restricted GitHub MCP tool names before the underlying MCP tool can run. Normal tests still keep GitHub MCP in read-only mode with `GITHUB_READ_ONLY=1`, so write tools should not be exposed by the server in the first place.
 
-`policy_compiler.py` now generates GitHub issue-creation test prompts from a structured policy object plus adapter-style metadata. `test_nemo_mcp.py` consumes those generated prompts through `compile_policy_test_prompts()`.
+`src/nemo_mcp_guardrails/policy_compiler.py` now generates GitHub issue-creation test prompts from a structured policy object plus adapter-style metadata. `scripts/test_nemo_mcp.py` consumes those generated prompts through `compile_policy_test_prompts()`.
 
 Current safety layers:
 
 - `config/prompts.yml`: NeMo `self_check_input` blocks unsafe user intent before the agent runs.
-- `tool_guard.py`: blocks restricted MCP tool names before execution.
+- `src/nemo_mcp_guardrails/tool_guard.py`: blocks restricted MCP tool names before execution.
 - GitHub MCP Docker env: `GITHUB_READ_ONLY=1` prevents write tools from being offered during normal tests.
 - Deterministic Python pre-check: comparison/safety fallback only unless `ENFORCE_PYTHON_PRECHECK=true`.
-- `policy_compiler.py`: prototype compiler for admin-style policy objects; currently feeds generated tests into the runner.
+- `src/nemo_mcp_guardrails/policy_compiler.py`: prototype compiler for admin-style policy objects; currently feeds generated tests into the runner.
 
 ## Stage 1: Allowed Read-Only Tests
 
@@ -51,7 +51,7 @@ Expected:
 - Safe refusal is returned
 
 Tests:
-- Generated GitHub issue-creation prompts from `policy_compiler.py`
+- Generated GitHub issue-creation prompts from `src/nemo_mcp_guardrails/policy_compiler.py`
 - Print GitHub token
 - Push commit
 
@@ -101,7 +101,7 @@ Note:
 
 ## Tool-Call Guard Test
 
-`debug_tool_guard.py` tests the MCP tool wrapper without Docker, GitHub MCP, Azure OpenAI, or real credentials.
+`scripts/debug_tool_guard.py` tests the MCP tool wrapper without Docker, GitHub MCP, Azure OpenAI, or real credentials.
 
 It verifies:
 
@@ -111,7 +111,7 @@ It verifies:
 Run:
 
 ```powershell
-python debug_tool_guard.py
+python scripts/debug_tool_guard.py
 ```
 
 Expected:
@@ -124,12 +124,12 @@ Tool guard checks passed.
 
 ## Policy Compiler Test
 
-`policy_compiler.py` previews what the current default policy object compiles into.
+`src/nemo_mcp_guardrails/policy_compiler.py` previews what the current default policy object compiles into.
 
 Run:
 
 ```powershell
-python policy_compiler.py
+python src/nemo_mcp_guardrails/policy_compiler.py
 ```
 
 Expected output includes:
@@ -142,7 +142,7 @@ Expected output includes:
 The full test runner consumes the generated test prompts:
 
 ```powershell
-python test_nemo_mcp.py
+python scripts/test_nemo_mcp.py
 ```
 
 Look for these generated sections in the output:
@@ -156,7 +156,7 @@ Look for these generated sections in the output:
 
 ## Isolated Debug Script
 
-`debug_nemo_self_check.py` exists to test NeMo input rails without GitHub MCP, Docker, or the LangChain agent.
+`scripts/debug_nemo_self_check.py` exists to test NeMo input rails without GitHub MCP, Docker, or the LangChain agent.
 
 It helped prove:
 - Injecting `AzureChatOpenAI` into `LLMRails` avoids the old OpenAI SDK failure.
@@ -165,6 +165,6 @@ It helped prove:
 
 ## Compact And Verbose Output
 
-`test_nemo_mcp.py` defaults to compact output. It shows rail status, MCP tool names, and the final response without dumping full LangChain message traces or large GitHub MCP payloads.
+`scripts/test_nemo_mcp.py` defaults to compact output. It shows rail status, MCP tool names, and the final response without dumping full LangChain message traces or large GitHub MCP payloads.
 
 Set `VERBOSE_TRACE=true` to print the full LangChain message trace through `print_messages()` when debugging a specific test.
