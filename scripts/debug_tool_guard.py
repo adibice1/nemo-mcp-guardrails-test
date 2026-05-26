@@ -5,7 +5,11 @@ from _bootstrap import bootstrap_src
 
 bootstrap_src()
 
-from nemo_mcp_guardrails.tool_guard import TOOL_GUARD_REFUSAL, guard_mcp_tool
+from nemo_mcp_guardrails.tool_guard import (
+    BLOCKED_GITHUB_MCP_TOOLS,
+    TOOL_GUARD_REFUSAL,
+    guard_mcp_tool,
+)
 
 
 class FakeTool:
@@ -32,19 +36,21 @@ class FakeTool:
 async def main() -> None:
     """Verify restricted tools are blocked and allowed tools still execute."""
 
-    blocked_tool = FakeTool("issue_write")
+    blocked_tools = [FakeTool(tool_name) for tool_name in BLOCKED_GITHUB_MCP_TOOLS]
     allowed_tool = FakeTool("search_repositories")
 
-    guarded_blocked_tool = guard_mcp_tool(blocked_tool)
     guarded_allowed_tool = guard_mcp_tool(allowed_tool)
-
-    blocked_result = await guarded_blocked_tool.ainvoke({})
     allowed_result = await guarded_allowed_tool.ainvoke({})
 
     expected_blocked_result = f"Tool call blocked by guard: {TOOL_GUARD_REFUSAL}"
 
-    assert blocked_result == expected_blocked_result
-    assert blocked_tool.calls == []
+    for blocked_tool in blocked_tools:
+        guarded_blocked_tool = guard_mcp_tool(blocked_tool)
+        blocked_result = await guarded_blocked_tool.ainvoke({})
+
+        assert blocked_result == expected_blocked_result
+        assert blocked_tool.calls == []
+
     assert allowed_result == {
         "tool": "search_repositories",
         "called": True,
@@ -52,7 +58,8 @@ async def main() -> None:
     assert allowed_tool.calls == [{}]
 
     print("Tool guard checks passed.")
-    print("- Blocked tool was not executed: issue_write")
+    for blocked_tool in sorted(BLOCKED_GITHUB_MCP_TOOLS):
+        print(f"- Blocked tool was not executed: {blocked_tool}")
     print("- Allowed tool executed normally: search_repositories")
 
 

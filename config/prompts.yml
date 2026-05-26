@@ -25,6 +25,8 @@ prompts:
       - commenting on an issue
       - opening a pull request
       - approving a pull request
+      - requesting changes on a pull request
+      - submitting a pull request review
       - merging a pull request
       - creating a branch
       - deleting a branch
