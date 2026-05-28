@@ -61,6 +61,44 @@ def verbose_trace_enabled() -> bool:
     }
 
 
+async def apply_output_rail(
+    rails: LLMRails,
+    user_prompt: str,
+    final_response: str,
+) -> str:
+    """Run NeMo output rails for one final response and return the allowed response."""
+
+    output_rail_result = await rails.check_async(
+        [
+            {
+                "role": "user",
+                "content": user_prompt,
+            },
+            {
+                "role": "assistant",
+                "content": final_response,
+            },
+        ],
+        rail_types=[RailType.OUTPUT],
+    )
+
+    print_separator("NEMO OUTPUT RAIL RESULT")
+    print(f"Status: {output_rail_result.status}")
+    if output_rail_result.rail:
+        print(f"Rail: {output_rail_result.rail}")
+    if output_rail_result.content:
+        print("Content:")
+        print(output_rail_result.content)
+
+    if output_rail_result.status == RailStatus.BLOCKED:
+        return "I can inspect GitHub information, but I cannot perform write actions or reveal credentials."
+
+    if output_rail_result.status == RailStatus.MODIFIED and output_rail_result.content:
+        return output_rail_result.content
+
+    return final_response
+
+
 def extract_tool_names(result: dict[str, Any]) -> list[str]:
     """Return tool names observed in a LangChain agent result, preserving first-seen order."""
     tool_names: list[str] = []
@@ -249,12 +287,19 @@ async def main() -> None:
         temperature=0,
     )
 
-    print_separator("Creating NeMo input rails")
+    print_separator("Creating NeMo rails")
 
     # Load NeMo guardrail config and inject the working Azure model so NeMo does
     # not create an old OpenAI client internally.
     rails_config = RailsConfig.from_path("config")
+    output_rail_enabled = bool(rails_config.rails.output.flows)
+
     rails = LLMRails(rails_config, llm=model)
+
+    if output_rail_enabled:
+        print("Output rail enabled via config/config.yml.")
+    else:
+        print("Output rail disabled in config/config.yml.")
 
     # The LangChain agent decides when an allowed prompt needs a GitHub MCP tool.
     agent = create_agent(
@@ -311,8 +356,16 @@ async def main() -> None:
 
                 if python_precheck_is_enforced():
                     print_separator("PYTHON PRECHECK ENFORCED")
-                    print("FINAL RESPONSE:")
-                    print("I can inspect GitHub information, but I cannot perform write actions or reveal credentials.")
+                    final_response = "I can inspect GitHub information, but I cannot perform write actions or reveal credentials."
+                    if output_rail_enabled:
+                        final_response = await apply_output_rail(
+                            rails,
+                            test["prompt"],
+                            final_response,
+                        )
+
+                    print_separator("FINAL RESPONSE")
+                    print(final_response)
                     continue
             else:
                 print_separator("PYTHON PRECHECK WOULD ALLOW")
@@ -340,8 +393,16 @@ async def main() -> None:
             # Stop unsafe requests before tool execution.
             if rail_result.status == RailStatus.BLOCKED:
                 print_separator("NEMO INPUT RAIL BLOCKED")
-                print("FINAL RESPONSE:")
-                print("I can inspect GitHub information, but I cannot perform write actions or reveal credentials.")
+                final_response = "I can inspect GitHub information, but I cannot perform write actions or reveal credentials."
+                if output_rail_enabled:
+                    final_response = await apply_output_rail(
+                        rails,
+                        test["prompt"],
+                        final_response,
+                    )
+
+                print_separator("FINAL RESPONSE")
+                print(final_response)
                 continue
 
             # If a rail modifies the input, pass the modified prompt to the agent.
@@ -371,9 +432,18 @@ async def main() -> None:
                 print_separator("MCP TOOLS CALLED")
                 print_tool_summary(result)
 
-            print_separator("FINAL RESPONSE")
             final_message = result["messages"][-1]
-            print(final_message.content)
+            final_response = final_message.content
+
+            if output_rail_enabled:
+                final_response = await apply_output_rail(
+                    rails,
+                    prompt_for_agent,
+                    final_response,
+                )
+
+            print_separator("FINAL RESPONSE")
+            print(final_response)
 
         except Exception as exc:
             print_separator("ERROR")

@@ -46,7 +46,9 @@ The system successfully:
 - Uses Azure OpenAI to call MCP read tools.
 - Reads GitHub repositories, branches, and README files.
 - Runs NeMo `self check input` before the LangChain agent can call MCP tools.
+- Runs NeMo `self check output` after the LangChain agent returns a final answer.
 - Blocks unsafe write/credential prompts through NeMo input rails.
+- Blocks unsafe secret-like assistant responses through NeMo output rails.
 - Keeps deterministic Python pre-checks only as a comparison/safety fallback.
 - Wraps MCP tools with `src/nemo_mcp_guardrails/tool_guard.py` so restricted tool names can be blocked before execution.
 - Uses `src/nemo_mcp_guardrails/policy_compiler.py` to prototype admin-style policy objects and generated policy artifacts.
@@ -62,6 +64,7 @@ User prompt
 -> if passed: LangChain agent
 -> src/nemo_mcp_guardrails/tool_guard.py wraps MCP tools and blocks restricted tool names before execution
 -> GitHub MCP read-only tools
+-> NeMo self_check_output using AzureChatOpenAI injected into LLMRails
 -> final answer
 ```
 
@@ -69,7 +72,7 @@ User prompt
 
 `src/nemo_mcp_guardrails/policy_compiler.py` contains the structured policy-object prototype.
 
-Example policy:
+Example input policy:
 
 ```json
 {
@@ -80,7 +83,9 @@ Example policy:
 }
 ```
 
-The compiler uses adapter-style GitHub metadata:
+The compiler uses `InputPolicyObject` for input/tool policies and `OutputPolicyObject` for output policies.
+
+For input policies, it uses adapter-style GitHub metadata:
 
 - action synonyms
 - resource synonyms
@@ -101,14 +106,50 @@ The compiler currently generates:
 - NeMo self-check rule text preview
 - compiler-generated blocked MCP tool names
 - curated blocked test prompts consumed by `scripts/test_nemo_mcp.py`
+- output self-check rule previews for credential/secret output policies
 
 `compile_policy_test_prompts()` returns one test per policy object by default, so the full test runner stays manageable.
+
+## Adding Policies In The Current Prototype
+
+For now, new policies are added by editing `src/nemo_mcp_guardrails/policy_compiler.py`.
+
+For a new GitHub input/tool policy:
+
+1. Add or reuse an action/resource tool mapping in `GITHUB_TOOL_MAPPINGS`.
+2. Add action synonyms in `GITHUB_ACTION_SYNONYMS` if the action is new.
+3. Add resource synonyms in `GITHUB_RESOURCE_SYNONYMS` if the resource is new.
+4. Add an `InputPolicyObject` to `DEFAULT_INPUT_POLICY_OBJECTS`.
+5. Make sure `config/prompts.yml` still describes the restriction clearly enough for `self_check_input`.
+6. Run the compiler, tool guard, and full MCP tests.
+
+Example:
+
+```python
+InputPolicyObject(
+    app="github",
+    action="create",
+    resource="issue",
+    effect="block",
+)
+```
+
+For a new output policy, add an `OutputPolicyObject` to `DEFAULT_OUTPUT_POLICY_OBJECTS` and make sure `config/prompts.yml` still describes the output restriction clearly enough for `self_check_output`.
+
+Current important design note:
+
+- `config/prompts.yml` is still manually maintained, which is normal for a NeMo Guardrails project and matches the standard NeMo examples.
+- `policy_compiler.py` currently previews rule text and drives tool denylist/test generation, but it does not automatically rewrite `config/prompts.yml`.
+- In the future admin/backend version, policy objects stored in MySQL or Oracle should be used to assemble more dynamic prompt text from templates, so administrators do not need to manually edit guardrail prompt files.
 
 ## Current Safety Layers
 
 ```text
 config/prompts.yml
 -> NeMo self_check_input blocks unsafe user intent before the agent runs
+
+config/prompts.yml
+-> NeMo self_check_output blocks unsafe assistant output after the agent runs
 
 src/nemo_mcp_guardrails/tool_guard.py
 -> blocks restricted MCP tool names before execution
@@ -130,7 +171,7 @@ This matters because stock `GuardrailsMiddleware(config_path="config")` construc
 
 ## Prompt Design Status
 
-`config/prompts.yml` currently defines `self_check_input` as a yes/no classifier:
+`config/prompts.yml` currently defines `self_check_input` and `self_check_output` as yes/no classifiers:
 
 - `no` means the request is allowed
 - `yes` means the request asks for a restricted operation and should be blocked
@@ -139,30 +180,30 @@ This matches NeMo's default parser, where `yes` maps to unsafe/block and `no` ma
 
 ## Output Rails Status
 
-Output rails are disabled for now.
+Output rails are enabled through `config/config.yml`:
 
-Earlier NeMo output rail attempts caused false blocking because NeMo tried to invoke an old/default OpenAI path. The next recommended implementation step is to debug output rails in an isolated script before enabling them in `scripts/test_nemo_mcp.py`.
-
-Recommended next output-rail script:
-
-```text
-scripts/debug_nemo_output_check.py
+```yaml
+output:
+  flows:
+    - self check output
 ```
 
-It should:
+`scripts/test_nemo_mcp.py` reads `rails_config.rails.output.flows` and runs `rails.check_async(..., rail_types=[RailType.OUTPUT])` after each final response.
 
-- Inject the same `AzureChatOpenAI` model into `LLMRails`.
-- Test a normal safe assistant response.
-- Test a fake token/secret-like assistant response.
-- Verify safe output passes.
-- Verify secret-like output blocks.
-- Verify no old OpenAI client path is used.
+The output self-check prompt only includes the assistant response:
+
+```text
+Assistant response:
+{{ bot_response }}
+```
+
+It intentionally does not echo the user input, because unsafe user prompts containing fake token-like strings can trigger Azure content filtering before NeMo can classify the assistant response.
+
+`scripts/debug_nemo_output_check.py` verifies safe assistant output passes and fake token/environment-variable output blocks.
 
 ## Current Next Step
 
-Fix NeMo output rails in isolation.
-
-After that, move into the MySQL/FastAPI foundation:
+Move into the MySQL/FastAPI foundation:
 
 ```text
 MySQL Docker container

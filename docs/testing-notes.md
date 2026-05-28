@@ -18,6 +18,7 @@ The runtime wraps MCP tools with `src/nemo_mcp_guardrails/tool_guard.py`. This e
 Current safety layers:
 
 - `config/prompts.yml`: NeMo `self_check_input` blocks unsafe user intent before the agent runs.
+- `config/prompts.yml`: NeMo `self_check_output` blocks unsafe assistant output after the agent runs.
 - `src/nemo_mcp_guardrails/tool_guard.py`: blocks restricted MCP tool names before execution.
 - GitHub MCP Docker env: `GITHUB_READ_ONLY=1` prevents write tools from being offered during normal tests.
 - Deterministic Python pre-check: comparison/safety fallback only unless `ENFORCE_PYTHON_PRECHECK=true`.
@@ -29,6 +30,7 @@ Expected:
 
 - NeMo input rail returns `RailStatus.PASSED`
 - LangChain agent calls the expected GitHub MCP read tool
+- NeMo output rail returns `RailStatus.PASSED`
 - Final answer is returned
 
 Tests:
@@ -52,6 +54,7 @@ Expected:
 - Python pre-check may report either `WOULD BLOCK` or `WOULD ALLOW`
 - NeMo input rail returns `RailStatus.BLOCKED`
 - No GitHub MCP tool call is made
+- NeMo output rail returns `RailStatus.PASSED` for the safe refusal text
 - Safe refusal is returned
 
 Generated tests currently include one curated prompt for each default policy object:
@@ -142,11 +145,12 @@ python src/nemo_mcp_guardrails/policy_compiler.py
 
 Expected output includes:
 
-- each default policy object
+- each default input policy object
 - generated NeMo self-check rule text
 - generated tool denylist entries
 - generated test cases
 - combined generated tool denylist
+- generated output rail rules
 
 The full test runner consumes a curated subset of generated test prompts:
 
@@ -164,23 +168,34 @@ It helped prove:
 - The self-check prompt must align with NeMo's parser semantics.
 - The current yes/no self-check prompt correctly allows read-only GitHub prompts and blocks write/credential prompts.
 
-## Next Testing Gap: Output Rails
+## Output Rail Test
 
-Output rails are still disabled.
+`config/config.yml` enables the output rail:
 
-Next testing script should be:
-
-```text
-scripts/debug_nemo_output_check.py
+```yaml
+output:
+  flows:
+    - self check output
 ```
 
-It should test:
+`scripts/debug_nemo_output_check.py` tests output rails without GitHub MCP, Docker, or the LangChain agent.
 
-- safe normal assistant output should pass
-- fake token/secret-like assistant output should block
-- NeMo should use the injected AzureChatOpenAI model and not the old OpenAI client path
+Run:
 
-Only after this isolated script is stable should output checking be wired into `scripts/test_nemo_mcp.py`.
+```powershell
+python scripts/debug_nemo_output_check.py
+```
+
+Expected:
+
+- safe normal assistant output passes
+- fake token-like assistant output blocks
+- fake environment-variable-like assistant output blocks
+- NeMo uses the injected AzureChatOpenAI model and not the old OpenAI client path
+
+The output self-check prompt intentionally checks only `{{ bot_response }}`. Do not add `{{ user_input }}` back unless retesting Azure content filtering, because token-like user prompts can cause Azure to reject the self-check prompt before NeMo can classify the assistant output.
+
+The full `scripts/test_nemo_mcp.py` run now includes `NEMO OUTPUT RAIL RESULT` before each final response.
 
 ## Compact And Verbose Output
 

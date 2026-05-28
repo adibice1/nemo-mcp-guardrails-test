@@ -28,9 +28,6 @@ rails:
       # - block branch code modification
       # - block credential requests
 
-  # Output rails are disabled for now because they currently trigger an old/default
-  # OpenAI path and falsely block allowed responses. Keep output checks isolated until
-  # Azure-backed NeMo output rails are fixed.
-  # output:
-  #   flows:
-  #     - block secrets in output
+  output:
+    flows:
+      - self check output

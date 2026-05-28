@@ -319,8 +319,7 @@ MySQL or Oracle policy/template/tool/synonym tables
 Near-term implementation order:
 
 ```text
-Fix NeMo output rails in isolation
--> MySQL Docker container for local development
+MySQL Docker container for local development
 -> DBeaver inspection/debugging
 -> FastAPI policy CRUD endpoints
 -> compiler loads active DB policies

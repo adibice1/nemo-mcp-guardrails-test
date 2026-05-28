@@ -136,13 +136,14 @@ The prototype blocks write or sensitive actions such as:
 
 ### Stage 4: Output Rail Testing
 
-A fake secret-like response was tested:
+Fake secret-like responses are tested in `scripts/debug_nemo_output_check.py`:
 
 ```text
 github_pat_fake_test_token_12345
+SERVICE_TOKEN=placeholder_test_secret_12345
 ```
 
-The output was blocked, but NeMo output rails currently cause false blocking on normal allowed responses due to an LLM invocation/configuration issue. For now, deterministic Python post-checks are preferred for output secret detection until NeMo output rails are debugged separately.
+NeMo output rails now pass safe assistant output and block fake token/environment-variable output. The full `scripts/test_nemo_mcp.py` runner also executes the output rail after each final assistant response because `config/config.yml` enables `self check output`.
 
 ## 7. High-Level Target Architecture
 
@@ -380,23 +381,19 @@ Possible future apps:
 
 ### NeMo Output Rails
 
-NeMo output rails currently cause false blocking because the middleware tries to invoke an old/default OpenAI path such as:
+NeMo output rails are now enabled through `config/config.yml` and verified with the injected `AzureChatOpenAI` model.
 
-```text
-gpt-3.5-turbo / APIRemovedInV1Proxy
-```
+Current working behavior:
 
-This causes allowed outputs to be replaced with:
+- Safe GitHub assistant output passes.
+- Fake token-like assistant output blocks.
+- Fake environment-variable-like assistant output blocks.
+- The full GitHub MCP runner prints `NEMO OUTPUT RAIL RESULT` before each final response.
 
-```text
-I cannot provide this response due to content policy.
-```
+Important prompt design note:
 
-Current workaround:
-
-- Keep deterministic Python pre-check for unsafe inputs
-- Use deterministic Python post-check for secret-like outputs
-- Debug NeMo output rails separately in a smaller isolated script
+- `self_check_output` checks only `{{ bot_response }}`.
+- It intentionally does not include `{{ user_input }}`, because unsafe user prompts containing fake token-like text can trigger Azure content filtering before NeMo can classify the assistant response.
 
 ### Secret Management
 
@@ -512,13 +509,14 @@ logs/                                local logs
 
 Key files:
 
-- `config/prompts.yml`: current NeMo `self_check_input` policy prompt.
-- `config/config.yml`: active NeMo config; input rail enabled, output rail disabled.
+- `config/prompts.yml`: current NeMo `self_check_input` and `self_check_output` policy prompts.
+- `config/config.yml`: active NeMo config; input and output rails enabled.
 - `src/nemo_mcp_guardrails/policy_compiler.py`: structured policy-object compiler prototype.
 - `src/nemo_mcp_guardrails/tool_guard.py`: execution-level MCP tool guard.
-- `scripts/test_nemo_mcp.py`: full GitHub MCP + NeMo input rail test runner.
+- `scripts/test_nemo_mcp.py`: full GitHub MCP + NeMo input/output rail test runner.
 - `scripts/debug_tool_guard.py`: isolated tool guard diagnostic.
 - `scripts/debug_nemo_self_check.py`: isolated input rail diagnostic.
+- `scripts/debug_nemo_output_check.py`: isolated output rail diagnostic.
 
 Current policy compiler coverage:
 
@@ -534,18 +532,37 @@ The compiler now drives:
 - Generated NeMo self-check rule previews
 - Generated blocked MCP tool names for `tool_guard.py`
 - Curated generated tests for `scripts/test_nemo_mcp.py`
+- Generated output rail rule previews
+
+To add a new policy in the current prototype:
+
+```text
+Input policy:
+GITHUB_TOOL_MAPPINGS
+-> GITHUB_ACTION_SYNONYMS / GITHUB_RESOURCE_SYNONYMS if needed
+-> DEFAULT_INPUT_POLICY_OBJECTS
+-> config/prompts.yml if self-check wording needs to be clearer
+
+Output policy:
+DEFAULT_OUTPUT_POLICY_OBJECTS
+-> config/prompts.yml if self-check output wording needs to be clearer
+```
+
+Hardcoded prompt text in `config/prompts.yml` is correct for the current NeMo prototype and matches standard NeMo Guardrails usage. The future admin/backend system should move toward dynamic prompt text assembled from stored policy objects and templates, so administrators do not need to edit prompt files manually.
 
 Latest verified full test result:
 
 - Allowed read-only GitHub prompts passed and called read tools only.
 - All 14 compiler-generated GitHub write-policy prompts were blocked by NeMo input rails.
 - Credential/token prompts were blocked by NeMo input rails.
+- Output rails passed safe final responses and safe refusal messages.
 - `scripts/debug_tool_guard.py` confirmed every compiler-generated blocked tool is blocked before execution.
+- `scripts/debug_nemo_output_check.py` confirmed fake token/environment-variable output is blocked.
 
 Important architectural decisions:
 
 - Do not add `config/policies.yml` yet. It is not a standard NeMo Guardrails file.
-- Keep `config/prompts.yml` as the NeMo input-rail policy source for now.
+- Keep `config/prompts.yml` as the NeMo input/output rail policy source for now.
 - Keep `src/nemo_mcp_guardrails/tool_guard.py` as the execution-level tool guard.
 - Use `src/nemo_mcp_guardrails/policy_compiler.py` as a prototype of the future backend/admin policy compiler.
 - In the final system, policy objects, tool mappings, synonyms, templates, versions, active mappings, and audit logs should move into MySQL or Oracle.
@@ -554,23 +571,6 @@ Important architectural decisions:
 - Plan for later containerisation/OpenShift deployment.
 
 Recommended next step for the next Codex session:
-
-```text
-Fix NeMo output rails in isolation before starting MySQL/FastAPI.
-```
-
-Suggested implementation:
-
-1. Create `scripts/debug_nemo_output_check.py`.
-2. Load `RailsConfig.from_path("config")`.
-3. Inject the same `AzureChatOpenAI` model into `LLMRails`.
-4. Test a normal safe assistant response.
-5. Test a fake token/secret-like assistant response.
-6. Verify safe output passes and secret-like output blocks.
-7. Verify NeMo does not use the old `openai.ChatCompletion` path.
-8. Only after this works, add optional output checking to `scripts/test_nemo_mcp.py`.
-
-After output rails are stable, start:
 
 ```text
 MySQL Docker container
@@ -586,6 +586,7 @@ Useful verification commands:
 ```powershell
 python src/nemo_mcp_guardrails/policy_compiler.py
 python scripts/debug_tool_guard.py
-python -m py_compile src/nemo_mcp_guardrails/policy_compiler.py src/nemo_mcp_guardrails/tool_guard.py scripts/test_nemo_mcp.py scripts/debug_tool_guard.py scripts/debug_nemo_self_check.py
+python scripts/debug_nemo_output_check.py
+python -m py_compile src/nemo_mcp_guardrails/policy_compiler.py src/nemo_mcp_guardrails/tool_guard.py scripts/test_nemo_mcp.py scripts/debug_tool_guard.py scripts/debug_nemo_self_check.py scripts/debug_nemo_output_check.py
 python scripts/test_nemo_mcp.py
 ```

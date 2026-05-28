@@ -8,6 +8,8 @@ The GitHub MCP prototype now has:
 - A compiler-driven tool-call guard in `src/nemo_mcp_guardrails/tool_guard.py`.
 - A structured policy-object prototype in `src/nemo_mcp_guardrails/policy_compiler.py`.
 - Curated generated policy tests consumed by `scripts/test_nemo_mcp.py`.
+- A config-driven NeMo output rail using `self check output`.
+- An isolated output-rail diagnostic script in `scripts/debug_nemo_output_check.py`.
 - Compact test output by default, with verbose LangChain traces controlled by `VERBOSE_TRACE=true`.
 
 Current successful flow:
@@ -20,6 +22,7 @@ User prompt
 -> if passed: LangChain agent runs
 -> src/nemo_mcp_guardrails/tool_guard.py checks MCP tool names before execution
 -> GitHub MCP read-only tools may be called
+-> NeMo self_check_output checks the final assistant response
 -> final answer
 ```
 
@@ -79,6 +82,32 @@ BLOCKED_GITHUB_MCP_TOOLS = STATIC_BLOCKED_GITHUB_MCP_TOOLS | compile_blocked_too
 
 `scripts/debug_tool_guard.py` verifies every compiler-generated blocked tool is intercepted before execution.
 
+## Adding A Policy Today
+
+Until the database/API phase exists, add policies in `src/nemo_mcp_guardrails/policy_compiler.py`.
+
+For GitHub input/tool policies:
+
+```text
+GITHUB_TOOL_MAPPINGS
+-> GITHUB_ACTION_SYNONYMS, if needed
+-> GITHUB_RESOURCE_SYNONYMS, if needed
+-> DEFAULT_INPUT_POLICY_OBJECTS
+-> config/prompts.yml, if the self-check prompt needs clearer wording
+-> run verification commands
+```
+
+For output policies:
+
+```text
+DEFAULT_OUTPUT_POLICY_OBJECTS
+-> config/prompts.yml, if the self-check output prompt needs clearer wording
+-> scripts/debug_nemo_output_check.py
+-> run verification commands
+```
+
+Side note: hardcoded prompt text in `config/prompts.yml` is correct for the current NeMo prototype and matches the standard NeMo Guardrails style. The compiler does not yet rewrite prompt files. The future admin/backend phase should move toward dynamic prompt text assembled from stored policy objects and templates.
+
 ## Completed: Curated Policy Tests
 
 `compile_policy_test_prompts()` now returns one generated test per policy object by default.
@@ -102,6 +131,9 @@ Latest observed full run:
 NeMo input rail
 -> checks prompt-level user intent through config/prompts.yml
 
+NeMo output rail
+-> checks final assistant responses through config/prompts.yml
+
 tool_guard.py
 -> checks actual MCP tool names before execution
 
@@ -111,29 +143,34 @@ GitHub MCP read-only mode
 
 The deterministic Python pre-check remains comparison/report-only unless `ENFORCE_PYTHON_PRECHECK=true`.
 
-## Immediate Next Step: Fix Output Rails In Isolation
+## Completed: Output Rails
 
-Before starting the database/API phase, debug NeMo output rails separately.
+Output rails are now enabled in `config/config.yml`:
 
-Do not enable output rails directly in the full GitHub MCP runner first. Earlier output rail attempts caused false blocking and old OpenAI client errors.
+```yaml
+output:
+  flows:
+    - self check output
+```
 
-Recommended small milestone:
+`scripts/test_nemo_mcp.py` reads that config and runs a NeMo output checkpoint after the LangChain agent produces a final answer. For input-blocked requests, it runs the output checkpoint against the safe refusal text.
+
+The output self-check prompt in `config/prompts.yml` intentionally checks only `{{ bot_response }}`. It does not include `{{ user_input }}`, because unsafe user prompts containing fake token-like strings can trigger Azure content filtering before NeMo can classify the assistant response.
+
+Verification:
 
 ```text
 scripts/debug_nemo_output_check.py
--> load config with RailsConfig.from_path("config")
--> inject the same AzureChatOpenAI model into LLMRails
--> test a normal safe assistant response
--> test a fake token/secret-like assistant response
--> verify no APIRemovedInV1 or old openai.ChatCompletion path
--> verify safe output passes and secret-like output blocks
+-> safe normal assistant output passes
+-> fake token/secret-like assistant output blocks
+-> no old OpenAI client path is used
 ```
 
-After that works, add optional output checking after the LangChain agent response in `scripts/test_nemo_mcp.py`.
+The full `scripts/test_nemo_mcp.py` run now prints `Output rail enabled via config/config.yml.` and includes `NEMO OUTPUT RAIL RESULT` before each final response.
 
-## Database/API Phase After Output Rails
+## Immediate Next Step: Database/API Phase
 
-After output rails are stable, start the backend foundation.
+Start the backend foundation.
 
 Supervisor guidance:
 

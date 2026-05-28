@@ -2,12 +2,21 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
-class PolicyObject:
-    """Represent one admin-created policy rule in structured form."""
+class InputPolicyObject:
+    """Represent one admin-created input policy rule in structured form."""
 
     app: str
     action: str
     resource: str
+    effect: str
+
+
+@dataclass(frozen=True)
+class OutputPolicyObject:
+    """Represent one admin-created output policy rule."""
+
+    category: str
+    description: str
     effect: str
 
 
@@ -20,8 +29,8 @@ class TestCase:
 
 
 @dataclass(frozen=True)
-class CompiledPolicy:
-    """Collect the runtime artifacts generated from a policy object."""
+class CompiledInputPolicy:
+    """Collect runtime artifacts generated from an input policy object."""
 
     input_rail_rule: str
     blocked_tools: tuple[str, ...]
@@ -88,86 +97,98 @@ GITHUB_TEST_PROMPT_TEMPLATES = (
 DEFAULT_TEST_CASES_PER_POLICY = 1
 
 
-DEFAULT_POLICY_OBJECTS = (
-    PolicyObject(
+DEFAULT_OUTPUT_POLICY_OBJECTS = (
+    OutputPolicyObject(
+        category="credentials",
+        description=(
+            "credentials, access tokens, API keys, hidden configuration files, "
+            ".env contents, or environment variables"
+        ),
+        effect="block",
+    ),
+)
+
+
+DEFAULT_INPUT_POLICY_OBJECTS = (
+    InputPolicyObject(
         app="github",
         action="create",
         resource="issue",
         effect="block",
     ),
-    PolicyObject(
+    InputPolicyObject(
         app="github",
         action="update",
         resource="issue",
         effect="block",
     ),
-    PolicyObject(
+    InputPolicyObject(
         app="github",
         action="comment",
         resource="issue",
         effect="block",
     ),
-    PolicyObject(
+    InputPolicyObject(
         app="github",
         action="create",
         resource="pull_request",
         effect="block",
     ),
-    PolicyObject(
+    InputPolicyObject(
         app="github",
         action="update",
         resource="pull_request",
         effect="block",
     ),
-    PolicyObject(
+    InputPolicyObject(
         app="github",
         action="merge",
         resource="pull_request",
         effect="block",
     ),
-    PolicyObject(
+    InputPolicyObject(
         app="github",
         action="review",
         resource="pull_request",
         effect="block",
     ),
-    PolicyObject(
+    InputPolicyObject(
         app="github",
         action="create",
         resource="branch",
         effect="block",
     ),
-    PolicyObject(
+    InputPolicyObject(
         app="github",
         action="create",
         resource="file",
         effect="block",
     ),
-    PolicyObject(
+    InputPolicyObject(
         app="github",
         action="update",
         resource="file",
         effect="block",
     ),
-    PolicyObject(
+    InputPolicyObject(
         app="github",
         action="delete",
         resource="file",
         effect="block",
     ),
-    PolicyObject(
+    InputPolicyObject(
         app="github",
         action="push",
         resource="file",
         effect="block",
     ),
-    PolicyObject(
+    InputPolicyObject(
         app="github",
         action="create",
         resource="repository",
         effect="block",
     ),
-    PolicyObject(
+    InputPolicyObject(
         app="github",
         action="fork",
         resource="repository",
@@ -206,13 +227,13 @@ def format_or_list(items: tuple[str, ...]) -> str:
     return ", ".join(items[:-1]) + f", or {items[-1]}"
 
 
-def get_policy_key(policy: PolicyObject) -> tuple[str, str]:
+def get_policy_key(policy: InputPolicyObject) -> tuple[str, str]:
     """Return the action/resource key used by GitHub adapter metadata."""
 
     return (policy.action, policy.resource)
 
 
-def compile_input_rail_rule(policy: PolicyObject) -> str:
+def compile_input_rail_rule(policy: InputPolicyObject) -> str:
     """Generate NeMo self-check policy text from adapter synonyms."""
 
     actions = GITHUB_ACTION_SYNONYMS[policy.action]
@@ -226,7 +247,7 @@ def compile_input_rail_rule(policy: PolicyObject) -> str:
     )
 
 
-def compile_test_cases(policy: PolicyObject) -> tuple[TestCase, ...]:
+def compile_test_cases(policy: InputPolicyObject) -> tuple[TestCase, ...]:
     """Generate representative blocked prompt tests from adapter templates."""
 
     actions = GITHUB_ACTION_SYNONYMS[policy.action]
@@ -251,7 +272,7 @@ def compile_test_cases(policy: PolicyObject) -> tuple[TestCase, ...]:
     return tuple(test_cases)
 
 
-def compile_policy(policy: PolicyObject) -> CompiledPolicy:
+def compile_policy(policy: InputPolicyObject) -> CompiledInputPolicy:
     """Compile one structured policy object into guardrail and test artifacts."""
 
     if policy.app != "github":
@@ -267,7 +288,7 @@ def compile_policy(policy: PolicyObject) -> CompiledPolicy:
             f"No GitHub tool mapping for action/resource: {policy.action}/{policy.resource}"
         )
 
-    return CompiledPolicy(
+    return CompiledInputPolicy(
         input_rail_rule=compile_input_rail_rule(policy),
         blocked_tools=GITHUB_TOOL_MAPPINGS[policy_key],
         test_cases=compile_test_cases(policy),
@@ -275,7 +296,7 @@ def compile_policy(policy: PolicyObject) -> CompiledPolicy:
 
 
 def compile_policy_test_prompts(
-    policies: tuple[PolicyObject, ...] = DEFAULT_POLICY_OBJECTS,
+    policies: tuple[InputPolicyObject, ...] = DEFAULT_INPUT_POLICY_OBJECTS,
     test_cases_per_policy: int = DEFAULT_TEST_CASES_PER_POLICY,
 ) -> list[dict[str, str]]:
     """Compile curated policy test cases into the prompt format used by test_nemo_mcp.py."""
@@ -296,7 +317,7 @@ def compile_policy_test_prompts(
 
 
 def compile_blocked_tools(
-    policies: tuple[PolicyObject, ...] = DEFAULT_POLICY_OBJECTS,
+    policies: tuple[InputPolicyObject, ...] = DEFAULT_INPUT_POLICY_OBJECTS,
 ) -> frozenset[str]:
     """Compile policy objects into the MCP tool names that should be blocked."""
 
@@ -309,10 +330,31 @@ def compile_blocked_tools(
     return frozenset(blocked_tools)
 
 
-def print_compiled_policy(policy: PolicyObject, compiled_policy: CompiledPolicy) -> None:
+def compile_output_rail_rules(
+    policies: tuple[OutputPolicyObject, ...] = DEFAULT_OUTPUT_POLICY_OBJECTS,
+) -> tuple[str, ...]:
+    """Compile output policy objects into NeMo self-check output rule text."""
+
+    output_rules: list[str] = []
+
+    for policy in policies:
+        if policy.effect != "block":
+            raise ValueError(f"Unsupported output policy effect: {policy.effect}")
+
+        output_rules.append(
+            f'Answer "yes" when the assistant response reveals {policy.description}.'
+        )
+
+    return tuple(output_rules)
+
+
+def print_compiled_policy(
+    policy: InputPolicyObject,
+    compiled_policy: CompiledInputPolicy,
+) -> None:
     """Print compiled policy artifacts in a human-readable preview format."""
 
-    print("POLICY OBJECT")
+    print("INPUT POLICY OBJECT")
     print(f"- app: {policy.app}")
     print(f"- action: {policy.action}")
     print(f"- resource: {policy.resource}")
@@ -334,7 +376,7 @@ def print_compiled_policy(policy: PolicyObject, compiled_policy: CompiledPolicy)
 def main() -> None:
     """Run a small demo compilation for the default GitHub policy objects."""
 
-    for index, policy in enumerate(DEFAULT_POLICY_OBJECTS):
+    for index, policy in enumerate(DEFAULT_INPUT_POLICY_OBJECTS):
         if index:
             print("\n" + "=" * 80 + "\n")
 
@@ -344,6 +386,10 @@ def main() -> None:
     print("\nCOMBINED GENERATED TOOL DENYLIST")
     for tool_name in sorted(compile_blocked_tools()):
         print(f"- {tool_name}")
+
+    print("\nGENERATED OUTPUT RAIL RULES")
+    for output_rule in compile_output_rail_rules():
+        print(f"- {output_rule}")
 
 
 if __name__ == "__main__":

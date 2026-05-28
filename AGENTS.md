@@ -16,11 +16,12 @@ User prompt
 -> LangChain agent
 -> `src/nemo_mcp_guardrails/tool_guard.py` wraps GitHub MCP tools and blocks restricted tool names before execution
 -> GitHub MCP tools in read-only Docker mode
+-> NeMo Guardrails output rail using injected AzureChatOpenAI
 -> final model answer
 
 The deterministic Python pre-check is no longer the main enforcement path. It currently reports what it would block for comparison, unless `ENFORCE_PYTHON_PRECHECK=true` is set.
 
-The project now also includes a policy-object compiler prototype in `src/nemo_mcp_guardrails/policy_compiler.py`. It models admin-created policies such as `github + create + issue + block`, generates NeMo self-check rule text as a preview, generates blocked MCP tool names for `src/nemo_mcp_guardrails/tool_guard.py`, and generates curated blocked prompt tests consumed by `scripts/test_nemo_mcp.py`.
+The project now also includes a policy-object compiler prototype in `src/nemo_mcp_guardrails/policy_compiler.py`. It models admin-created input policies such as `github + create + issue + block`, generates NeMo self-check rule text as a preview, generates blocked MCP tool names for `src/nemo_mcp_guardrails/tool_guard.py`, generates curated blocked prompt tests consumed by `scripts/test_nemo_mcp.py`, and previews output-policy rule text.
 
 ## Current Safety Policy
 
@@ -49,14 +50,19 @@ Blocked actions:
 - Azure OpenAI credentials are loaded from `.env`.
 - GitHub MCP runs in Docker with `GITHUB_READ_ONLY=1`.
 - Current input blocking is handled by NeMo `self check input` in `config/prompts.yml`.
+- Current output checking is handled by NeMo `self check output` in `config/prompts.yml`.
+- `config/config.yml` enables both `self check input` and `self check output`.
+- Output self-check prompts intentionally inspect only `{{ bot_response }}` and do not echo `{{ user_input }}`, because unsafe user prompts containing fake token-like text can trigger Azure content filtering before NeMo can classify the assistant output.
 - `scripts/test_nemo_mcp.py` manually creates `LLMRails(rails_config, llm=model)` so NeMo uses the same working AzureChatOpenAI model as the LangChain agent.
 - Do not switch back to stock `GuardrailsMiddleware(config_path="config")` without testing, because it constructs its own NeMo LLM and previously hit an old OpenAI client path.
 - `src/nemo_mcp_guardrails/tool_guard.py` contains the current execution-level MCP tool guard. It is intentionally separate from NeMo input rails and now gets its blocked GitHub tool names from the policy compiler.
-- `src/nemo_mcp_guardrails/policy_compiler.py` contains the structured policy-object prototype. It currently covers GitHub issue, pull request, branch, file, repository, and fork write actions.
+- `src/nemo_mcp_guardrails/policy_compiler.py` contains the structured policy-object prototype. It uses `InputPolicyObject` for input/tool policies and `OutputPolicyObject` for output policies. It currently covers GitHub issue, pull request, branch, file, repository, and fork write actions plus credential/secret output checks.
+- To add a new policy in the current prototype, edit `src/nemo_mcp_guardrails/policy_compiler.py` mappings/synonyms/default policy objects and update `config/prompts.yml` manually if the NeMo self-check wording needs to change. Hardcoded prompt text is correct for now; later database/API work should move toward dynamic prompt text assembled from stored policy objects and templates.
 - `scripts/test_nemo_mcp.py` imports curated generated tests with `compile_policy_test_prompts()`, one test per policy object by default.
 - `scripts/debug_nemo_self_check.py` is an isolated diagnostic script for NeMo input rails without GitHub MCP.
 - `scripts/debug_tool_guard.py` is an isolated diagnostic script for the MCP tool guard without Docker, GitHub MCP, Azure OpenAI, or real credentials.
-- NeMo output rails are still disabled. The next planned milestone is to debug output rails in isolation before moving into the MySQL/FastAPI database phase.
+- `scripts/debug_nemo_output_check.py` is an isolated diagnostic script for NeMo output rails without GitHub MCP.
+- NeMo output rails are now enabled through `config/config.yml` and verified in the full GitHub MCP test runner.
 - The later database/API phase should use an organisation-aligned database direction: MySQL or Oracle. For local development, MySQL in Docker plus DBeaver is the preferred first prototype path unless Oracle is explicitly required. The target deployment direction is containerisation and OpenShift.
 - Do not add a custom `config/policies.yml` yet unless explicitly choosing to prototype the future admin/backend policy store. It is not a standard NeMo Guardrails file.
 
@@ -71,20 +77,7 @@ Blocked actions:
 
 ## Recommended Next Step
 
-Fix NeMo output rails in isolation before starting the database/API phase.
-
-Recommended approach:
-
-```text
-scripts/debug_nemo_output_check.py
--> inject the same AzureChatOpenAI model into LLMRails
--> test safe normal output
--> test fake token/secret-like output
--> verify NeMo does not use the old OpenAI client path
--> only then wire optional output checking into scripts/test_nemo_mcp.py
-```
-
-After output rails are stable, move to:
+The current guardrail milestone is green. Move to the database/API phase:
 
 ```text
 MySQL Docker container
@@ -99,5 +92,6 @@ Useful verification commands for the current state:
 
 - `python src/nemo_mcp_guardrails/policy_compiler.py`
 - `python scripts/debug_tool_guard.py`
-- `python -m py_compile src/nemo_mcp_guardrails/policy_compiler.py src/nemo_mcp_guardrails/tool_guard.py scripts/test_nemo_mcp.py scripts/debug_tool_guard.py scripts/debug_nemo_self_check.py`
+- `python scripts/debug_nemo_output_check.py`
+- `python -m py_compile src/nemo_mcp_guardrails/policy_compiler.py src/nemo_mcp_guardrails/tool_guard.py scripts/test_nemo_mcp.py scripts/debug_tool_guard.py scripts/debug_nemo_self_check.py scripts/debug_nemo_output_check.py`
 - `python scripts/test_nemo_mcp.py`

@@ -43,3 +43,20 @@ prompts:
       Does the user message ask for a restricted operation?
 
       Answer only "yes" or "no".
+
+  - task: self_check_output
+    content: |
+      Your task is to decide whether the assistant's message should be blocked.
+
+      Policy:
+
+      Answer "no" when the assistant response only contains normal GitHub repository information, summaries, branch names, issue metadata, pull request metadata, or safe refusal text.
+
+      Answer "yes" when the assistant response reveals credentials, access tokens, API keys, hidden configuration files, .env contents, or environment variables.
+
+      Assistant response:
+      {{ bot_response }}
+
+      Does the assistant response reveal restricted information?
+
+      Answer only "yes" or "no".

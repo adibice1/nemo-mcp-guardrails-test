@@ -112,9 +112,15 @@ PARSED SELF-CHECK RESULT:
 
 If a safe prompt returns `yes`, revise `config/prompts.yml`.
 
-## NeMo Output Rail False Blocking
+## NeMo Output Rail Issues
 
-Output rails are disabled for now.
+Output rails are enabled in `config/config.yml`:
+
+```yaml
+output:
+  flows:
+    - self check output
+```
 
 If allowed read requests return:
 
@@ -122,19 +128,21 @@ If allowed read requests return:
 I cannot provide this response due to content policy.
 ```
 
-or logs mention the old OpenAI path, treat output rails as not yet fixed. The next planned task is to debug output rails separately in an isolated script before wiring them into the full GitHub MCP runner.
+or logs mention the old OpenAI path, debug output rails separately before changing the full GitHub MCP runner.
 
-Recommended next script:
+Use:
 
 ```text
 scripts/debug_nemo_output_check.py
 ```
 
-It should inject the same `AzureChatOpenAI` model into `LLMRails`, then verify:
+It injects the same `AzureChatOpenAI` model into `LLMRails`, then verifies:
 
 - safe normal assistant output passes
 - fake token/secret-like assistant output blocks
 - NeMo does not use the old `openai.ChatCompletion` path
+
+If Azure returns `content_filter` during output checks, inspect `config/prompts.yml`. The `self_check_output` prompt should only include `{{ bot_response }}`. Do not echo `{{ user_input }}` in the output prompt unless you are deliberately retesting Azure filtering behavior.
 
 ## Policy Compiler / Tool Guard Sanity Checks
 
@@ -143,15 +151,17 @@ If the next machine needs to verify the current policy-object prototype, run:
 ```powershell
 python src/nemo_mcp_guardrails/policy_compiler.py
 python scripts/debug_tool_guard.py
-python -m py_compile src/nemo_mcp_guardrails/policy_compiler.py src/nemo_mcp_guardrails/tool_guard.py scripts/test_nemo_mcp.py scripts/debug_tool_guard.py scripts/debug_nemo_self_check.py
+python scripts/debug_nemo_output_check.py
+python -m py_compile src/nemo_mcp_guardrails/policy_compiler.py src/nemo_mcp_guardrails/tool_guard.py scripts/test_nemo_mcp.py scripts/debug_tool_guard.py scripts/debug_nemo_self_check.py scripts/debug_nemo_output_check.py
 python scripts/test_nemo_mcp.py
 ```
 
 Expected:
 
-- `src/nemo_mcp_guardrails/policy_compiler.py` prints all default GitHub write-policy objects and a combined generated tool denylist.
+- `src/nemo_mcp_guardrails/policy_compiler.py` prints all default GitHub write input policy objects, a combined generated tool denylist, and generated output rail rules.
 - `scripts/debug_tool_guard.py` reports every compiler-generated blocked tool was blocked before execution.
-- `scripts/test_nemo_mcp.py` blocks all curated generated write-policy prompts through NeMo input rails.
+- `scripts/debug_nemo_output_check.py` reports output rail checks passed.
+- `scripts/test_nemo_mcp.py` blocks all curated generated write-policy prompts through NeMo input rails and prints `NEMO OUTPUT RAIL RESULT` before final responses.
 
 If `scripts/test_nemo_mcp.py` passes allowed read prompts but generated policy prompts are not present, check that it imports `compile_policy_test_prompts()` from `src/nemo_mcp_guardrails/policy_compiler.py`.
 
