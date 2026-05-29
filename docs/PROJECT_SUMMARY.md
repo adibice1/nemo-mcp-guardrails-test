@@ -1,5 +1,60 @@
 # Guardrails Management System — Project Summary and Flow
 
+## Current Handoff - 2026-05-29
+
+The current prototype has moved beyond hardcoded policy previews. It now has a working Postgres/FastAPI policy storage slice and a runtime loader that lets enabled database rows control the tool guard and generated policy tests.
+
+Current implemented flow:
+
+```text
+User prompt
+-> deterministic Python pre-check report only
+-> NeMo self_check_input using injected AzureChatOpenAI
+-> LangChain agent
+-> src/nemo_mcp_guardrails/tool_guard.py wraps MCP tools
+-> blocked tool names are compiled from enabled Postgres input policies
+-> GitHub MCP read-only tools run when allowed
+-> NeMo self_check_output checks final assistant response
+-> final response
+```
+
+Current backend/API state:
+
+- Postgres and pgAdmin run through `docker-compose.yml`.
+- DBeaver can connect to the same local Postgres database.
+- FastAPI starts with `python scripts/run_api.py`.
+- Policy CRUD is available under `/policies`.
+- `POST /policies/compile-preview` previews compiler output from enabled DB rows.
+- `src/nemo_mcp_guardrails/database/policy_loader.py` loads enabled input/output policy rows for runtime/debug code.
+
+Current verified DB-backed runtime behavior:
+
+- Enabled input policies are loaded from Postgres.
+- `tool_guard.py` compiles blocked MCP tool names from those DB input policies.
+- `scripts/debug_tool_guard.py` verifies DB-derived blocked tools are blocked before execution.
+- `scripts/test_nemo_mcp.py` prints the DB-loaded runtime input policies and generates blocked tests from the same loaded policies.
+
+Latest example enabled input policies:
+
+```text
+github create issue block -> issue_write
+github create pull_request block -> create_pull_request
+github merge pull_request block -> merge_pull_request
+github update file block -> create_or_update_file
+```
+
+Normal full-run GitHub MCP tests should stay in read-only mode with `GITHUB_READ_ONLY=1`. Future write-capable testing should be a separate opt-in harness with a throwaway repository and limited token.
+
+Immediate next step:
+
+```text
+document/commit current DB-backed milestone
+-> design next policy schema for argument/workflow/stateful policies
+-> then build dynamic prompt assembly from DB policies
+```
+
+Future write-tool policies will need more than a tool denylist. For example, allowing merges only in sequence `A -> B -> C` requires policy conditions, tool arguments, workflow state, and history checks before allowing tool execution.
+
 ## 1. Project Purpose
 
 This project explores how to build a **Guardrails Management System** for AI agents that are connected to external applications such as GitHub, Outlook, Slack, Jira, or other enterprise tools.
@@ -476,10 +531,10 @@ Current verified results:
 - Allowed GitHub read prompts pass NeMo input rails and call MCP tools.
 - Blocked write/credential prompts are stopped by NeMo before MCP tool execution.
 - The deterministic Python pre-check is now a comparison/safety fallback, not the main enforcement path.
-- NeMo output rails remain disabled and should be debugged separately.
+- NeMo output rails are enabled through `config/config.yml` and verified in the full runner.
 - See `docs/next-steps.md` for the recommended work order.
 
-## Current Implementation Update - 2026-05-26 Handoff
+## Historical Implementation Update - 2026-05-26 Handoff
 
 The prototype has progressed beyond the original NeMo input-rail milestone and beyond the first compiler-to-tool-guard milestone.
 
@@ -570,7 +625,7 @@ Important architectural decisions:
 - Use pgAdmin in Docker or DBeaver to inspect and manage the local database.
 - Plan for later containerisation/OpenShift deployment.
 
-Recommended next step for the next Codex session:
+Historical recommended next step from 2026-05-26, now completed:
 
 ```text
 POST /policies/compile-preview
@@ -578,6 +633,8 @@ POST /policies/compile-preview
 -> compiler loads active DB policies
 -> generated policy previews return through the API
 ```
+
+Current recommended next step is documented at the top of this file and in `docs/next-steps.md`.
 
 Useful verification commands:
 

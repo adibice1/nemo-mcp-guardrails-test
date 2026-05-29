@@ -10,6 +10,9 @@ The GitHub MCP prototype now has:
 - Curated generated policy tests consumed by `scripts/test_nemo_mcp.py`.
 - A config-driven NeMo output rail using `self check output`.
 - An isolated output-rail diagnostic script in `scripts/debug_nemo_output_check.py`.
+- A Postgres/FastAPI policy store with CRUD endpoints.
+- A compile-preview endpoint that turns enabled DB rows into compiler artifacts.
+- A runtime policy loader that feeds enabled DB input policies into the tool guard and generated tests.
 - Compact test output by default, with verbose LangChain traces controlled by `VERBOSE_TRACE=true`.
 
 Current successful flow:
@@ -20,7 +23,7 @@ User prompt
 -> NeMo self_check_input using injected AzureChatOpenAI
 -> if blocked: safe refusal, no MCP tool call
 -> if passed: LangChain agent runs
--> src/nemo_mcp_guardrails/tool_guard.py checks MCP tool names before execution
+-> src/nemo_mcp_guardrails/tool_guard.py checks DB-derived blocked MCP tool names before execution
 -> GitHub MCP read-only tools may be called
 -> NeMo self_check_output checks the final assistant response
 -> final answer
@@ -168,9 +171,9 @@ scripts/debug_nemo_output_check.py
 
 The full `scripts/test_nemo_mcp.py` run now prints `Output rail enabled via config/config.yml.` and includes `NEMO OUTPUT RAIL RESULT` before each final response.
 
-## Immediate Next Step: Database/API Phase
+## Completed: Database/API Foundation
 
-Start the backend foundation.
+The first backend slice is now in place.
 
 Supervisor guidance:
 
@@ -179,7 +182,17 @@ Supervisor guidance:
 - Use pgAdmin in Docker or DBeaver for database inspection and manual debugging.
 - Plan for containerisation and later OpenShift deployment.
 
-Recommended database/API path:
+Completed local foundation:
+
+- Postgres and pgAdmin run through `docker-compose.yml`.
+- DBeaver can connect to the same local Postgres database.
+- FastAPI starts from `scripts/run_api.py`.
+- SQLAlchemy creates the prototype `policies` table.
+- Policy CRUD endpoints support create, read, update, and delete.
+- `POST /policies/compile-preview` converts enabled DB policy rows into compiler artifacts.
+- `src/nemo_mcp_guardrails/database/policy_loader.py` loads enabled DB input/output policies for runtime/debug code.
+- `src/nemo_mcp_guardrails/tool_guard.py` compiles blocked tools from enabled DB input policies.
+- `scripts/test_nemo_mcp.py` prints DB-loaded runtime input policies and generates blocked tests from those policies.
 
 ```text
 Postgres Docker container
@@ -187,15 +200,7 @@ Postgres Docker container
 -> FastAPI app skeleton
 -> SQLAlchemy policy model
 -> policy CRUD endpoints
--> compiler loads active DB policies
-```
-
-Current FastAPI skeleton:
-
-```text
-src/nemo_mcp_guardrails/api/main.py
--> GET /health
--> GET /health/db
+-> compiler preview endpoint
 ```
 
 Run locally:
@@ -221,15 +226,71 @@ GET    /policies
 GET    /policies/{policy_id}
 PUT    /policies/{policy_id}
 DELETE /policies/{policy_id}
-```
-
-Next API endpoint:
-
-```text
 POST   /policies/compile-preview
 ```
 
+`POST /policies/compile-preview` returns:
+
+```text
+input_rules
+blocked_tools
+test_prompts
+output_rules
+```
+
 Keep the first schema simple and Postgres-native. Portability can be revisited later only if the deployment target changes.
+
+Latest verified DB-backed input policy sample:
+
+```text
+github create issue block -> issue_write
+github create pull_request block -> create_pull_request
+github merge pull_request block -> merge_pull_request
+github update file block -> create_or_update_file
+```
+
+## Completed: Runtime DB Policy Loading
+
+Runtime code now consumes enabled database rows instead of only using `DEFAULT_INPUT_POLICY_OBJECTS` and `DEFAULT_OUTPUT_POLICY_OBJECTS`.
+
+Current behavior:
+
+```text
+Postgres input policies
+-> policy_loader.py
+-> InputPolicyObject
+-> compile_blocked_tools()
+-> tool_guard.py runtime denylist
+-> scripts/test_nemo_mcp.py generated blocked tests
+```
+
+Output policies are also loadable through `load_output_policy_objects()`, but NeMo output enforcement still uses the manually maintained `config/prompts.yml` prompt until dynamic prompt assembly is built.
+
+Watch for duplicate enabled rows while testing the API. `compile-preview` intentionally compiles every enabled policy row, so duplicate rows produce duplicate rule/test previews.
+
+## Immediate Next Step: Commit And Schema Design
+
+Commit the current DB-backed milestone, then design the next policy schema before enabling write-capable MCP testing.
+
+Recommended order:
+
+```text
+commit current DB-backed milestone
+-> design policy schema extensions for tool arguments, conditions, workflow state, and priority
+-> keep normal GitHub MCP tests read-only
+-> build dynamic prompt assembly from DB policies
+-> only later add an opt-in write-mode harness with a throwaway repo and limited token
+```
+
+Future policy types to design:
+
+- `input`: user intent checks.
+- `output`: final response checks.
+- `tool`: tool-name restrictions.
+- `argument`: restrictions on tool arguments, such as file path or branch.
+- `workflow`: stateful sequences, such as allowing PR merges only in order `A -> B -> C`.
+
+Do not switch the default full MCP runner out of `GITHUB_READ_ONLY=1`. Write-capable tests should be separate and explicit.
 
 ## Files To Read First On Another Machine
 

@@ -16,7 +16,7 @@ Long-term project idea: build a web app for administrators to drag and drop app-
 - `.env` for secrets
 - `.env.example` for shareable placeholders
 
-Planned backend/database direction:
+Backend/database direction:
 
 - FastAPI
 - SQLAlchemy
@@ -53,6 +53,10 @@ The system successfully:
 - Wraps MCP tools with `src/nemo_mcp_guardrails/tool_guard.py` so restricted tool names can be blocked before execution.
 - Uses `src/nemo_mcp_guardrails/policy_compiler.py` to prototype admin-style policy objects and generated policy artifacts.
 - Feeds curated policy-generated tests into `scripts/test_nemo_mcp.py`.
+- Stores prototype policy rows in local Postgres through FastAPI CRUD endpoints.
+- Previews compiler output from enabled database policy rows through `POST /policies/compile-preview`.
+- Loads enabled Postgres input policies into runtime code through `src/nemo_mcp_guardrails/database/policy_loader.py`.
+- Uses DB-loaded input policies to compile `tool_guard.py` blocked tools and `scripts/test_nemo_mcp.py` generated blocked tests.
 
 ## Current Runtime Flow
 
@@ -152,11 +156,13 @@ config/prompts.yml
 -> NeMo self_check_output blocks unsafe assistant output after the agent runs
 
 src/nemo_mcp_guardrails/tool_guard.py
--> blocks restricted MCP tool names before execution
+-> blocks DB-derived restricted MCP tool names before execution
 
 GitHub MCP Docker env
 -> GITHUB_READ_ONLY=1 prevents write tools from being offered during normal tests
 ```
+
+Normal full-run GitHub MCP tests should remain read-only. Future write-capable testing should use a separate opt-in harness with a throwaway repository, limited token, and explicit safety flags.
 
 ## Important Implementation Detail
 
@@ -201,13 +207,39 @@ It intentionally does not echo the user input, because unsafe user prompts conta
 
 `scripts/debug_nemo_output_check.py` verifies safe assistant output passes and fake token/environment-variable output blocks.
 
-## Current Next Step
+## Current DB-Backed Runtime State
 
-The first Postgres/FastAPI CRUD slice is in place. Continue with compiler integration:
+The first Postgres/FastAPI CRUD slice, compile-preview endpoint, and runtime database policy loader are in place.
 
 ```text
-POST /policies/compile-preview
--> convert DB policy rows into InputPolicyObject / OutputPolicyObject
--> compiler loads active DB policies
--> generated policy previews return through the API
+Postgres policies
+-> policy_loader.py
+-> InputPolicyObject / OutputPolicyObject
+-> compiler
+-> tool_guard.py blocked tool names
+-> generated tests in scripts/test_nemo_mcp.py
 ```
+
+Latest verified enabled input policy sample:
+
+```text
+github create issue block -> issue_write
+github create pull_request block -> create_pull_request
+github merge pull_request block -> merge_pull_request
+github update file block -> create_or_update_file
+```
+
+Output policies are loadable for debug/compiler visibility, but actual NeMo output enforcement still comes from `config/prompts.yml` until dynamic prompt assembly is implemented.
+
+## Current Next Step
+
+Commit the current DB-backed milestone, then design the next policy schema for future write-capable systems:
+
+```text
+policy types: input / output / tool / argument / workflow
+conditions: repo, branch, PR number, file path, allowed sequence, current state
+effect: allow / block
+priority: explicit conflict resolution
+```
+
+Example future policy need: allow merges only in sequence `A -> B -> C`, and block `B -> A -> C` or any other order. That requires tool-argument and workflow-state checks, not only prompt rails or a tool-name denylist.

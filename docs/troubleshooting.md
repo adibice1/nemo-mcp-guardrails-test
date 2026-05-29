@@ -159,14 +159,49 @@ python scripts/test_nemo_mcp.py
 Expected:
 
 - `src/nemo_mcp_guardrails/policy_compiler.py` prints all default GitHub write input policy objects, a combined generated tool denylist, and generated output rail rules.
-- `scripts/debug_tool_guard.py` reports every compiler-generated blocked tool was blocked before execution.
+- `scripts/debug_tool_guard.py` reports every DB-derived compiler-generated blocked tool was blocked before execution.
 - `scripts/debug_nemo_output_check.py` reports output rail checks passed.
-- `scripts/test_nemo_mcp.py` blocks all curated generated write-policy prompts through NeMo input rails and prints `NEMO OUTPUT RAIL RESULT` before final responses.
+- `scripts/test_nemo_mcp.py` prints `Runtime input policies loaded`, blocks generated DB-policy prompts through NeMo input rails, and prints `NEMO OUTPUT RAIL RESULT` before final responses.
 
-If `scripts/test_nemo_mcp.py` passes allowed read prompts but generated policy prompts are not present, check that it imports `compile_policy_test_prompts()` from `src/nemo_mcp_guardrails/policy_compiler.py`.
+If `scripts/test_nemo_mcp.py` passes allowed read prompts but generated policy prompts are not present, check:
+
+- `src/nemo_mcp_guardrails/database/policy_loader.py` can connect to Postgres.
+- Enabled input policy rows exist in the `policies` table.
+- Rows include `policy_type=input`, `enabled=true`, `app`, `action`, `resource`, and `effect`.
+- `scripts/test_nemo_mcp.py` calls `compile_policy_test_prompts(load_input_policy_objects())`.
+
+If the database is unavailable or has no valid enabled input rows, `policy_loader.py` falls back to `DEFAULT_INPUT_POLICY_OBJECTS`.
 
 ## Database Tooling Direction
 
 The current database direction is PostgreSQL. For the first local backend prototype, use the Postgres service in `docker-compose.yml`.
 
 pgAdmin is available as a Docker service, and DBeaver can also connect to the same local Postgres database for inspecting policy rows, running manual queries, and debugging FastAPI CRUD behavior.
+
+## Runtime DB Policy Loading
+
+Current runtime input/tool policy flow:
+
+```text
+Postgres policies table
+-> load_input_policy_objects()
+-> compile_blocked_tools()
+-> tool_guard.py
+```
+
+To inspect what runtime code sees:
+
+```powershell
+$env:PYTHONPATH="src"; @'
+from nemo_mcp_guardrails.database.policy_loader import load_input_policy_objects
+from nemo_mcp_guardrails.policy_compiler import compile_blocked_tools
+
+policies = load_input_policy_objects()
+for policy in policies:
+    print(policy)
+
+print(sorted(compile_blocked_tools(policies)))
+'@ | .\.venv\Scripts\python.exe -
+```
+
+Normal full-run GitHub MCP tests should keep `GITHUB_READ_ONLY=1`. Do not switch the default test runner to write mode. Future write-capable tests should be separate, opt-in, and use a throwaway repo plus a limited token.

@@ -255,7 +255,7 @@ subgraph ExampleFlow["Example Policy Flow"]
 end
 ```
 
-## Current Prototype Overlay - 2026-05-26
+## Current Prototype Overlay - 2026-05-29
 
 The full architecture above is still the target direction. The current research prototype is a smaller GitHub-only slice.
 
@@ -267,29 +267,33 @@ User prompt
 -> NeMo self_check_input using injected AzureChatOpenAI
 -> LangChain agent
 -> src/nemo_mcp_guardrails/tool_guard.py MCP tool wrapper
+-> blocked tool names compiled from enabled Postgres input policies
 -> GitHub MCP server in Docker with GITHUB_READ_ONLY=1
+-> NeMo self_check_output using injected AzureChatOpenAI
 -> final answer
 ```
 
-Current policy-object compiler prototype:
+Current policy/compiler/database prototype:
 
 ```text
-Admin-style policy object
+Admin-style policy row
+-> Postgres policies table
+-> FastAPI CRUD endpoints
+-> POST /policies/compile-preview
+-> src/nemo_mcp_guardrails/database/policy_loader.py
 -> src/nemo_mcp_guardrails/policy_compiler.py
 -> generated NeMo self-check rule preview
--> generated tool denylist preview
+-> generated DB-derived tool denylist
 -> generated test prompts consumed by scripts/test_nemo_mcp.py
 ```
 
-Current default policy object:
+Latest verified enabled input policy sample:
 
-```json
-{
-  "app": "github",
-  "action": "create",
-  "resource": "issue",
-  "effect": "block"
-}
+```text
+github create issue block -> issue_write
+github create pull_request block -> create_pull_request
+github merge pull_request block -> merge_pull_request
+github update file block -> create_or_update_file
 ```
 
 Current compiler metadata:
@@ -299,10 +303,12 @@ Current compiler metadata:
 - tool mapping: `create + issue -> issue_write`
 - generated blocked test prompts for issue creation variants
 
-Near-term next architecture step:
+Completed near-term architecture step:
 
 ```text
-src/nemo_mcp_guardrails/policy_compiler.py generated blocked tool names
+Postgres enabled input policies
+-> policy_loader.py
+-> policy_compiler.py generated blocked tool names
 -> src/nemo_mcp_guardrails/tool_guard.py runtime denylist
 ```
 
@@ -312,19 +318,21 @@ Longer-term target:
 Postgres policy/template/tool/synonym tables
 -> backend compiler
 -> generated NeMo prompt/config artifacts
--> runtime tool-call guard rules
+-> runtime input/tool/argument/workflow guard rules
 -> generated tests
 ```
 
-Near-term implementation order:
+Next implementation direction:
 
 ```text
-Postgres Docker container for local development
--> pgAdmin or DBeaver inspection/debugging
--> FastAPI policy CRUD endpoints
--> compiler loads active DB policies
+commit current DB-backed milestone
+-> design richer policy schema for conditions, arguments, priority, and workflow state
+-> keep normal GitHub MCP tests read-only
+-> build dynamic prompt assembly from DB policies
 -> later OpenShift deployment
 ```
+
+Future write-capable behavior should not rely only on prompt rails or a tool-name denylist. Use cases like allowing PR merges only in sequence `A -> B -> C` need tool arguments and workflow state, for example current merge history and the next allowed step.
 
 Important current decision:
 

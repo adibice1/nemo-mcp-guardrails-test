@@ -10,6 +10,7 @@ from nemoguardrails.rails.llm.options import RailStatus, RailType
 
 bootstrap_src()
 
+from nemo_mcp_guardrails.database.policy_loader import load_output_policy_objects
 from nemo_mcp_guardrails.policy_compiler import compile_output_rail_rules
 
 
@@ -81,7 +82,7 @@ async def main() -> None:
     rails = LLMRails(config, llm=model)
 
     print_separator("Compiled output policy rules")
-    for rule in compile_output_rail_rules():
+    for rule in compile_output_rail_rules(load_output_policy_objects()):
         print(f"- {rule}")
 
     for test in TEST_OUTPUTS:

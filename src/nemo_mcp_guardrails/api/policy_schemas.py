@@ -50,3 +50,19 @@ class PolicyRead(BaseModel):
     enabled: bool
     created_at: datetime
     updated_at: datetime
+
+
+class CompiledTestPrompt(BaseModel):
+    """Response body for one generated blocked prompt test."""
+
+    name: str
+    prompt: str
+
+
+class CompilePreviewResponse(BaseModel):
+    """Response body for previewing active policy compiler output."""
+
+    input_rules: list[str]
+    blocked_tools: list[str]
+    test_prompts: list[CompiledTestPrompt]
+    output_rules: list[str]

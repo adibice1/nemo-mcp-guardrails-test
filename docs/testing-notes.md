@@ -23,6 +23,7 @@ Current safety layers:
 - GitHub MCP Docker env: `GITHUB_READ_ONLY=1` prevents write tools from being offered during normal tests.
 - Deterministic Python pre-check: comparison/safety fallback only unless `ENFORCE_PYTHON_PRECHECK=true`.
 - `src/nemo_mcp_guardrails/policy_compiler.py`: prototype compiler for admin-style policy objects.
+- `src/nemo_mcp_guardrails/database/policy_loader.py`: loads enabled DB policy rows for runtime/debug code.
 
 ## Stage 1: Allowed Read-Only Tests
 
@@ -57,7 +58,24 @@ Expected:
 - NeMo output rail returns `RailStatus.PASSED` for the safe refusal text
 - Safe refusal is returned
 
-Generated tests currently include one curated prompt for each default policy object:
+Generated tests now come from enabled Postgres input policies loaded by `load_input_policy_objects()`. In the latest verified local DB state, the full test runner prints:
+
+```text
+Runtime input policies loaded
+- github create issue block -> issue_write
+- github create pull_request block -> create_pull_request
+- github merge pull_request block -> merge_pull_request
+- github update file block -> create_or_update_file
+```
+
+With those DB rows enabled, generated blocked tests include:
+
+- `Blocked: create issue`
+- `Blocked: create pull request`
+- `Blocked: merge pull request`
+- `Blocked: update file`
+
+If the database is unavailable or has no valid enabled input policies, the loader falls back to the default input policies from `policy_compiler.py`, which include:
 
 - `Blocked: create issue`
 - `Blocked: update issue`
@@ -103,7 +121,7 @@ Note:
 
 It verifies:
 
-- Every compiler-generated blocked tool is blocked before its `ainvoke` method is called.
+- Every DB-derived compiler-generated blocked tool is blocked before its `ainvoke` method is called.
 - A fake allowed tool named `search_repositories` passes through normally.
 
 Run:
@@ -112,20 +130,12 @@ Run:
 python scripts/debug_tool_guard.py
 ```
 
-Expected blocked tools include:
+With the latest verified DB rows, expected blocked tools include:
 
-- `add_issue_comment`
-- `create_branch`
 - `create_or_update_file`
 - `create_pull_request`
-- `create_repository`
-- `delete_file`
-- `fork_repository`
 - `issue_write`
 - `merge_pull_request`
-- `pull_request_review_write`
-- `push_files`
-- `update_pull_request`
 
 Expected final line:
 
@@ -157,6 +167,35 @@ The full test runner consumes a curated subset of generated test prompts:
 ```powershell
 python scripts/test_nemo_mcp.py
 ```
+
+The full runner should print `Runtime input policies loaded` near startup. That section is the easiest proof that Postgres-backed input policies are feeding the generated tests.
+
+## API Compile Preview Test
+
+The FastAPI backend can preview compiler output from enabled policy rows stored in Postgres.
+
+Run the API:
+
+```powershell
+python scripts/run_api.py
+```
+
+Then create policies through DBeaver, pgAdmin, Swagger, or HTTP clients and call:
+
+```text
+POST http://127.0.0.1:8000/policies/compile-preview
+```
+
+Expected response fields:
+
+- `input_rules`
+- `blocked_tools`
+- `test_prompts`
+- `output_rules`
+
+The endpoint compiles every enabled row. If duplicate enabled policies exist in the database, duplicate input rule and test prompt previews are expected.
+
+The endpoint is a preview/debug surface. Runtime input/tool enforcement is handled by `policy_loader.py` plus `tool_guard.py`; runtime output enforcement still depends on `config/prompts.yml` until dynamic prompt assembly is implemented.
 
 ## Isolated Input Debug Script
 

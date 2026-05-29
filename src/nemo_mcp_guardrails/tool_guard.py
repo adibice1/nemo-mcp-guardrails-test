@@ -2,11 +2,14 @@ from typing import Any
 
 from langchain_core.tools import StructuredTool
 
+from nemo_mcp_guardrails.database.policy_loader import load_input_policy_objects
 from nemo_mcp_guardrails.policy_compiler import compile_blocked_tools
 
 STATIC_BLOCKED_GITHUB_MCP_TOOLS: frozenset[str] = frozenset()
 
-BLOCKED_GITHUB_MCP_TOOLS = STATIC_BLOCKED_GITHUB_MCP_TOOLS | compile_blocked_tools()
+BLOCKED_GITHUB_MCP_TOOLS = STATIC_BLOCKED_GITHUB_MCP_TOOLS | compile_blocked_tools(
+    load_input_policy_objects()
+)
 
 TOOL_GUARD_REFUSAL = (
     "I can inspect GitHub information, but I cannot perform write actions "
