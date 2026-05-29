@@ -20,9 +20,9 @@ Planned backend/database direction:
 
 - FastAPI
 - SQLAlchemy
-- MySQL or Oracle, based on organisation preference
-- MySQL in Docker for the first local prototype unless Oracle is required immediately
-- DBeaver for database inspection
+- PostgreSQL
+- Postgres in Docker for the first local prototype
+- pgAdmin in Docker or DBeaver for database inspection
 - Later containerisation/OpenShift deployment
 
 ## Current Repository Layout
@@ -140,7 +140,7 @@ Current important design note:
 
 - `config/prompts.yml` is still manually maintained, which is normal for a NeMo Guardrails project and matches the standard NeMo examples.
 - `policy_compiler.py` currently previews rule text and drives tool denylist/test generation, but it does not automatically rewrite `config/prompts.yml`.
-- In the future admin/backend version, policy objects stored in MySQL or Oracle should be used to assemble more dynamic prompt text from templates, so administrators do not need to manually edit guardrail prompt files.
+- In the future admin/backend version, policy objects stored in Postgres should be used to assemble more dynamic prompt text from templates, so administrators do not need to manually edit guardrail prompt files.
 
 ## Current Safety Layers
 
@@ -203,13 +203,11 @@ It intentionally does not echo the user input, because unsafe user prompts conta
 
 ## Current Next Step
 
-Move into the MySQL/FastAPI foundation:
+The first Postgres/FastAPI CRUD slice is in place. Continue with compiler integration:
 
 ```text
-MySQL Docker container
--> DBeaver connection
--> FastAPI app skeleton
--> SQLAlchemy policy model
--> policy CRUD endpoints
+POST /policies/compile-preview
+-> convert DB policy rows into InputPolicyObject / OutputPolicyObject
 -> compiler loads active DB policies
+-> generated policy previews return through the API
 ```

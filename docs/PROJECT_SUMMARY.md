@@ -158,7 +158,7 @@ Python FastAPI Backend
     ↓
 Policy Validation
     ↓
-MySQL / Oracle Storage
+PostgreSQL Storage
     ↓
 Policy Compiler
     ↓
@@ -216,7 +216,7 @@ Backend responsibilities:
 
 Recommended stack:
 
-- MySQL or Oracle, matching organisation database standards
+- PostgreSQL, matching the current supervisor direction
 - JSON columns where available for flexible policy definitions
 
 Database stores:
@@ -271,7 +271,7 @@ The guardrails system should sit before these tools are executed, so unsafe acti
 3. Admin builds policy using visual blocks
 4. Frontend sends structured policy object to backend
 5. Backend validates policy
-6. Policy is saved in MySQL or Oracle
+6. Policy is saved in Postgres
 7. Policy compiler generates guardrail-compatible config
 8. Admin tests policy with sample prompts
 9. Admin activates policy for app or agent
@@ -444,7 +444,7 @@ nemo-mcp-guardrails-test/
 
 ## 15. One-Paragraph Summary
 
-This project is a web-based guardrails management platform that allows administrators to visually create, save, test, and activate app-specific AI agent policies. The frontend provides a drag-and-drop policy builder where admins assemble restrictions using blocks such as action, resource, condition, and effect. The Python backend stores these policies in MySQL or Oracle, validates them, and compiles them into NVIDIA NeMo Guardrails-compatible configurations. At runtime, AI agents load both organisation-wide system policies and app-specific active policies before interacting with external tools such as GitHub MCP or Outlook APIs. This enables organisations to safely customise agent behaviour across different applications without requiring administrators to manually write guardrail code.
+This project is a web-based guardrails management platform that allows administrators to visually create, save, test, and activate app-specific AI agent policies. The frontend provides a drag-and-drop policy builder where admins assemble restrictions using blocks such as action, resource, condition, and effect. The Python backend stores these policies in Postgres, validates them, and compiles them into NVIDIA NeMo Guardrails-compatible configurations. At runtime, AI agents load both organisation-wide system policies and app-specific active policies before interacting with external tools such as GitHub MCP or Outlook APIs. This enables organisations to safely customise agent behaviour across different applications without requiring administrators to manually write guardrail code.
 <!-- Current implementation update is maintained in docs/next-steps.md and docs/project-context.md. -->
 
 ## Current Implementation Update
@@ -565,20 +565,18 @@ Important architectural decisions:
 - Keep `config/prompts.yml` as the NeMo input/output rail policy source for now.
 - Keep `src/nemo_mcp_guardrails/tool_guard.py` as the execution-level tool guard.
 - Use `src/nemo_mcp_guardrails/policy_compiler.py` as a prototype of the future backend/admin policy compiler.
-- In the final system, policy objects, tool mappings, synonyms, templates, versions, active mappings, and audit logs should move into MySQL or Oracle.
-- The organisation prefers MySQL or Oracle. Use MySQL in Docker first for local development unless Oracle is explicitly required.
-- Use DBeaver to inspect and manage the local database.
+- In the final system, policy objects, tool mappings, synonyms, templates, versions, active mappings, and audit logs should move into Postgres.
+- Use the normal Postgres Docker image for local development.
+- Use pgAdmin in Docker or DBeaver to inspect and manage the local database.
 - Plan for later containerisation/OpenShift deployment.
 
 Recommended next step for the next Codex session:
 
 ```text
-MySQL Docker container
--> DBeaver connection
--> FastAPI app skeleton
--> SQLAlchemy policy model
--> policy CRUD endpoints
+POST /policies/compile-preview
+-> convert DB policy rows into InputPolicyObject / OutputPolicyObject
 -> compiler loads active DB policies
+-> generated policy previews return through the API
 ```
 
 Useful verification commands:

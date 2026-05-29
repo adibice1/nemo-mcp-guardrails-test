@@ -63,7 +63,7 @@ Blocked actions:
 - `scripts/debug_tool_guard.py` is an isolated diagnostic script for the MCP tool guard without Docker, GitHub MCP, Azure OpenAI, or real credentials.
 - `scripts/debug_nemo_output_check.py` is an isolated diagnostic script for NeMo output rails without GitHub MCP.
 - NeMo output rails are now enabled through `config/config.yml` and verified in the full GitHub MCP test runner.
-- The later database/API phase should use an organisation-aligned database direction: MySQL or Oracle. For local development, MySQL in Docker plus DBeaver is the preferred first prototype path unless Oracle is explicitly required. The target deployment direction is containerisation and OpenShift.
+- The later database/API phase should use PostgreSQL. Local development now starts from `docker-compose.yml`, which runs Postgres and pgAdmin. DBeaver can also connect to the same local Postgres database. The target deployment direction is containerisation and OpenShift.
 - Do not add a custom `config/policies.yml` yet unless explicitly choosing to prototype the future admin/backend policy store. It is not a standard NeMo Guardrails file.
 
 ## When Editing This Project
@@ -77,15 +77,13 @@ Blocked actions:
 
 ## Recommended Next Step
 
-The current guardrail milestone is green. Move to the database/API phase:
+The current guardrail milestone is green, and the first Postgres/FastAPI CRUD slice is in place. Continue with compiler integration:
 
 ```text
-MySQL Docker container
--> DBeaver local inspection
--> FastAPI app skeleton
--> SQLAlchemy policy model
--> policy CRUD endpoints
+POST /policies/compile-preview
+-> convert DB policy rows into InputPolicyObject / OutputPolicyObject
 -> compiler loads active policies from the database
+-> generated policy previews return through the API
 ```
 
 Useful verification commands for the current state:
@@ -93,5 +91,6 @@ Useful verification commands for the current state:
 - `python src/nemo_mcp_guardrails/policy_compiler.py`
 - `python scripts/debug_tool_guard.py`
 - `python scripts/debug_nemo_output_check.py`
+- `python scripts/run_api.py`
 - `python -m py_compile src/nemo_mcp_guardrails/policy_compiler.py src/nemo_mcp_guardrails/tool_guard.py scripts/test_nemo_mcp.py scripts/debug_tool_guard.py scripts/debug_nemo_self_check.py scripts/debug_nemo_output_check.py`
 - `python scripts/test_nemo_mcp.py`

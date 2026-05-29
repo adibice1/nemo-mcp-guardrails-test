@@ -174,35 +174,62 @@ Start the backend foundation.
 
 Supervisor guidance:
 
-- Use MySQL or Oracle because those align with the organisation.
-- Prefer MySQL first for local Docker prototyping unless Oracle is explicitly required immediately.
-- Use DBeaver for database inspection and manual debugging.
+- Use PostgreSQL for the policy store.
+- Use the normal Postgres Docker image for local development.
+- Use pgAdmin in Docker or DBeaver for database inspection and manual debugging.
 - Plan for containerisation and later OpenShift deployment.
 
 Recommended database/API path:
 
 ```text
-MySQL Docker container
--> DBeaver connection
+Postgres Docker container
+-> pgAdmin or DBeaver connection
 -> FastAPI app skeleton
 -> SQLAlchemy policy model
 -> policy CRUD endpoints
 -> compiler loads active DB policies
 ```
 
-Initial API endpoints:
+Current FastAPI skeleton:
+
+```text
+src/nemo_mcp_guardrails/api/main.py
+-> GET /health
+-> GET /health/db
+```
+
+Run locally:
+
+```powershell
+python scripts/run_api.py
+```
+
+Then open:
+
+```text
+http://127.0.0.1:8000/health
+http://127.0.0.1:8000/health/db
+```
+
+Current API endpoints:
 
 ```text
 GET    /health
+GET    /health/db
 POST   /policies
 GET    /policies
 GET    /policies/{policy_id}
-PATCH  /policies/{policy_id}
+PUT    /policies/{policy_id}
 DELETE /policies/{policy_id}
+```
+
+Next API endpoint:
+
+```text
 POST   /policies/compile-preview
 ```
 
-Keep the DB schema portable enough that Oracle support remains realistic later.
+Keep the first schema simple and Postgres-native. Portability can be revisited later only if the deployment target changes.
 
 ## Files To Read First On Another Machine
 

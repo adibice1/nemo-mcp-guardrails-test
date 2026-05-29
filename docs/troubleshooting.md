@@ -167,6 +167,6 @@ If `scripts/test_nemo_mcp.py` passes allowed read prompts but generated policy p
 
 ## Database Tooling Direction
 
-The organisation prefers MySQL or Oracle. For the first local backend prototype, use MySQL in Docker unless Oracle is explicitly required.
+The current database direction is PostgreSQL. For the first local backend prototype, use the Postgres service in `docker-compose.yml`.
 
-DBeaver is the recommended local database management tool for inspecting policy rows, running manual queries, and debugging FastAPI CRUD behavior.
+pgAdmin is available as a Docker service, and DBeaver can also connect to the same local Postgres database for inspecting policy rows, running manual queries, and debugging FastAPI CRUD behavior.
