@@ -10,6 +10,7 @@ Current handoff status:
 - `src/nemo_mcp_guardrails/database/policy_loader.py` loads enabled DB policies for runtime code.
 - `src/nemo_mcp_guardrails/tool_guard.py` now compiles blocked tools from enabled DB input policies.
 - `scripts/test_nemo_mcp.py` prints the DB-loaded runtime input policies before running generated tests.
+- `scripts/debug_policy_loader.py` verifies Postgres policy loading without Azure OpenAI or GitHub MCP.
 
 Start here for current project context:
 

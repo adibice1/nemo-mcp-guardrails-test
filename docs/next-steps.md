@@ -193,6 +193,7 @@ Completed local foundation:
 - `src/nemo_mcp_guardrails/database/policy_loader.py` loads enabled DB input/output policies for runtime/debug code.
 - `src/nemo_mcp_guardrails/tool_guard.py` compiles blocked tools from enabled DB input policies.
 - `scripts/test_nemo_mcp.py` prints DB-loaded runtime input policies and generates blocked tests from those policies.
+- `scripts/debug_policy_loader.py` verifies Postgres policy loading and compiler output without Azure OpenAI or GitHub MCP.
 
 ```text
 Postgres Docker container
@@ -305,6 +306,7 @@ Start with:
 - `src/nemo_mcp_guardrails/policy_compiler.py`
 - `src/nemo_mcp_guardrails/tool_guard.py`
 - `scripts/debug_tool_guard.py`
+- `scripts/debug_policy_loader.py`
 - `scripts/debug_nemo_self_check.py`
 - `config/prompts.yml`
 - `config/config.yml`

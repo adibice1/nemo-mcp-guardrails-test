@@ -32,6 +32,7 @@ Current verified DB-backed runtime behavior:
 - Enabled input policies are loaded from Postgres.
 - `tool_guard.py` compiles blocked MCP tool names from those DB input policies.
 - `scripts/debug_tool_guard.py` verifies DB-derived blocked tools are blocked before execution.
+- `scripts/debug_policy_loader.py` verifies enabled Postgres policies and compiled artifacts without Azure OpenAI or GitHub MCP.
 - `scripts/test_nemo_mcp.py` prints the DB-loaded runtime input policies and generates blocked tests from the same loaded policies.
 
 Latest example enabled input policies:

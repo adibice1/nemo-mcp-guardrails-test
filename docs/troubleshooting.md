@@ -151,8 +151,9 @@ If the next machine needs to verify the current policy-object prototype, run:
 ```powershell
 python src/nemo_mcp_guardrails/policy_compiler.py
 python scripts/debug_tool_guard.py
+python scripts/debug_policy_loader.py
 python scripts/debug_nemo_output_check.py
-python -m py_compile src/nemo_mcp_guardrails/policy_compiler.py src/nemo_mcp_guardrails/tool_guard.py scripts/test_nemo_mcp.py scripts/debug_tool_guard.py scripts/debug_nemo_self_check.py scripts/debug_nemo_output_check.py
+python -m py_compile src/nemo_mcp_guardrails/policy_compiler.py src/nemo_mcp_guardrails/tool_guard.py src/nemo_mcp_guardrails/database/policy_loader.py scripts/test_nemo_mcp.py scripts/debug_tool_guard.py scripts/debug_policy_loader.py scripts/debug_nemo_self_check.py scripts/debug_nemo_output_check.py
 python scripts/test_nemo_mcp.py
 ```
 
@@ -160,6 +161,7 @@ Expected:
 
 - `src/nemo_mcp_guardrails/policy_compiler.py` prints all default GitHub write input policy objects, a combined generated tool denylist, and generated output rail rules.
 - `scripts/debug_tool_guard.py` reports every DB-derived compiler-generated blocked tool was blocked before execution.
+- `scripts/debug_policy_loader.py` reports enabled Postgres input/output policies and their compiled artifacts.
 - `scripts/debug_nemo_output_check.py` reports output rail checks passed.
 - `scripts/test_nemo_mcp.py` prints `Runtime input policies loaded`, blocks generated DB-policy prompts through NeMo input rails, and prints `NEMO OUTPUT RAIL RESULT` before final responses.
 

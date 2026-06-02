@@ -1,7 +1,10 @@
 import asyncio
+import os
 from typing import Any
 
 from _bootstrap import bootstrap_src
+
+os.environ.setdefault("NEMO_POLICY_SOURCE", "defaults")
 
 bootstrap_src()
 

@@ -375,11 +375,11 @@ async def main() -> None:
             # NeMo is the primary gate unless ENFORCE_PYTHON_PRECHECK is enabled.
             blocked_reason = precheck_user_prompt(test["prompt"])
             if blocked_reason:
-                print_separator("PYTHON PRECHECK WOULD BLOCK")
+                print_separator("OLD PYTHON PRECHECK WOULD HAVE BLOCKED")
                 print(blocked_reason)
 
                 if python_precheck_is_enforced():
-                    print_separator("PYTHON PRECHECK ENFORCED")
+                    print_separator("OLD PYTHON PRECHECK ENFORCED")
                     final_response = "I can inspect GitHub information, but I cannot perform write actions or reveal credentials."
                     if output_rail_enabled:
                         final_response = await apply_output_rail(
@@ -392,7 +392,7 @@ async def main() -> None:
                     print(final_response)
                     continue
             else:
-                print_separator("PYTHON PRECHECK WOULD ALLOW")
+                print_separator("OLD PYTHON PRECHECK WOULD HAVE ALLOWED")
                 print("No deterministic Python block matched.")
 
             # Run NeMo input rails before the agent can call any GitHub MCP tool.

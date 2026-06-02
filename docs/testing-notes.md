@@ -143,6 +143,34 @@ Expected final line:
 - Allowed tool executed normally: search_repositories
 ```
 
+## Policy Loader Test
+
+`scripts/debug_policy_loader.py` tests Postgres policy loading and compiler output without Azure OpenAI or GitHub MCP.
+
+Run:
+
+```powershell
+python scripts/debug_policy_loader.py
+```
+
+Expected with the latest verified DB rows:
+
+```text
+Loaded input policies
+- github create issue block
+- github create pull_request block
+- github merge pull_request block
+- github update file block
+
+Compiled blocked tools
+- create_or_update_file
+- create_pull_request
+- issue_write
+- merge_pull_request
+```
+
+If Postgres is not running, this diagnostic falls back to default compiler policies through `policy_loader.py`.
+
 ## Policy Compiler Test
 
 `src/nemo_mcp_guardrails/policy_compiler.py` previews what the current default policy objects compile into.

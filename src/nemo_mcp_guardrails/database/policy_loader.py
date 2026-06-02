@@ -1,3 +1,5 @@
+import os
+
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -9,6 +11,19 @@ from nemo_mcp_guardrails.policy_compiler import (
     InputPolicyObject,
     OutputPolicyObject,
 )
+
+
+POLICY_SOURCE_ENV = "NEMO_POLICY_SOURCE"
+
+
+def default_policy_source_requested() -> bool:
+    """Return whether runtime policy loading should skip the database."""
+
+    return os.getenv(POLICY_SOURCE_ENV, "").lower() in {
+        "default",
+        "defaults",
+        "static",
+    }
 
 
 def _load_enabled_policy_records(policy_type: str) -> list[PolicyRecord] | None:
@@ -60,6 +75,9 @@ def _to_output_policy_object(record: PolicyRecord) -> OutputPolicyObject | None:
 def load_input_policy_objects() -> tuple[InputPolicyObject, ...]:
     """Load enabled input policies from Postgres, falling back to default policies."""
 
+    if default_policy_source_requested():
+        return DEFAULT_INPUT_POLICY_OBJECTS
+
     records = _load_enabled_policy_records("input")
     if records is None:
         return DEFAULT_INPUT_POLICY_OBJECTS
@@ -75,6 +93,9 @@ def load_input_policy_objects() -> tuple[InputPolicyObject, ...]:
 
 def load_output_policy_objects() -> tuple[OutputPolicyObject, ...]:
     """Load enabled output policies from Postgres, falling back to default policies."""
+
+    if default_policy_source_requested():
+        return DEFAULT_OUTPUT_POLICY_OBJECTS
 
     records = _load_enabled_policy_records("output")
     if records is None:
