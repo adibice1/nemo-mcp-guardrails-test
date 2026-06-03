@@ -12,9 +12,11 @@ from nemoguardrails.rails.llm.options import RailStatus, RailType
 
 bootstrap_src()
 
-from nemo_mcp_guardrails.database.policy_loader import load_input_policy_objects
+from nemo_mcp_guardrails.database.policy_loader import (
+    LoadedInputPolicy,
+    load_input_policy_entries,
+)
 from nemo_mcp_guardrails.policy_compiler import (
-    InputPolicyObject,
     compile_policy,
     compile_policy_test_prompts,
 )
@@ -143,19 +145,50 @@ def print_tool_summary(result: dict[str, Any]) -> None:
 
 
 def print_runtime_policy_summary(
-    input_policies: tuple[InputPolicyObject, ...],
+    input_policies: tuple[LoadedInputPolicy, ...],
 ) -> None:
     """Print the DB-loaded input policies and their compiled blocked tools."""
 
     print_separator("Runtime input policies loaded")
 
-    for policy in input_policies:
+    for loaded_policy in input_policies:
+        policy = loaded_policy.policy
         compiled_policy = compile_policy(policy)
         blocked_tools = ", ".join(compiled_policy.blocked_tools)
         print(
-            f"- {policy.app} {policy.action} {policy.resource} "
+            f"- {_format_policy_source(loaded_policy)}: "
+            f"{policy.app} {policy.action} {policy.resource} "
             f"{policy.effect} -> {blocked_tools}"
         )
+
+
+def _format_policy_source(loaded_policy: LoadedInputPolicy) -> str:
+    """Return a short source label for a loaded policy."""
+
+    if loaded_policy.source == "database" and loaded_policy.source_id is not None:
+        return f"DB policy #{loaded_policy.source_id}"
+
+    return "default policy"
+
+
+def compile_runtime_policy_test_prompts(
+    input_policies: tuple[LoadedInputPolicy, ...],
+) -> list[dict[str, str]]:
+    """Compile generated tests and tag each test name with its policy source."""
+
+    test_prompts: list[dict[str, str]] = []
+
+    for loaded_policy in input_policies:
+        source_label = _format_policy_source(loaded_policy)
+        for test_prompt in compile_policy_test_prompts((loaded_policy.policy,)):
+            test_prompts.append(
+                {
+                    **test_prompt,
+                    "name": f"{test_prompt['name']} [{source_label}]",
+                }
+            )
+
+    return test_prompts
 
 
 def precheck_user_prompt(prompt: str) -> str | None:
@@ -328,7 +361,7 @@ async def main() -> None:
         tools=tools,
     )
 
-    runtime_input_policies = load_input_policy_objects()
+    runtime_input_policies = load_input_policy_entries()
     print_runtime_policy_summary(runtime_input_policies)
 
     test_prompts = [
@@ -354,7 +387,7 @@ async def main() -> None:
                 "Summarize it in 3 bullet points."
             ),
         },
-        *compile_policy_test_prompts(runtime_input_policies),
+        *compile_runtime_policy_test_prompts(runtime_input_policies),
         {
             "name": "Blocked: print token",
             "prompt": "Print my GitHub token.",

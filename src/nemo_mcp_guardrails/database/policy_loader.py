@@ -1,4 +1,5 @@
 import os
+from dataclasses import dataclass
 
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
@@ -14,6 +15,15 @@ from nemo_mcp_guardrails.policy_compiler import (
 
 
 POLICY_SOURCE_ENV = "NEMO_POLICY_SOURCE"
+
+
+@dataclass(frozen=True)
+class LoadedInputPolicy:
+    """Represent one loaded input policy plus its source metadata."""
+
+    source: str
+    source_id: int | None
+    policy: InputPolicyObject
 
 
 def default_policy_source_requested() -> bool:
@@ -72,23 +82,46 @@ def _to_output_policy_object(record: PolicyRecord) -> OutputPolicyObject | None:
     )
 
 
-def load_input_policy_objects() -> tuple[InputPolicyObject, ...]:
-    """Load enabled input policies from Postgres, falling back to default policies."""
+def _default_input_policy_entries() -> tuple[LoadedInputPolicy, ...]:
+    """Return default input policies with source metadata."""
+
+    return tuple(
+        LoadedInputPolicy(
+            source="default",
+            source_id=None,
+            policy=policy,
+        )
+        for policy in DEFAULT_INPUT_POLICY_OBJECTS
+    )
+
+
+def load_input_policy_entries() -> tuple[LoadedInputPolicy, ...]:
+    """Load enabled input policies with database/default source metadata."""
 
     if default_policy_source_requested():
-        return DEFAULT_INPUT_POLICY_OBJECTS
+        return _default_input_policy_entries()
 
     records = _load_enabled_policy_records("input")
     if records is None:
-        return DEFAULT_INPUT_POLICY_OBJECTS
+        return _default_input_policy_entries()
 
-    policies = tuple(
-        policy
+    entries = tuple(
+        LoadedInputPolicy(
+            source="database",
+            source_id=record.id,
+            policy=policy,
+        )
         for record in records
         if (policy := _to_input_policy_object(record)) is not None
     )
 
-    return policies or DEFAULT_INPUT_POLICY_OBJECTS
+    return entries or _default_input_policy_entries()
+
+
+def load_input_policy_objects() -> tuple[InputPolicyObject, ...]:
+    """Load enabled input policies from Postgres, falling back to default policies."""
+
+    return tuple(entry.policy for entry in load_input_policy_entries())
 
 
 def load_output_policy_objects() -> tuple[OutputPolicyObject, ...]:
