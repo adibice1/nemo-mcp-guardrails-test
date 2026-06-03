@@ -66,3 +66,35 @@ class CompilePreviewResponse(BaseModel):
     blocked_tools: list[str]
     test_prompts: list[CompiledTestPrompt]
     output_rules: list[str]
+
+
+class AllowedTestCaseCreate(BaseModel):
+    """Request body for creating an allowed test case."""
+
+    name: str
+    prompt: str
+    expected_tools: str | None = None
+    enabled: bool = True
+
+
+class AllowedTestCaseUpdate(BaseModel):
+    """Request body for updating an allowed test case."""
+
+    name: str | None = None
+    prompt: str | None = None
+    expected_tools: str | None = None
+    enabled: bool | None = None
+
+
+class AllowedTestCaseRead(BaseModel):
+    """Response body for a stored allowed test case."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    prompt: str
+    expected_tools: str | None
+    enabled: bool
+    created_at: datetime
+    updated_at: datetime

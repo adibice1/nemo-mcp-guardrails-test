@@ -194,6 +194,7 @@ Completed local foundation:
 - `src/nemo_mcp_guardrails/tool_guard.py` compiles blocked tools from enabled DB input policies.
 - `scripts/test_nemo_mcp.py` prints DB-loaded runtime input policies and generates blocked tests from those policies.
 - `scripts/debug_policy_loader.py` verifies Postgres policy loading and compiler output without Azure OpenAI or GitHub MCP.
+- `allowed_test_cases` stores safe prompts that `scripts/test_nemo_mcp.py` should expect to pass.
 
 ```text
 Postgres Docker container
@@ -222,6 +223,11 @@ Current API endpoints:
 ```text
 GET    /health
 GET    /health/db
+POST   /allowed-test-cases
+GET    /allowed-test-cases
+GET    /allowed-test-cases/{test_case_id}
+PUT    /allowed-test-cases/{test_case_id}
+DELETE /allowed-test-cases/{test_case_id}
 POST   /policies
 GET    /policies
 GET    /policies/{policy_id}

@@ -5,6 +5,7 @@ from fastapi import Depends, FastAPI
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from nemo_mcp_guardrails.api.allowed_test_cases import router as allowed_test_cases_router
 from nemo_mcp_guardrails.api.policies import router as policies_router
 from nemo_mcp_guardrails.database.connection import create_database_tables, get_db
 
@@ -23,6 +24,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.include_router(allowed_test_cases_router)
 app.include_router(policies_router)
 
 

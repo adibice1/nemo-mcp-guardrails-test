@@ -83,6 +83,38 @@ updated_at
 
 `conditions` should probably be JSONB in Postgres.
 
+## Allowed Test Cases
+
+Allowed test cases are separate from policies. They are safe prompts that the
+test runner should expect to pass. Blocked tests are generated from active
+blocking policies, so they do not need to be manually stored as test cases in
+the first prototype.
+
+```text
+allowed_test_cases
+------------------
+id
+name
+prompt
+expected_tools
+enabled
+created_at
+updated_at
+```
+
+`enabled` means run or skip the test case. It does not mean allow or block.
+
+Example:
+
+```json
+{
+  "name": "Allowed: search repository",
+  "prompt": "Use GitHub MCP to search repositories for github/github-mcp-server.",
+  "expected_tools": "search_repositories",
+  "enabled": true
+}
+```
+
 ## Conditions
 
 Possible condition keys:
