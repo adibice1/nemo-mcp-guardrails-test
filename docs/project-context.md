@@ -57,7 +57,7 @@ The system successfully:
 - Previews compiler output from enabled database policy rows through `POST /policies/compile-preview`.
 - Loads enabled Postgres input policies into runtime code through `src/nemo_mcp_guardrails/database/policy_loader.py`.
 - Uses DB-loaded input policies to compile `tool_guard.py` blocked tools and `scripts/test_nemo_mcp.py` generated blocked tests.
-- Verifies DB policy loading through `scripts/debug_policy_loader.py`.
+- Verifies DB policy loading through `scripts/test_policy_loader.py`.
 
 ## Current Runtime Flow
 

@@ -58,7 +58,7 @@ Run scripts from the repository root, for example:
 
 ```powershell
 python scripts/test_nemo_mcp.py
-python scripts/debug_tool_guard.py
+python scripts/test_tool_guard.py
 python src/nemo_mcp_guardrails/policy_compiler.py
 ```
 
@@ -83,7 +83,7 @@ BLOCKED_GITHUB_MCP_TOOLS = STATIC_BLOCKED_GITHUB_MCP_TOOLS | compile_blocked_too
 
 `STATIC_BLOCKED_GITHUB_MCP_TOOLS` is currently an empty reserved hook for emergency/manual blocks.
 
-`scripts/debug_tool_guard.py` verifies every compiler-generated blocked tool is intercepted before execution.
+`scripts/test_tool_guard.py` verifies every compiler-generated blocked tool is intercepted before execution.
 
 ## Adding A Policy Today
 
@@ -193,7 +193,7 @@ Completed local foundation:
 - `src/nemo_mcp_guardrails/database/policy_loader.py` loads enabled DB input/output policies for runtime/debug code.
 - `src/nemo_mcp_guardrails/tool_guard.py` compiles blocked tools from enabled DB input policies.
 - `scripts/test_nemo_mcp.py` prints DB-loaded runtime input policies and generates blocked tests from those policies.
-- `scripts/debug_policy_loader.py` verifies Postgres policy loading and compiler output without Azure OpenAI or GitHub MCP.
+- `scripts/test_policy_loader.py` verifies Postgres policy loading and compiler output without Azure OpenAI or GitHub MCP.
 - `allowed_test_cases` stores safe prompts that `scripts/test_nemo_mcp.py` should expect to pass.
 
 ```text
@@ -331,8 +331,8 @@ Start with:
 - `scripts/test_nemo_mcp.py`
 - `src/nemo_mcp_guardrails/policy_compiler.py`
 - `src/nemo_mcp_guardrails/tool_guard.py`
-- `scripts/debug_tool_guard.py`
-- `scripts/debug_policy_loader.py`
+- `scripts/test_tool_guard.py`
+- `scripts/test_policy_loader.py`
 - `scripts/debug_nemo_self_check.py`
 - `config/prompts.yml`
 - `config/config.yml`

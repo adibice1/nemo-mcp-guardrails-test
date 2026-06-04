@@ -122,7 +122,7 @@ Note:
 
 ## Tool-Call Guard Test
 
-`scripts/debug_tool_guard.py` tests the MCP tool wrapper without Docker, GitHub MCP, Azure OpenAI, or real credentials.
+`scripts/test_tool_guard.py` tests the MCP tool wrapper without Docker, GitHub MCP, Azure OpenAI, or real credentials.
 
 It verifies:
 
@@ -132,7 +132,7 @@ It verifies:
 Run:
 
 ```powershell
-python scripts/debug_tool_guard.py
+python scripts/test_tool_guard.py
 ```
 
 With the latest verified DB rows, expected blocked tools include:
@@ -150,12 +150,12 @@ Expected final line:
 
 ## Policy Loader Test
 
-`scripts/debug_policy_loader.py` tests Postgres policy loading and compiler output without Azure OpenAI or GitHub MCP.
+`scripts/test_policy_loader.py` tests Postgres policy loading and compiler output without Azure OpenAI or GitHub MCP.
 
 Run:
 
 ```powershell
-python scripts/debug_policy_loader.py
+python scripts/test_policy_loader.py
 ```
 
 Expected with the latest verified DB rows:

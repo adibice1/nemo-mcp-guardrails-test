@@ -31,8 +31,8 @@ Current verified DB-backed runtime behavior:
 
 - Enabled input policies are loaded from Postgres.
 - `tool_guard.py` compiles blocked MCP tool names from those DB input policies.
-- `scripts/debug_tool_guard.py` verifies DB-derived blocked tools are blocked before execution.
-- `scripts/debug_policy_loader.py` verifies enabled Postgres policies and compiled artifacts without Azure OpenAI or GitHub MCP.
+- `scripts/test_tool_guard.py` verifies DB-derived blocked tools are blocked before execution.
+- `scripts/test_policy_loader.py` verifies enabled Postgres policies and compiled artifacts without Azure OpenAI or GitHub MCP.
 - `scripts/test_nemo_mcp.py` prints the DB-loaded runtime input policies and generates blocked tests from the same loaded policies.
 
 Latest example enabled input policies:
@@ -570,7 +570,7 @@ Key files:
 - `src/nemo_mcp_guardrails/policy_compiler.py`: structured policy-object compiler prototype.
 - `src/nemo_mcp_guardrails/tool_guard.py`: execution-level MCP tool guard.
 - `scripts/test_nemo_mcp.py`: full GitHub MCP + NeMo input/output rail test runner.
-- `scripts/debug_tool_guard.py`: isolated tool guard diagnostic.
+- `scripts/test_tool_guard.py`: isolated tool guard diagnostic.
 - `scripts/debug_nemo_self_check.py`: isolated input rail diagnostic.
 - `scripts/debug_nemo_output_check.py`: isolated output rail diagnostic.
 
@@ -612,7 +612,7 @@ Latest verified full test result:
 - All 14 compiler-generated GitHub write-policy prompts were blocked by NeMo input rails.
 - Credential/token prompts were blocked by NeMo input rails.
 - Output rails passed safe final responses and safe refusal messages.
-- `scripts/debug_tool_guard.py` confirmed every compiler-generated blocked tool is blocked before execution.
+- `scripts/test_tool_guard.py` confirmed every compiler-generated blocked tool is blocked before execution.
 - `scripts/debug_nemo_output_check.py` confirmed fake token/environment-variable output is blocked.
 
 Important architectural decisions:
@@ -641,8 +641,8 @@ Useful verification commands:
 
 ```powershell
 python src/nemo_mcp_guardrails/policy_compiler.py
-python scripts/debug_tool_guard.py
+python scripts/test_tool_guard.py
 python scripts/debug_nemo_output_check.py
-python -m py_compile src/nemo_mcp_guardrails/policy_compiler.py src/nemo_mcp_guardrails/tool_guard.py scripts/test_nemo_mcp.py scripts/debug_tool_guard.py scripts/debug_nemo_self_check.py scripts/debug_nemo_output_check.py
+python -m py_compile src/nemo_mcp_guardrails/policy_compiler.py src/nemo_mcp_guardrails/tool_guard.py scripts/test_nemo_mcp.py scripts/test_tool_guard.py scripts/debug_nemo_self_check.py scripts/debug_nemo_output_check.py
 python scripts/test_nemo_mcp.py
 ```
