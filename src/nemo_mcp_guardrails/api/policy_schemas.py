@@ -98,3 +98,24 @@ class AllowedTestCaseRead(BaseModel):
     enabled: bool
     created_at: datetime
     updated_at: datetime
+
+
+class CompiledPolicyRuleRead(BaseModel):
+    """Response body for one compiled policy rule."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    policy_id: int
+    rail_type: str
+    rule_text: str
+    enabled: bool
+    generated_at: datetime
+    created_at: datetime
+    updated_at: datetime
+
+
+class CompileAndStoreRulesResponse(BaseModel):
+    """Response body for compiling active policies into stored rail rules."""
+
+    rules: list[CompiledPolicyRuleRead]

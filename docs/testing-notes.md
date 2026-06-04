@@ -230,6 +230,36 @@ The endpoint compiles every enabled row. If duplicate enabled policies exist in 
 
 The endpoint is a preview/debug surface. Runtime input/tool enforcement is handled by `policy_loader.py` plus `tool_guard.py`; runtime output enforcement still depends on `config/prompts.yml` until dynamic prompt assembly is implemented.
 
+## Compiled Policy Rules API
+
+The API can also compile enabled policies into stored NeMo rail rule text.
+These stored rules are generated artifacts, not the policy source of truth.
+
+Endpoints:
+
+```text
+POST /policies/compile-rules
+GET  /policies/compiled-rules
+```
+
+Expected behavior:
+
+```text
+policies table
+-> POST /policies/compile-rules
+-> compiled_policy_rules table
+```
+
+With the current GitHub policy set, `POST /policies/compile-rules` should
+store 15 rules:
+
+- 14 input rail rules for GitHub write policies
+- 1 output rail rule for credential/secret leakage
+
+Runtime NeMo rails do not consume `compiled_policy_rules` yet. The next step is
+to build a prompt builder that injects these stored rules into the NeMo
+self-check prompt templates.
+
 ## Allowed Test Case API
 
 Allowed test cases are stored separately from policies. They are safe prompts

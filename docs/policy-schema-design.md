@@ -115,6 +115,99 @@ Example:
 }
 ```
 
+## Compiled Policy Rules
+
+Policies should remain the source of truth. Compiled policy rules are generated
+artifacts that turn active policy objects into NeMo-friendly rule text.
+
+This keeps the system split cleanly:
+
+```text
+policies
+-> admin-created source of truth
+
+compiled_policy_rules
+-> generated input/output rail rule text
+
+config/prompts.yml
+-> stable NeMo prompt template
+```
+
+Proposed table:
+
+```text
+compiled_policy_rules
+---------------------
+id
+policy_id
+rail_type
+rule_text
+enabled
+generated_at
+created_at
+updated_at
+```
+
+`rail_type` should currently support:
+
+```text
+input
+output
+```
+
+Example input rule:
+
+```json
+{
+  "policy_id": 12,
+  "rail_type": "input",
+  "rule_text": "Answer \"yes\" when the user asks to create, open, file, submit, raise, or log a GitHub issue or GitHub bug report.",
+  "enabled": true
+}
+```
+
+Example output rule:
+
+```json
+{
+  "policy_id": 30,
+  "rail_type": "output",
+  "rule_text": "Answer \"yes\" when the assistant response reveals credentials, access tokens, API keys, hidden configuration files, .env contents, or environment variables.",
+  "enabled": true
+}
+```
+
+The prompt builder should load enabled compiled rules by rail type:
+
+```sql
+SELECT rule_text
+FROM compiled_policy_rules
+WHERE rail_type = 'input'
+AND enabled = true
+ORDER BY id;
+```
+
+Then it injects those rules into a stable prompt template.
+
+Future `config/prompts.yml` shape:
+
+```yaml
+- task: self_check_input
+  content: |
+    Your task is to decide whether the user request should be blocked.
+
+    Policy:
+    {{ input_policy_rules }}
+
+    User message:
+    {{ user_input }}
+
+    Answer only "yes" or "no".
+```
+
+The same pattern should be used for output rails with
+`{{ output_policy_rules }}`.
+
 ## Conditions
 
 Possible condition keys:
@@ -138,10 +231,12 @@ current_state
 
 ```text
 input policies
--> NeMo input rail
+-> compiled_policy_rules where rail_type=input
+-> NeMo input rail prompt template
 
 output policies
--> NeMo output rail
+-> compiled_policy_rules where rail_type=output
+-> NeMo output rail prompt template
 
 tool policies
 -> tool_guard.py tool-name check
@@ -152,6 +247,10 @@ argument policies
 workflow policies
 -> workflow/state guard using database history
 ```
+
+Compiled rule text should describe what NeMo can classify from language. Tool,
+argument, and workflow policies still need Python-side enforcement because they
+depend on proposed tool names, tool arguments, and runtime state.
 
 ## Example Policies
 
@@ -221,6 +320,7 @@ more specific conditions should use higher priority
 1. Keep the current `policies` table for prototype CRUD.
 2. Add `priority` and `conditions` columns.
 3. Support `policy_type=tool` and `policy_type=argument`.
-4. Add workflow state/history tables later.
-5. Build dynamic prompt assembly for input/output policies.
-6. Add opt-in write-mode tests only after argument/workflow guards exist.
+4. Add `compiled_policy_rules` for generated NeMo input/output rule text.
+5. Build a prompt builder that injects compiled rules into NeMo templates.
+6. Add workflow state/history tables later.
+7. Add opt-in write-mode tests only after argument/workflow guards exist.

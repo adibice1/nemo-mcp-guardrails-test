@@ -1,16 +1,21 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from nemo_mcp_guardrails.api.policy_schemas import (
+    CompileAndStoreRulesResponse,
     CompilePreviewResponse,
+    CompiledPolicyRuleRead,
     CompiledTestPrompt,
     PolicyCreate,
     PolicyRead,
     PolicyUpdate,
 )
 from nemo_mcp_guardrails.database.connection import get_db
-from nemo_mcp_guardrails.database.models import PolicyRecord
+from nemo_mcp_guardrails.database.models import (
+    CompiledPolicyRuleRecord,
+    PolicyRecord,
+)
 from nemo_mcp_guardrails.policy_compiler import (
     InputPolicyObject,
     OutputPolicyObject,
@@ -57,6 +62,30 @@ def _to_output_policy_object(policy: PolicyRecord) -> OutputPolicyObject:
         description=policy.description or "",
         effect=policy.effect,
     )
+
+
+def _compile_policy_rule_record(policy: PolicyRecord) -> CompiledPolicyRuleRecord:
+    """Compile one stored policy row into a persisted rail rule record."""
+
+    if policy.policy_type == "input":
+        compiled_policy = compile_policy(_to_input_policy_object(policy))
+        return CompiledPolicyRuleRecord(
+            policy_id=policy.id,
+            rail_type="input",
+            rule_text=compiled_policy.input_rail_rule,
+            enabled=True,
+        )
+
+    if policy.policy_type == "output":
+        output_rules = compile_output_rail_rules((_to_output_policy_object(policy),))
+        return CompiledPolicyRuleRecord(
+            policy_id=policy.id,
+            rail_type="output",
+            rule_text=output_rules[0],
+            enabled=True,
+        )
+
+    raise ValueError(f"Unsupported policy type: {policy.policy_type}")
 
 
 @router.get("", response_model=list[PolicyRead])
@@ -111,6 +140,51 @@ def compile_policy_preview(db: Session = Depends(get_db)) -> CompilePreviewRespo
         test_prompts=test_prompts,
         output_rules=output_rules,
     )
+
+
+@router.get("/compiled-rules", response_model=list[CompiledPolicyRuleRead])
+def list_compiled_policy_rules(
+    db: Session = Depends(get_db),
+) -> list[CompiledPolicyRuleRecord]:
+    """Return stored compiled policy rail rules."""
+
+    return list(
+        db.scalars(
+            select(CompiledPolicyRuleRecord).order_by(CompiledPolicyRuleRecord.id)
+        )
+    )
+
+
+@router.post("/compile-rules", response_model=CompileAndStoreRulesResponse)
+def compile_and_store_policy_rules(
+    db: Session = Depends(get_db),
+) -> CompileAndStoreRulesResponse:
+    """Compile enabled policies into stored NeMo rail rule text."""
+
+    policies = list(
+        db.scalars(
+            select(PolicyRecord)
+            .where(PolicyRecord.enabled.is_(True))
+            .order_by(PolicyRecord.id)
+        )
+    )
+
+    try:
+        compiled_rules = [_compile_policy_rule_record(policy) for policy in policies]
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+
+    db.execute(delete(CompiledPolicyRuleRecord))
+    db.add_all(compiled_rules)
+    db.commit()
+
+    for compiled_rule in compiled_rules:
+        db.refresh(compiled_rule)
+
+    return CompileAndStoreRulesResponse(rules=compiled_rules)
 
 
 @router.get("/{policy_id}", response_model=PolicyRead)

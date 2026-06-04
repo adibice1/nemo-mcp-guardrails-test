@@ -230,6 +230,8 @@ PUT    /allowed-test-cases/{test_case_id}
 DELETE /allowed-test-cases/{test_case_id}
 POST   /policies
 GET    /policies
+POST   /policies/compile-rules
+GET    /policies/compiled-rules
 GET    /policies/{policy_id}
 PUT    /policies/{policy_id}
 DELETE /policies/{policy_id}
@@ -275,17 +277,35 @@ Output policies are also loadable through `load_output_policy_objects()`, but Ne
 
 Watch for duplicate enabled rows while testing the API. `compile-preview` intentionally compiles every enabled policy row, so duplicate rows produce duplicate rule/test previews.
 
+## Completed: Compiled Policy Rule Storage
+
+The API can now store generated NeMo rail rule text in `compiled_policy_rules`.
+
+Current behavior:
+
+```text
+enabled policies
+-> POST /policies/compile-rules
+-> compiled_policy_rules
+```
+
+`GET /policies/compiled-rules` returns the stored generated rules. These are
+generated artifacts, not the source of truth. Runtime rails still use
+`config/prompts.yml` until dynamic prompt assembly is implemented.
+
 ## Immediate Next Step: Commit And Schema Design
 
-Commit the current DB-backed milestone, then design the next policy schema before enabling write-capable MCP testing.
+Commit the current DB-backed milestone, then build the prompt builder that
+injects stored compiled rules into NeMo prompt templates.
 
 Recommended order:
 
 ```text
 commit current DB-backed milestone
--> design policy schema extensions for tool arguments, conditions, workflow state, and priority
+-> build prompt builder from compiled_policy_rules
+-> update prompts.yml into a stable template with injected rule blocks
 -> keep normal GitHub MCP tests read-only
--> build dynamic prompt assembly from DB policies
+-> later design policy schema extensions for tool arguments, conditions, workflow state, and priority
 -> only later add an opt-in write-mode harness with a throwaway repo and limited token
 ```
 
