@@ -12,6 +12,7 @@ The test pipeline is:
 
 User prompt
 -> deterministic Python pre-check report only
+-> DB compiled prompt rules are injected into `config/prompts.yml` templates
 -> NeMo Guardrails input rail using injected AzureChatOpenAI
 -> LangChain agent
 -> `src/nemo_mcp_guardrails/tool_guard.py` wraps GitHub MCP tools and blocks DB-derived restricted tool names before execution
@@ -49,8 +50,8 @@ Blocked actions:
 - `config/config.yml` should be committed but must not contain real API keys.
 - Azure OpenAI credentials are loaded from `.env`.
 - GitHub MCP runs in Docker with `GITHUB_READ_ONLY=1`.
-- Current input blocking is handled by NeMo `self check input` in `config/prompts.yml`.
-- Current output checking is handled by NeMo `self check output` in `config/prompts.yml`.
+- Current input blocking is handled by NeMo `self check input` using `config/prompts.yml` plus enabled DB rules from `compiled_policy_rules`.
+- Current output checking is handled by NeMo `self check output` using `config/prompts.yml` plus enabled DB rules from `compiled_policy_rules`.
 - `config/config.yml` enables both `self check input` and `self check output`.
 - Output self-check prompts intentionally inspect only `{{ bot_response }}` and do not echo `{{ user_input }}`, because unsafe user prompts containing fake token-like text can trigger Azure content filtering before NeMo can classify the assistant output.
 - `scripts/test_nemo_mcp.py` manually creates `LLMRails(rails_config, llm=model)` so NeMo uses the same working AzureChatOpenAI model as the LangChain agent.
@@ -58,7 +59,7 @@ Blocked actions:
 - `src/nemo_mcp_guardrails/tool_guard.py` contains the current execution-level MCP tool guard. It is intentionally separate from NeMo input rails and now gets its blocked GitHub tool names from enabled DB input policies through `src/nemo_mcp_guardrails/database/policy_loader.py` and the policy compiler.
 - `src/nemo_mcp_guardrails/policy_compiler.py` contains the structured policy-object prototype. It uses `InputPolicyObject` for input/tool policies and `OutputPolicyObject` for output policies. It currently covers GitHub issue, pull request, branch, file, repository, and fork write actions plus credential/secret output checks.
 - To add a runtime input policy in the current prototype, add an enabled policy row through the FastAPI CRUD endpoints or DBeaver. Edit `src/nemo_mcp_guardrails/policy_compiler.py` only when adding a new action/resource mapping, synonym, or template that the compiler does not yet understand.
-- Hardcoded prompt text in `config/prompts.yml` is correct for now; future work should move toward dynamic prompt text assembled from stored policy objects and templates.
+- `config/prompts.yml` is now a stable prompt template. `src/nemo_mcp_guardrails/database/prompt_rule_loader.py` loads enabled rows from `compiled_policy_rules`, and `src/nemo_mcp_guardrails/prompt_rule_compiler.py` injects those rules into the template before `LLMRails` is created.
 - `scripts/test_nemo_mcp.py` imports curated generated tests with `compile_policy_test_prompts(load_input_policy_objects())`, so generated blocked tests follow enabled DB input policies.
 - `scripts/debug_nemo_self_check.py` is an isolated diagnostic script for NeMo input rails without GitHub MCP.
 - `scripts/test_tool_guard.py` is an isolated diagnostic script for the MCP tool guard without Docker, Postgres, GitHub MCP, Azure OpenAI, or real credentials. It forces `NEMO_POLICY_SOURCE=defaults`.
@@ -69,7 +70,7 @@ Blocked actions:
 - FastAPI policy CRUD endpoints live under `/policies`.
 - `POST /policies/compile-preview` reads enabled DB policy rows, converts them into `InputPolicyObject` / `OutputPolicyObject`, and returns generated input rules, blocked tools, generated test prompts, and output rules.
 - FastAPI allowed-test CRUD endpoints live under `/allowed-test-cases`. These rows are safe prompts that `scripts/test_nemo_mcp.py` should expect to pass; they are not allow/block policies.
-- `src/nemo_mcp_guardrails/database/policy_loader.py` provides `load_input_policy_objects()` and `load_output_policy_objects()`. Input policies affect runtime tool guarding now; output policies are loadable for compiler/debug visibility, but actual output enforcement still comes from `config/prompts.yml` until dynamic prompt assembly is implemented.
+- `src/nemo_mcp_guardrails/database/policy_loader.py` provides `load_input_policy_objects()` and `load_output_policy_objects()`. Input policies affect runtime tool guarding. Output policies can be compiled and stored in `compiled_policy_rules`; those stored output rules are now injected into the NeMo output prompt by `prompt_rule_compiler.py`.
 - `src/nemo_mcp_guardrails/database/test_case_loader.py` loads enabled DB allowed test cases for `scripts/test_nemo_mcp.py`, falling back to the three default read tests if no enabled DB rows exist.
 - Normal full-run GitHub MCP tests should keep `GITHUB_READ_ONLY=1`. Future write-capable testing should be a separate opt-in harness with a throwaway repo and limited token.
 - Do not add a custom `config/policies.yml` yet unless explicitly choosing to prototype the future admin/backend policy store. It is not a standard NeMo Guardrails file.
@@ -91,7 +92,7 @@ The current guardrail milestone is green, and the Postgres/FastAPI CRUD, compile
 commit current DB-backed milestone
 -> design policy schema extensions for tool arguments, conditions, workflow state, and priority
 -> keep normal GitHub MCP tests read-only
--> build dynamic prompt assembly from DB policies
+-> refine DB prompt-rule lifecycle and admin UX
 ```
 
 Future write-tool use cases, such as allowing PR merges only in sequence `A -> B -> C`, require argument and workflow-state checks. A simple tool-name denylist is not enough for that class of policy.
@@ -103,5 +104,5 @@ Useful verification commands for the current state:
 - `python scripts/test_policy_loader.py`
 - `python scripts/debug_nemo_output_check.py`
 - `python scripts/run_api.py`
-- `python -m py_compile src/nemo_mcp_guardrails/policy_compiler.py src/nemo_mcp_guardrails/tool_guard.py src/nemo_mcp_guardrails/database/policy_loader.py src/nemo_mcp_guardrails/database/test_case_loader.py scripts/test_nemo_mcp.py scripts/test_tool_guard.py scripts/test_policy_loader.py scripts/debug_nemo_self_check.py scripts/debug_nemo_output_check.py`
+- `python -m py_compile src/nemo_mcp_guardrails/policy_compiler.py src/nemo_mcp_guardrails/tool_guard.py src/nemo_mcp_guardrails/database/policy_loader.py src/nemo_mcp_guardrails/database/test_case_loader.py src/nemo_mcp_guardrails/database/prompt_rule_loader.py src/nemo_mcp_guardrails/prompt_rule_compiler.py scripts/test_nemo_mcp.py scripts/test_tool_guard.py scripts/test_policy_loader.py scripts/debug_nemo_self_check.py scripts/debug_nemo_output_check.py`
 - `python scripts/test_nemo_mcp.py`

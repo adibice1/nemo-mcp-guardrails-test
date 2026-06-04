@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from langchain.agents import create_agent
 from langchain_openai import AzureChatOpenAI
 from langchain_mcp_adapters.client import MultiServerMCPClient
-from nemoguardrails import LLMRails, RailsConfig
+from nemoguardrails import LLMRails
 from nemoguardrails.rails.llm.options import RailStatus, RailType
 
 bootstrap_src()
@@ -23,6 +23,10 @@ from nemo_mcp_guardrails.database.test_case_loader import (
 from nemo_mcp_guardrails.policy_compiler import (
     compile_policy,
     compile_policy_test_prompts,
+)
+from nemo_mcp_guardrails.prompt_rule_compiler import (
+    PromptRuleConfig,
+    build_rails_config_with_prompt_rules,
 )
 from nemo_mcp_guardrails.tool_guard import guard_mcp_tool
 
@@ -219,6 +223,23 @@ def print_allowed_test_case_summary(
         )
 
 
+def print_prompt_rule_summary(prompt_rule_config: PromptRuleConfig) -> None:
+    """Print the DB prompt rules injected into the NeMo config."""
+
+    print_separator("NeMo prompt policy rules loaded")
+    print(
+        "- input rules from compiled_policy_rules: "
+        f"{prompt_rule_config.input_rule_count}"
+    )
+    print(
+        "- output rules from compiled_policy_rules: "
+        f"{prompt_rule_config.output_rule_count}"
+    )
+
+    if not prompt_rule_config.prompt_rules:
+        print("- fallback: using static config/prompts.yml policy text only")
+
+
 def compile_allowed_test_prompts(
     allowed_test_cases: tuple[LoadedAllowedTestCase, ...],
 ) -> list[dict[str, str]]:
@@ -390,7 +411,9 @@ async def main() -> None:
 
     # Load NeMo guardrail config and inject the working Azure model so NeMo does
     # not create an old OpenAI client internally.
-    rails_config = RailsConfig.from_path("config")
+    prompt_rule_config = build_rails_config_with_prompt_rules("config")
+    print_prompt_rule_summary(prompt_rule_config)
+    rails_config = prompt_rule_config.rails_config
     output_rail_enabled = bool(rails_config.rails.output.flows)
 
     rails = LLMRails(rails_config, llm=model)
@@ -476,7 +499,7 @@ async def main() -> None:
 
             # Stop unsafe requests before tool execution.
             if rail_result.status == RailStatus.BLOCKED:
-                print_separator("NEMO INPUT RAIL BLOCKED")
+                print_separator("REQUEST STOPPED BEFORE ACTION EXECUTION")
                 final_response = "I can inspect GitHub information, but I cannot perform write actions or reveal credentials."
                 if output_rail_enabled:
                     final_response = await apply_output_rail(

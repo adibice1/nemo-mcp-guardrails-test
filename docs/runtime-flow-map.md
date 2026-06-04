@@ -8,6 +8,7 @@ This is a concise map of how the current project moves from database policies to
 Postgres policy rows
 -> policy_loader.py converts rows into policy objects
 -> policy_compiler.py compiles policy objects into guardrail artifacts
+-> compiled_policy_rules are loaded and injected into prompts.yml templates
 -> test_nemo_mcp.py builds allowed + blocked test prompts
 -> NeMo input rail decides pass/block
 -> LangChain agent calls GitHub MCP tools for passed prompts
@@ -57,7 +58,30 @@ policy_loader.py:127
 load_output_policy_objects()
 ```
 
-Loads enabled `output` policy rows from Postgres and converts them into `OutputPolicyObject`s. These can be compiled into output rail rule text, but the actual runtime NeMo output rail still uses `config/prompts.yml` until dynamic prompt assembly is added.
+Loads enabled `output` policy rows from Postgres and converts them into `OutputPolicyObject`s. These can be compiled into output rail rule text, stored in `compiled_policy_rules`, and injected into the runtime NeMo output prompt.
+
+## Prompt Rule Loading
+
+```text
+src/nemo_mcp_guardrails/database/prompt_rule_loader.py:21
+load_prompt_policy_rules()
+```
+
+Loads enabled rule rows from the `compiled_policy_rules` table. These rows are generated artifacts created by `POST /policies/compile-rules`.
+
+```text
+-> src/nemo_mcp_guardrails/prompt_rule_compiler.py:23
+   format_prompt_rule_block()
+```
+
+Formats loaded input/output rules as prompt-ready bullet lists.
+
+```text
+-> src/nemo_mcp_guardrails/prompt_rule_compiler.py:52
+   build_rails_config_with_prompt_rules()
+```
+
+Reads `config/config.yml`, `config/prompts.yml`, and `config/rails.co`, injects the loaded DB rule blocks into `{{ input_policy_rules }}` and `{{ output_policy_rules }}`, then builds the runtime `RailsConfig` in memory.
 
 ## Policy Compilation
 
@@ -147,7 +171,14 @@ main()
 Starts the full integration test runner.
 
 ```text
--> test_nemo_mcp.py:409
+-> test_nemo_mcp.py:414
+   build_rails_config_with_prompt_rules()
+```
+
+Builds the NeMo config using static prompt templates plus enabled rows from `compiled_policy_rules`.
+
+```text
+-> test_nemo_mcp.py:432
    load_input_policy_entries()
 ```
 
@@ -161,7 +192,7 @@ Loads enabled runtime input policies from the DB.
 Prints the DB policy IDs and their compiled blocked tool names in the terminal.
 
 ```text
--> test_nemo_mcp.py:412
+-> test_nemo_mcp.py:435
    load_allowed_test_cases()
 ```
 
@@ -175,7 +206,7 @@ Loads enabled allowed test cases from the DB.
 Prints allowed test case DB IDs, names, and expected tools.
 
 ```text
--> test_nemo_mcp.py:415
+-> test_nemo_mcp.py:438
    test_prompts = [...]
 ```
 
@@ -208,7 +239,7 @@ Takes DB-loaded input policies, calls `compile_policy_test_prompts()`, and appen
 This is what proves the blocked tests came from DB-backed policies instead of only static Python defaults.
 
 ```text
--> test_nemo_mcp.py:428
+-> test_nemo_mcp.py:451
    for test in test_prompts:
 ```
 
@@ -338,15 +369,18 @@ Reads the currently stored compiled rules.
 | Generated blocked test prompts | DB policies compiled by `policy_compiler.py` | Used by `test_nemo_mcp.py`. |
 | Allowed test prompts | Postgres `allowed_test_cases` table | Falls back to defaults if DB unavailable/empty. |
 | Output policy objects | Postgres `policies` table | Loadable/compilable now. |
-| Actual NeMo input prompt template | `config/prompts.yml` | Still hardcoded for now. |
-| Actual NeMo output prompt template | `config/prompts.yml` | Still hardcoded for now. |
-| Stored compiled rule text | Postgres `compiled_policy_rules` table | Created by `POST /policies/compile-rules`. |
+| Actual NeMo input prompt template | `config/prompts.yml` + DB rules | `prompt_rule_compiler.py` injects `compiled_policy_rules` into the template. |
+| Actual NeMo output prompt template | `config/prompts.yml` + DB rules | `prompt_rule_compiler.py` injects `compiled_policy_rules` into the template. |
+| Stored compiled rule text | Postgres `compiled_policy_rules` table | Created by `POST /policies/compile-rules`, consumed by `prompt_rule_loader.py`. |
 
 ## Current End State In Terminal
 
 When `scripts/test_nemo_mcp.py` runs successfully, the terminal should show:
 
 ```text
+NeMo prompt policy rules loaded
+-> input/output rule counts from compiled_policy_rules
+
 Runtime input policies loaded
 -> DB policy IDs and blocked tools
 
@@ -362,4 +396,3 @@ Each test case
 ```
 
 That is the current proof that policies and allowed tests are coming from the database, then being compiled into runnable guardrail/test artifacts.
-

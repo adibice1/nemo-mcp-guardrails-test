@@ -5,7 +5,8 @@
 NeMo input rails are working in the full GitHub MCP test path when `LLMRails` is created with the already-working AzureChatOpenAI model:
 
 ```python
-rails_config = RailsConfig.from_path("config")
+prompt_rule_config = build_rails_config_with_prompt_rules("config")
+rails_config = prompt_rule_config.rails_config
 rails = LLMRails(rails_config, llm=model)
 ```
 
@@ -17,8 +18,8 @@ The runtime wraps MCP tools with `src/nemo_mcp_guardrails/tool_guard.py`. This e
 
 Current safety layers:
 
-- `config/prompts.yml`: NeMo `self_check_input` blocks unsafe user intent before the agent runs.
-- `config/prompts.yml`: NeMo `self_check_output` blocks unsafe assistant output after the agent runs.
+- `config/prompts.yml` plus `compiled_policy_rules`: NeMo `self_check_input` blocks unsafe user intent before the agent runs.
+- `config/prompts.yml` plus `compiled_policy_rules`: NeMo `self_check_output` blocks unsafe assistant output after the agent runs.
 - `src/nemo_mcp_guardrails/tool_guard.py`: blocks restricted MCP tool names before execution.
 - GitHub MCP Docker env: `GITHUB_READ_ONLY=1` prevents write tools from being offered during normal tests.
 - Deterministic Python pre-check: comparison/safety fallback only unless `ENFORCE_PYTHON_PRECHECK=true`.
@@ -228,7 +229,7 @@ Expected response fields:
 
 The endpoint compiles every enabled row. If duplicate enabled policies exist in the database, duplicate input rule and test prompt previews are expected.
 
-The endpoint is a preview/debug surface. Runtime input/tool enforcement is handled by `policy_loader.py` plus `tool_guard.py`; runtime output enforcement still depends on `config/prompts.yml` until dynamic prompt assembly is implemented.
+The endpoint is a preview/debug surface. Runtime input/tool enforcement is handled by `policy_loader.py` plus `tool_guard.py`; runtime NeMo prompt rules come from `config/prompts.yml` with enabled `compiled_policy_rules` injected by `prompt_rule_compiler.py`.
 
 ## Compiled Policy Rules API
 
@@ -256,9 +257,10 @@ store 15 rules:
 - 14 input rail rules for GitHub write policies
 - 1 output rail rule for credential/secret leakage
 
-Runtime NeMo rails do not consume `compiled_policy_rules` yet. The next step is
-to build a prompt builder that injects these stored rules into the NeMo
-self-check prompt templates.
+Runtime NeMo rails now consume enabled rows from `compiled_policy_rules`.
+`prompt_rule_loader.py` loads those rows, and `prompt_rule_compiler.py`
+injects them into the NeMo self-check prompt templates before `LLMRails` is
+created.
 
 ## Allowed Test Case API
 

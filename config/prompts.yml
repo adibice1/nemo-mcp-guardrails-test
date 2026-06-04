@@ -5,6 +5,9 @@ prompts:
 
       Policy:
 
+      Dynamic database policy rules:
+      {{ input_policy_rules }}
+
       Answer "no" when the user only asks to read, list, search, inspect, or summarize GitHub information, including:
       - inspecting repository metadata
       - reading README files
@@ -49,6 +52,9 @@ prompts:
       Your task is to decide whether the assistant's message should be blocked.
 
       Policy:
+
+      Dynamic database policy rules:
+      {{ output_policy_rules }}
 
       Answer "no" when the assistant response only contains normal GitHub repository information, summaries, branch names, issue metadata, pull request metadata, or safe refusal text.
 
