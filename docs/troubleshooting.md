@@ -57,7 +57,8 @@ Current workaround:
 
 ```python
 model = AzureChatOpenAI(...)
-rails_config = RailsConfig.from_path("config")
+prompt_rule_config = build_rails_config_with_prompt_rules("config")
+rails_config = prompt_rule_config.rails_config
 rails = LLMRails(rails_config, llm=model)
 ```
 
@@ -150,10 +151,11 @@ If the next machine needs to verify the current policy-object prototype, run:
 
 ```powershell
 python src/nemo_mcp_guardrails/policy_compiler.py
+python scripts/seed_normalized_policy_metadata.py
 python scripts/test_tool_guard.py
 python scripts/test_policy_loader.py
 python scripts/debug_nemo_output_check.py
-python -m py_compile src/nemo_mcp_guardrails/policy_compiler.py src/nemo_mcp_guardrails/tool_guard.py src/nemo_mcp_guardrails/database/policy_loader.py scripts/test_nemo_mcp.py scripts/test_tool_guard.py scripts/test_policy_loader.py scripts/debug_nemo_self_check.py scripts/debug_nemo_output_check.py
+python -m py_compile src/nemo_mcp_guardrails/policy_compiler.py src/nemo_mcp_guardrails/tool_guard.py src/nemo_mcp_guardrails/database/models.py src/nemo_mcp_guardrails/database/policy_loader.py src/nemo_mcp_guardrails/database/test_case_loader.py src/nemo_mcp_guardrails/database/prompt_rule_loader.py src/nemo_mcp_guardrails/prompt_rule_compiler.py scripts/seed_normalized_policy_metadata.py scripts/test_nemo_mcp.py scripts/test_tool_guard.py scripts/test_policy_loader.py scripts/debug_nemo_self_check.py scripts/debug_nemo_output_check.py
 python scripts/test_nemo_mcp.py
 ```
 
@@ -162,8 +164,9 @@ Expected:
 - `src/nemo_mcp_guardrails/policy_compiler.py` prints all default GitHub write input policy objects, a combined generated tool denylist, and generated output rail rules.
 - `scripts/test_tool_guard.py` reports every DB-derived compiler-generated blocked tool was blocked before execution.
 - `scripts/test_policy_loader.py` reports enabled Postgres input/output policies and their compiled artifacts.
+- `scripts/seed_normalized_policy_metadata.py` reports `apps: global, github`, `github actions: 11`, `github resources: 5`, `github tool mappings: 17`, and `allowed test expected-tool links: 3`.
 - `scripts/debug_nemo_output_check.py` reports output rail checks passed.
-- `scripts/test_nemo_mcp.py` prints `Runtime input policies loaded`, blocks generated DB-policy prompts through NeMo input rails, and prints `NEMO OUTPUT RAIL RESULT` before final responses.
+- `scripts/test_nemo_mcp.py` prints `NeMo prompt policy rules loaded`, `Runtime input policies loaded`, blocks generated DB-policy prompts through NeMo input rails, and prints `NEMO OUTPUT RAIL RESULT` before final responses.
 
 If `scripts/test_nemo_mcp.py` passes allowed read prompts but generated policy prompts are not present, check:
 
@@ -207,3 +210,26 @@ print(sorted(compile_blocked_tools(policies)))
 ```
 
 Normal full-run GitHub MCP tests should keep `GITHUB_READ_ONLY=1`. Do not switch the default test runner to write mode. Future write-capable tests should be separate, opt-in, and use a throwaway repo plus a limited token.
+
+## Normalized Metadata Tables
+
+If `allowed_test_case_expected_tools` is empty, run:
+
+```powershell
+python scripts/seed_normalized_policy_metadata.py
+```
+
+Expected counts:
+
+```text
+apps 2
+app_actions 11
+app_resources 5
+tool_mappings 17
+allowed_test_case_expected_tools 3
+```
+
+The join table is currently backfilled for inspection and for the next loader
+slice. Runtime allowed-test loading still uses the old
+`allowed_test_cases.expected_tools` text column until `test_case_loader.py` is
+updated.

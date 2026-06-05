@@ -255,7 +255,7 @@ subgraph ExampleFlow["Example Policy Flow"]
 end
 ```
 
-## Current Prototype Overlay - 2026-05-29
+## Current Prototype Overlay - 2026-06-05
 
 The full architecture above is still the target direction. The current research prototype is a smaller GitHub-only slice.
 
@@ -264,6 +264,7 @@ Current implemented path:
 ```text
 User prompt
 -> deterministic Python pre-check report only
+-> compiled_policy_rules injected into config/prompts.yml template
 -> NeMo self_check_input using injected AzureChatOpenAI
 -> LangChain agent
 -> src/nemo_mcp_guardrails/tool_guard.py MCP tool wrapper
@@ -280,11 +281,13 @@ Admin-style policy row
 -> Postgres policies table
 -> FastAPI CRUD endpoints
 -> POST /policies/compile-preview
+-> POST /policies/compile-rules stores compiled_policy_rules
 -> src/nemo_mcp_guardrails/database/policy_loader.py
 -> src/nemo_mcp_guardrails/policy_compiler.py
 -> generated NeMo self-check rule preview
 -> generated DB-derived tool denylist
 -> generated test prompts consumed by scripts/test_nemo_mcp.py
+-> prompt_rule_compiler.py injects stored compiled rules into NeMo prompts
 ```
 
 Latest verified enabled input policy sample:
@@ -300,7 +303,8 @@ Current compiler metadata:
 
 - action synonyms: `create`, `open`, `file`, `submit`, `raise`, `log`
 - resource synonyms: `issue`, `bug report`
-- tool mapping: `create + issue -> issue_write`
+- write tool mapping example: `create + issue -> issue_write`
+- read metadata mapping example: `search + repository -> search_repositories`
 - generated blocked test prompts for issue creation variants
 
 Completed near-term architecture step:
@@ -310,6 +314,17 @@ Postgres enabled input policies
 -> policy_loader.py
 -> policy_compiler.py generated blocked tool names
 -> src/nemo_mcp_guardrails/tool_guard.py runtime denylist
+```
+
+Current normalized metadata step:
+
+```text
+scripts/seed_normalized_policy_metadata.py
+-> apps: global, github
+-> app_actions
+-> app_resources
+-> tool_mappings
+-> allowed_test_case_expected_tools
 ```
 
 Longer-term target:
@@ -325,10 +340,10 @@ Postgres policy/template/tool/synonym tables
 Next implementation direction:
 
 ```text
-commit current DB-backed milestone
--> design richer policy schema for conditions, arguments, priority, and workflow state
+commit current normalized metadata milestone
+-> add/backfill normalized policy FK columns
+-> update policy_loader.py to prefer normalized joins
 -> keep normal GitHub MCP tests read-only
--> build dynamic prompt assembly from DB policies
 -> later OpenShift deployment
 ```
 

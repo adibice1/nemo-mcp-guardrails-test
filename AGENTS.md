@@ -58,6 +58,7 @@ Blocked actions:
 - Do not switch back to stock `GuardrailsMiddleware(config_path="config")` without testing, because it constructs its own NeMo LLM and previously hit an old OpenAI client path.
 - `src/nemo_mcp_guardrails/tool_guard.py` contains the current execution-level MCP tool guard. It is intentionally separate from NeMo input rails and now gets its blocked GitHub tool names from enabled DB input policies through `src/nemo_mcp_guardrails/database/policy_loader.py` and the policy compiler.
 - `src/nemo_mcp_guardrails/policy_compiler.py` contains the structured policy-object prototype. It uses `InputPolicyObject` for input/tool policies and `OutputPolicyObject` for output policies. It currently covers GitHub issue, pull request, branch, file, repository, and fork write actions plus credential/secret output checks.
+- GitHub compiler metadata is split into `GITHUB_WRITE_TOOL_MAPPINGS`, `GITHUB_READ_TOOL_MAPPINGS`, and `GITHUB_METADATA_TOOL_MAPPINGS`. Runtime blocking uses write mappings only; normalized metadata seeding uses the combined metadata mapping.
 - To add a runtime input policy in the current prototype, add an enabled policy row through the FastAPI CRUD endpoints or DBeaver. Edit `src/nemo_mcp_guardrails/policy_compiler.py` only when adding a new action/resource mapping, synonym, or template that the compiler does not yet understand.
 - `config/prompts.yml` is now a stable prompt template. `src/nemo_mcp_guardrails/database/prompt_rule_loader.py` loads enabled rows from `compiled_policy_rules`, and `src/nemo_mcp_guardrails/prompt_rule_compiler.py` injects those rules into the template before `LLMRails` is created.
 - `scripts/test_nemo_mcp.py` imports curated generated tests with `compile_policy_test_prompts(load_input_policy_objects())`, so generated blocked tests follow enabled DB input policies.
@@ -72,6 +73,8 @@ Blocked actions:
 - FastAPI allowed-test CRUD endpoints live under `/allowed-test-cases`. These rows are safe prompts that `scripts/test_nemo_mcp.py` should expect to pass; they are not allow/block policies.
 - `src/nemo_mcp_guardrails/database/policy_loader.py` provides `load_input_policy_objects()` and `load_output_policy_objects()`. Input policies affect runtime tool guarding. Output policies can be compiled and stored in `compiled_policy_rules`; those stored output rules are now injected into the NeMo output prompt by `prompt_rule_compiler.py`.
 - `src/nemo_mcp_guardrails/database/test_case_loader.py` loads enabled DB allowed test cases for `scripts/test_nemo_mcp.py`, falling back to the three default read tests if no enabled DB rows exist.
+- `scripts/seed_normalized_policy_metadata.py` seeds normalized app/action/resource/tool metadata and backfills `allowed_test_case_expected_tools`. Expected counts after seeding are: apps 2, app_actions 11, app_resources 5, tool_mappings 17, allowed_test_case_expected_tools 3.
+- Normalized metadata tables exist now: `apps`, `app_actions`, `app_resources`, `tool_mappings`, and `allowed_test_case_expected_tools`. Runtime policy loading still uses the flat `policies.app/action/resource` columns until the next migration slice.
 - Normal full-run GitHub MCP tests should keep `GITHUB_READ_ONLY=1`. Future write-capable testing should be a separate opt-in harness with a throwaway repo and limited token.
 - Do not add a custom `config/policies.yml` yet unless explicitly choosing to prototype the future admin/backend policy store. It is not a standard NeMo Guardrails file.
 
@@ -86,13 +89,14 @@ Blocked actions:
 
 ## Recommended Next Step
 
-The current guardrail milestone is green, and the Postgres/FastAPI CRUD, compile-preview, and runtime DB policy loading slices are in place. Continue with commit plus schema design:
+The current guardrail milestone is green, DB prompt-rule injection is implemented, and normalized metadata has been seeded. Continue with normalized policy FK backfill:
 
 ```text
-commit current DB-backed milestone
--> design policy schema extensions for tool arguments, conditions, workflow state, and priority
+commit current normalized metadata milestone
+-> add nullable policy FK/version/condition columns
+-> backfill policies.app/action/resource to normalized IDs
+-> update policy_loader.py to prefer normalized joins with flat-column fallback
 -> keep normal GitHub MCP tests read-only
--> refine DB prompt-rule lifecycle and admin UX
 ```
 
 Future write-tool use cases, such as allowing PR merges only in sequence `A -> B -> C`, require argument and workflow-state checks. A simple tool-name denylist is not enough for that class of policy.
@@ -100,9 +104,10 @@ Future write-tool use cases, such as allowing PR merges only in sequence `A -> B
 Useful verification commands for the current state:
 
 - `python src/nemo_mcp_guardrails/policy_compiler.py`
+- `python scripts/seed_normalized_policy_metadata.py`
 - `python scripts/test_tool_guard.py`
 - `python scripts/test_policy_loader.py`
 - `python scripts/debug_nemo_output_check.py`
 - `python scripts/run_api.py`
-- `python -m py_compile src/nemo_mcp_guardrails/policy_compiler.py src/nemo_mcp_guardrails/tool_guard.py src/nemo_mcp_guardrails/database/policy_loader.py src/nemo_mcp_guardrails/database/test_case_loader.py src/nemo_mcp_guardrails/database/prompt_rule_loader.py src/nemo_mcp_guardrails/prompt_rule_compiler.py scripts/test_nemo_mcp.py scripts/test_tool_guard.py scripts/test_policy_loader.py scripts/debug_nemo_self_check.py scripts/debug_nemo_output_check.py`
+- `python -m py_compile src/nemo_mcp_guardrails/policy_compiler.py src/nemo_mcp_guardrails/tool_guard.py src/nemo_mcp_guardrails/database/models.py src/nemo_mcp_guardrails/database/policy_loader.py src/nemo_mcp_guardrails/database/test_case_loader.py src/nemo_mcp_guardrails/database/prompt_rule_loader.py src/nemo_mcp_guardrails/prompt_rule_compiler.py scripts/seed_normalized_policy_metadata.py scripts/test_nemo_mcp.py scripts/test_tool_guard.py scripts/test_policy_loader.py scripts/debug_nemo_self_check.py scripts/debug_nemo_output_check.py`
 - `python scripts/test_nemo_mcp.py`

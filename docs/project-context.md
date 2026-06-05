@@ -58,12 +58,17 @@ The system successfully:
 - Loads enabled Postgres input policies into runtime code through `src/nemo_mcp_guardrails/database/policy_loader.py`.
 - Uses DB-loaded input policies to compile `tool_guard.py` blocked tools and `scripts/test_nemo_mcp.py` generated blocked tests.
 - Verifies DB policy loading through `scripts/test_policy_loader.py`.
+- Stores compiled NeMo rule text in `compiled_policy_rules`.
+- Injects enabled compiled rules into `config/prompts.yml` at runtime through `prompt_rule_compiler.py`.
+- Seeds normalized app/action/resource/tool metadata through `scripts/seed_normalized_policy_metadata.py`.
+- Backfills `allowed_test_case_expected_tools` from current allowed test rows.
 
 ## Current Runtime Flow
 
 ```text
 User prompt
 -> Python pre-check report only
+-> compiled_policy_rules are injected into config/prompts.yml template
 -> NeMo self_check_input using AzureChatOpenAI injected into LLMRails
 -> if blocked: safe refusal and no MCP tool call
 -> if passed: LangChain agent
@@ -117,16 +122,19 @@ The compiler currently generates:
 
 ## Adding Policies In The Current Prototype
 
-For now, new policies are added by editing `src/nemo_mcp_guardrails/policy_compiler.py`.
+For runtime policy testing, add enabled policy rows through FastAPI Swagger,
+DBeaver, or direct SQL. Edit `src/nemo_mcp_guardrails/policy_compiler.py` only
+when adding a new GitHub action/resource/tool mapping or new compiler metadata.
 
 For a new GitHub input/tool policy:
 
-1. Add or reuse an action/resource tool mapping in `GITHUB_TOOL_MAPPINGS`.
+1. Add or reuse an action/resource tool mapping in `GITHUB_WRITE_TOOL_MAPPINGS`.
 2. Add action synonyms in `GITHUB_ACTION_SYNONYMS` if the action is new.
 3. Add resource synonyms in `GITHUB_RESOURCE_SYNONYMS` if the resource is new.
 4. Add an `InputPolicyObject` to `DEFAULT_INPUT_POLICY_OBJECTS`.
-5. Make sure `config/prompts.yml` still describes the restriction clearly enough for `self_check_input`.
-6. Run the compiler, tool guard, and full MCP tests.
+5. Add or enable the policy row in Postgres.
+6. Run `POST /policies/compile-rules`.
+7. Run the compiler, tool guard, and full MCP tests.
 
 Example:
 
@@ -139,22 +147,28 @@ InputPolicyObject(
 )
 ```
 
-For a new output policy, add an `OutputPolicyObject` to `DEFAULT_OUTPUT_POLICY_OBJECTS` and make sure `config/prompts.yml` still describes the output restriction clearly enough for `self_check_output`.
+For a new output policy, add an enabled output policy row in Postgres, run
+`POST /policies/compile-rules`, and verify that the output rule count appears
+in `scripts/test_nemo_mcp.py`.
 
 Current important design note:
 
-- `config/prompts.yml` is still manually maintained, which is normal for a NeMo Guardrails project and matches the standard NeMo examples.
-- `policy_compiler.py` currently previews rule text and drives tool denylist/test generation, but it does not automatically rewrite `config/prompts.yml`.
-- In the future admin/backend version, policy objects stored in Postgres should be used to assemble more dynamic prompt text from templates, so administrators do not need to manually edit guardrail prompt files.
+- `config/prompts.yml` is now a stable template with `{{ input_policy_rules }}` and `{{ output_policy_rules }}` placeholders.
+- `prompt_rule_loader.py` loads enabled rows from `compiled_policy_rules`.
+- `prompt_rule_compiler.py` injects those rows into the prompt template before `LLMRails` is created.
+- The static prompt text remains as context/fallback around the dynamic DB rules.
 
 ## Current Safety Layers
 
 ```text
 config/prompts.yml
--> NeMo self_check_input blocks unsafe user intent before the agent runs
+-> stable template for NeMo self_check_input
 
 config/prompts.yml
--> NeMo self_check_output blocks unsafe assistant output after the agent runs
+-> stable template for NeMo self_check_output
+
+compiled_policy_rules
+-> dynamic input/output rules injected into prompts.yml templates
 
 src/nemo_mcp_guardrails/tool_guard.py
 -> blocks DB-derived restricted MCP tool names before execution
@@ -170,7 +184,8 @@ Normal full-run GitHub MCP tests should remain read-only. Future write-capable t
 NeMo input rails work when the project creates rails like this:
 
 ```python
-rails_config = RailsConfig.from_path("config")
+prompt_rule_config = build_rails_config_with_prompt_rules("config")
+rails_config = prompt_rule_config.rails_config
 rails = LLMRails(rails_config, llm=model)
 ```
 
@@ -230,17 +245,42 @@ github merge pull_request block -> merge_pull_request
 github update file block -> create_or_update_file
 ```
 
-Output policies are loadable for debug/compiler visibility, but actual NeMo output enforcement still comes from `config/prompts.yml` until dynamic prompt assembly is implemented.
+Output policies are compiled into `compiled_policy_rules`; enabled output rules
+are now injected into the runtime NeMo output prompt by `prompt_rule_compiler.py`.
+
+## Current Normalized Metadata State
+
+The normalized metadata slice has started. The new tables are:
+
+```text
+apps
+app_actions
+app_resources
+tool_mappings
+allowed_test_case_expected_tools
+```
+
+Seed with:
+
+```powershell
+python scripts/seed_normalized_policy_metadata.py
+```
+
+Latest expected counts:
+
+```text
+apps 2
+app_actions 11
+app_resources 5
+tool_mappings 17
+allowed_test_case_expected_tools 3
+```
 
 ## Current Next Step
 
-Commit the current DB-backed milestone, then design the next policy schema for future write-capable systems:
+Add normalized FK/version/condition columns to `policies`, backfill current flat
+policy rows to point at `apps`, `app_actions`, and `app_resources`, then update
+`policy_loader.py` to prefer normalized joins while keeping flat text columns as
+fallback.
 
-```text
-policy types: input / output / tool / argument / workflow
-conditions: repo, branch, PR number, file path, allowed sequence, current state
-effect: allow / block
-priority: explicit conflict resolution
-```
-
-Example future policy need: allow merges only in sequence `A -> B -> C`, and block `B -> A -> C` or any other order. That requires tool-argument and workflow-state checks, not only prompt rails or a tool-name denylist.
+Do not remove the flat `policies.app/action/resource` columns yet.

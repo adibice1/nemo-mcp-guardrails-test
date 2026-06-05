@@ -25,6 +25,8 @@ Current safety layers:
 - Deterministic Python pre-check: comparison/safety fallback only unless `ENFORCE_PYTHON_PRECHECK=true`.
 - `src/nemo_mcp_guardrails/policy_compiler.py`: prototype compiler for admin-style policy objects.
 - `src/nemo_mcp_guardrails/database/policy_loader.py`: loads enabled DB policy rows for runtime/debug code.
+- `src/nemo_mcp_guardrails/prompt_rule_compiler.py`: injects enabled `compiled_policy_rules` into NeMo prompt templates.
+- `scripts/seed_normalized_policy_metadata.py`: seeds normalized app/action/resource/tool metadata and backfills allowed-test expected-tool links.
 
 ## Stage 1: Allowed Read-Only Tests
 
@@ -181,6 +183,19 @@ If Postgres is not running, this diagnostic falls back to default compiler polic
 
 `src/nemo_mcp_guardrails/policy_compiler.py` previews what the current default policy objects compile into.
 
+GitHub metadata is split into:
+
+```text
+GITHUB_WRITE_TOOL_MAPPINGS
+-> used by compile_policy() and compile_blocked_tools()
+
+GITHUB_READ_TOOL_MAPPINGS
+-> read-only metadata for allowed test/tool mapping seeding
+
+GITHUB_METADATA_TOOL_MAPPINGS
+-> write + read mappings used by seed_normalized_policy_metadata.py
+```
+
 Run:
 
 ```powershell
@@ -261,6 +276,41 @@ Runtime NeMo rails now consume enabled rows from `compiled_policy_rules`.
 `prompt_rule_loader.py` loads those rows, and `prompt_rule_compiler.py`
 injects them into the NeMo self-check prompt templates before `LLMRails` is
 created.
+
+## Normalized Metadata Seed Test
+
+The normalized metadata seed script creates and backfills system/reference rows:
+
+```powershell
+python scripts/seed_normalized_policy_metadata.py
+```
+
+Expected output:
+
+```text
+Normalized policy metadata seeded.
+- apps: global, github
+- github actions: 11
+- github resources: 5
+- github tool mappings: 17
+- allowed test expected-tool links: 3
+```
+
+The script is idempotent. Running it multiple times should not duplicate rows.
+
+Current normalized tables:
+
+```text
+apps
+app_actions
+app_resources
+tool_mappings
+allowed_test_case_expected_tools
+```
+
+`test_case_loader.py` still reads the old comma-separated
+`allowed_test_cases.expected_tools` field for runtime output. The join table is
+backfilled and ready for the next loader update.
 
 ## Allowed Test Case API
 

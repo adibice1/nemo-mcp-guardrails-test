@@ -2,11 +2,30 @@
 
 ## Purpose
 
-This document sketches the next policy model for the guardrails management system before changing the database schema.
+This document defines the next normalized database shape for the guardrails
+management system.
 
-## Current Model
+The goal is to support many apps, each with its own actions, resources, tools,
+policy rules, test cases, and compiled NeMo prompt rules without hardcoding all
+policy data in Python files.
 
-The current prototype stores simple policies:
+## Current Working Flow
+
+The current runtime flow is:
+
+```text
+Postgres policies
+-> policy_loader.py
+-> policy_compiler.py
+-> compiled_policy_rules
+-> prompt_rule_loader.py
+-> prompt_rule_compiler.py
+-> config/prompts.yml template
+-> NeMo input/output rails
+-> scripts/test_nemo_mcp.py terminal output
+```
+
+This is now DB-backed, but the main `policies` table is still flat:
 
 ```text
 policy_type
@@ -19,42 +38,148 @@ effect
 enabled
 ```
 
+That flat shape works for the GitHub prototype, but it will become difficult to
+maintain when the system supports Slack, Jira, Google Drive, databases, or other
+apps with different actions/resources/tools.
+
+## Normalization Goals
+
+The normalized model should:
+
+- store each app once
+- store valid actions per app
+- store valid resources per app
+- map app/action/resource combinations to concrete tool names
+- keep policies as the source of truth
+- keep compiled NeMo rules as generated artifacts
+- keep allowed test cases separate from block policies
+- support future argument and workflow conditions
+- avoid duplicating strings such as `github`, `pull_request`, and `merge`
+
+## Proposed Core Tables
+
+### apps
+
+One row per protected app or connector.
+
+```sql
+CREATE TABLE apps (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    display_name VARCHAR(200) NOT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
 Example:
 
-```json
-{
-  "policy_type": "input",
-  "app": "github",
-  "action": "merge",
-  "resource": "pull_request",
-  "effect": "block",
-  "enabled": true
-}
+```text
+github -> GitHub
+jira -> Jira
+slack -> Slack
 ```
 
-This works for broad policies such as blocking all pull request merges.
+### app_actions
 
-## Current Limitations
+Actions supported by one app.
 
-The current model cannot express:
+```sql
+CREATE TABLE app_actions (
+    id SERIAL PRIMARY KEY,
+    app_id INTEGER NOT NULL REFERENCES apps(id) ON DELETE CASCADE,
+    name VARCHAR(100) NOT NULL,
+    display_name VARCHAR(200) NOT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (app_id, name)
+);
+```
 
-- repo-specific rules
-- branch-specific rules
-- file-path rules
-- PR-number or PR-label rules
-- approval/count-based rules
-- ordered workflows
-- stateful policies
-- allow/block conflict priority
-
-Example it cannot express yet:
+GitHub examples:
 
 ```text
-Allow merges only in order A -> B -> C.
-Block B -> A -> C or any other order.
+create
+update
+comment
+merge
+review
+push
+fork
+delete
 ```
 
-## Future Policy Types
+Slack examples:
+
+```text
+send
+update
+delete
+invite
+```
+
+### app_resources
+
+Resources supported by one app.
+
+```sql
+CREATE TABLE app_resources (
+    id SERIAL PRIMARY KEY,
+    app_id INTEGER NOT NULL REFERENCES apps(id) ON DELETE CASCADE,
+    name VARCHAR(100) NOT NULL,
+    display_name VARCHAR(200) NOT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (app_id, name)
+);
+```
+
+GitHub examples:
+
+```text
+issue
+pull_request
+branch
+file
+repository
+```
+
+Slack examples:
+
+```text
+message
+channel
+user
+```
+
+## Policy Source Of Truth
+
+### policies
+
+The policy row says what should be allowed or blocked. It references normalized
+app/action/resource rows instead of storing repeated strings.
+
+```sql
+CREATE TABLE policies (
+    id SERIAL PRIMARY KEY,
+    policy_type VARCHAR(30) NOT NULL,
+    app_id INTEGER REFERENCES apps(id) ON DELETE RESTRICT,
+    action_id INTEGER REFERENCES app_actions(id) ON DELETE RESTRICT,
+    resource_id INTEGER REFERENCES app_resources(id) ON DELETE RESTRICT,
+    category VARCHAR(100),
+    description TEXT,
+    effect VARCHAR(20) NOT NULL DEFAULT 'block',
+    priority INTEGER NOT NULL DEFAULT 100,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+Expected `policy_type` values:
 
 ```text
 input
@@ -64,157 +189,44 @@ argument
 workflow
 ```
 
-## Proposed Policy Fields
+Expected `effect` values:
 
 ```text
-id
-policy_type
-app
-action
-resource
-effect
-priority
-enabled
-conditions
-metadata
-created_at
-updated_at
+allow
+block
 ```
 
-`conditions` should probably be JSONB in Postgres.
+Notes:
 
-## Allowed Test Cases
+- `input` policies describe user intent that NeMo should block before action execution.
+- `output` policies describe unsafe assistant responses.
+- `tool` policies block/allow tool names before execution.
+- `argument` policies inspect tool arguments.
+- `workflow` policies depend on stored state/history.
+- Output policies may not need `action_id` or `resource_id`; they may use `category` instead, such as `credentials`.
 
-Allowed test cases are separate from policies. They are safe prompts that the
-test runner should expect to pass. Blocked tests are generated from active
-blocking policies, so they do not need to be manually stored as test cases in
-the first prototype.
+### policy_conditions
 
-```text
-allowed_test_cases
-------------------
-id
-name
-prompt
-expected_tools
-enabled
-created_at
-updated_at
-```
-
-`enabled` means run or skip the test case. It does not mean allow or block.
-
-Example:
-
-```json
-{
-  "name": "Allowed: search repository",
-  "prompt": "Use GitHub MCP to search repositories for github/github-mcp-server.",
-  "expected_tools": "search_repositories",
-  "enabled": true
-}
-```
-
-## Compiled Policy Rules
-
-Policies should remain the source of truth. Compiled policy rules are generated
-artifacts that turn active policy objects into NeMo-friendly rule text.
-
-This keeps the system split cleanly:
-
-```text
-policies
--> admin-created source of truth
-
-compiled_policy_rules
--> generated input/output rail rule text
-
-config/prompts.yml
--> stable NeMo prompt template
-```
-
-Proposed table:
-
-```text
-compiled_policy_rules
----------------------
-id
-policy_id
-rail_type
-rule_text
-enabled
-generated_at
-created_at
-updated_at
-```
-
-`rail_type` should currently support:
-
-```text
-input
-output
-```
-
-Example input rule:
-
-```json
-{
-  "policy_id": 12,
-  "rail_type": "input",
-  "rule_text": "Answer \"yes\" when the user asks to create, open, file, submit, raise, or log a GitHub issue or GitHub bug report.",
-  "enabled": true
-}
-```
-
-Example output rule:
-
-```json
-{
-  "policy_id": 30,
-  "rail_type": "output",
-  "rule_text": "Answer \"yes\" when the assistant response reveals credentials, access tokens, API keys, hidden configuration files, .env contents, or environment variables.",
-  "enabled": true
-}
-```
-
-The prompt builder should load enabled compiled rules by rail type:
+Future optional table for structured conditions if JSONB on `policies` becomes
+too hard to query or validate.
 
 ```sql
-SELECT rule_text
-FROM compiled_policy_rules
-WHERE rail_type = 'input'
-AND enabled = true
-ORDER BY id;
+CREATE TABLE policy_conditions (
+    id SERIAL PRIMARY KEY,
+    policy_id INTEGER NOT NULL REFERENCES policies(id) ON DELETE CASCADE,
+    condition_key VARCHAR(100) NOT NULL,
+    operator VARCHAR(50) NOT NULL DEFAULT 'equals',
+    condition_value JSONB NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 ```
-
-Then it injects those rules into a stable prompt template.
-
-Future `config/prompts.yml` shape:
-
-```yaml
-- task: self_check_input
-  content: |
-    Your task is to decide whether the user request should be blocked.
-
-    Policy:
-    {{ input_policy_rules }}
-
-    User message:
-    {{ user_input }}
-
-    Answer only "yes" or "no".
-```
-
-The same pattern should be used for output rails with
-`{{ output_policy_rules }}`.
-
-## Conditions
 
 Possible condition keys:
 
 ```text
-repo
 owner
+repo
 branch
 base_branch
 head_branch
@@ -227,100 +239,407 @@ allowed_sequence
 current_state
 ```
 
-## Enforcement Locations
+Example:
+
+```json
+{
+  "condition_key": "file_glob",
+  "operator": "matches",
+  "condition_value": "docs/**"
+}
+```
+
+## Tool Mapping Tables
+
+### tool_mappings
+
+Maps normalized app/action/resource concepts to actual connector or MCP tool
+names.
+
+```sql
+CREATE TABLE tool_mappings (
+    id SERIAL PRIMARY KEY,
+    app_id INTEGER NOT NULL REFERENCES apps(id) ON DELETE CASCADE,
+    action_id INTEGER NOT NULL REFERENCES app_actions(id) ON DELETE CASCADE,
+    resource_id INTEGER NOT NULL REFERENCES app_resources(id) ON DELETE CASCADE,
+    tool_name VARCHAR(200) NOT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (app_id, action_id, resource_id, tool_name)
+);
+```
+
+GitHub examples:
 
 ```text
-input policies
--> compiled_policy_rules where rail_type=input
--> NeMo input rail prompt template
-
-output policies
--> compiled_policy_rules where rail_type=output
--> NeMo output rail prompt template
-
-tool policies
--> tool_guard.py tool-name check
-
-argument policies
--> tool_guard.py argument check before calling tool
-
-workflow policies
--> workflow/state guard using database history
+github create issue        -> issue_write
+github update issue        -> issue_write
+github comment issue       -> add_issue_comment
+github create pull_request -> create_pull_request
+github update pull_request -> update_pull_request
+github merge pull_request  -> merge_pull_request
+github review pull_request -> pull_request_review_write
+github create branch       -> create_branch
+github update file         -> create_or_update_file
 ```
 
-Compiled rule text should describe what NeMo can classify from language. Tool,
-argument, and workflow policies still need Python-side enforcement because they
-depend on proposed tool names, tool arguments, and runtime state.
+This table is the normalized replacement for hardcoded tool mappings in
+`policy_compiler.py`.
 
-## Example Policies
+## Prompt Rule Artifacts
 
-### Block All Pull Request Merges
+### compiled_policy_rules
 
-```json
-{
-  "policy_type": "tool",
-  "app": "github",
-  "action": "merge",
-  "resource": "pull_request",
-  "effect": "block",
-  "priority": 100,
-  "enabled": true,
-  "conditions": {}
-}
+Generated NeMo rule text derived from enabled source policies.
+
+```sql
+CREATE TABLE compiled_policy_rules (
+    id SERIAL PRIMARY KEY,
+    policy_id INTEGER NOT NULL REFERENCES policies(id) ON DELETE CASCADE,
+    rail_type VARCHAR(20) NOT NULL,
+    rule_text TEXT NOT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    generated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 ```
 
-### Allow Only Docs File Updates
-
-```json
-{
-  "policy_type": "argument",
-  "app": "github",
-  "action": "update",
-  "resource": "file",
-  "effect": "allow",
-  "priority": 200,
-  "enabled": true,
-  "conditions": {
-    "file_glob": "docs/**"
-  }
-}
-```
-
-### Allow Merge Order A -> B -> C
-
-```json
-{
-  "policy_type": "workflow",
-  "app": "github",
-  "action": "merge",
-  "resource": "pull_request",
-  "effect": "allow",
-  "priority": 300,
-  "enabled": true,
-  "conditions": {
-    "workflow_id": "release-merge-sequence",
-    "allowed_sequence": ["A", "B", "C"]
-  }
-}
-```
-
-## Conflict Resolution
-
-Proposed rule:
+Expected `rail_type` values:
 
 ```text
-higher priority wins
-explicit block wins over allow at same priority
-disabled policies are ignored
-more specific conditions should use higher priority
+input
+output
 ```
 
-## Migration Path
+Important:
 
-1. Keep the current `policies` table for prototype CRUD.
-2. Add `priority` and `conditions` columns.
-3. Support `policy_type=tool` and `policy_type=argument`.
-4. Add `compiled_policy_rules` for generated NeMo input/output rule text.
-5. Build a prompt builder that injects compiled rules into NeMo templates.
-6. Add workflow state/history tables later.
-7. Add opt-in write-mode tests only after argument/workflow guards exist.
+- `policies` remain the source of truth.
+- `compiled_policy_rules` are generated artifacts.
+- `prompt_rule_loader.py` reads this table.
+- `prompt_rule_compiler.py` injects enabled rules into `config/prompts.yml`.
+
+## Test Tables
+
+### allowed_test_cases
+
+Allowed test cases are safe prompts expected to pass. They are not allow/block
+policies.
+
+```sql
+CREATE TABLE allowed_test_cases (
+    id SERIAL PRIMARY KEY,
+    app_id INTEGER REFERENCES apps(id) ON DELETE SET NULL,
+    name VARCHAR(200) NOT NULL,
+    prompt TEXT NOT NULL,
+    expected_tools TEXT,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+### allowed_test_case_expected_tools
+
+Expected tools are a many-to-many relationship:
+
+```text
+one allowed test case can expect multiple tools
+one tool mapping can be reused by multiple allowed test cases
+```
+
+So the normalized version should move away from comma-separated
+`allowed_test_cases.expected_tools`.
+
+```sql
+CREATE TABLE allowed_test_case_expected_tools (
+    id SERIAL PRIMARY KEY,
+    allowed_test_case_id INTEGER NOT NULL REFERENCES allowed_test_cases(id) ON DELETE CASCADE,
+    tool_mapping_id INTEGER NOT NULL REFERENCES tool_mappings(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (allowed_test_case_id, tool_mapping_id)
+);
+```
+
+Blocked test cases are generated from active block policies, so they do not need
+to be manually stored in the first normalized version.
+
+## Future Workflow Tables
+
+Workflow policies need state, not only prompt classification.
+
+### workflow_definitions
+
+```sql
+CREATE TABLE workflow_definitions (
+    id SERIAL PRIMARY KEY,
+    app_id INTEGER NOT NULL REFERENCES apps(id) ON DELETE CASCADE,
+    name VARCHAR(200) NOT NULL,
+    description TEXT,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (app_id, name)
+);
+```
+
+### workflow_events
+
+```sql
+CREATE TABLE workflow_events (
+    id SERIAL PRIMARY KEY,
+    workflow_id INTEGER NOT NULL REFERENCES workflow_definitions(id) ON DELETE CASCADE,
+    policy_id INTEGER REFERENCES policies(id) ON DELETE SET NULL,
+    app_id INTEGER NOT NULL REFERENCES apps(id) ON DELETE CASCADE,
+    action_id INTEGER REFERENCES app_actions(id) ON DELETE SET NULL,
+    resource_id INTEGER REFERENCES app_resources(id) ON DELETE SET NULL,
+    actor VARCHAR(200),
+    event_payload JSONB NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+This is what future policies like `allow merge A -> B -> C only` would use.
+
+## Example Normalized GitHub Policy
+
+Human meaning:
+
+```text
+Block GitHub pull request merges.
+```
+
+Normalized rows:
+
+```text
+apps
+- id=1, name=github
+
+app_actions
+- id=6, app_id=1, name=merge
+
+app_resources
+- id=2, app_id=1, name=pull_request
+
+policies
+- policy_type=input, app_id=1, action_id=6, resource_id=2, effect=block
+
+tool_mappings
+- app_id=1, action_id=6, resource_id=2, tool_name=merge_pull_request
+
+compiled_policy_rules
+- policy_id=<policy id>, rail_type=input, rule_text=Answer "yes" when...
+```
+
+## Loader Behavior After Normalization
+
+`policy_loader.py` should eventually join:
+
+```text
+policies
+-> apps
+-> app_actions
+-> app_resources
+```
+
+and still return the same compiler object:
+
+```python
+InputPolicyObject(
+    app="github",
+    action="merge",
+    resource="pull_request",
+    effect="block",
+)
+```
+
+This keeps the current compiler/test runner stable while the DB becomes more
+normalized underneath.
+
+## Compiler Behavior After Normalization
+
+Short term:
+
+```text
+policy_loader.py joins normalized tables
+-> policy_compiler.py still uses Python mappings/synonyms
+```
+
+Long term:
+
+```text
+policy_loader.py joins normalized tables
+-> policy_compiler.py reads DB tool_mappings and synonym/template tables
+```
+
+So normalization can happen in stages without rewriting the whole compiler at
+once.
+
+## Migration Plan
+
+Because the local DB can be reset during this prototype, the simplest migration
+path is:
+
+1. Create normalized metadata tables: `apps`, `app_actions`, `app_resources`, `tool_mappings`, `allowed_test_case_expected_tools`.
+2. Add normalized columns to `policies`: `app_id`, `action_id`, `resource_id`, `priority`, `conditions`, `policy_version`.
+3. Seed GitHub app/action/resource/tool mapping rows from current compiler data.
+4. Backfill existing `policies.app/action/resource` strings into FK IDs.
+5. Update `policy_loader.py` to prefer normalized FK joins.
+6. Keep old string columns temporarily as fallback/debug fields.
+7. Rerun `POST /policies/compile-rules`.
+8. Rerun `scripts/test_policy_loader.py`.
+9. Rerun `scripts/test_nemo_mcp.py`.
+10. After stable verification, remove old string columns in a later migration.
+
+## Proposed Implementation Slices
+
+### Slice 1: Add normalized tables without breaking current runtime
+
+Add new ORM models and create metadata/test join tables. Keep existing flat columns in `policies`.
+
+### Slice 2: Seed normalized GitHub metadata
+
+Seed:
+
+```text
+apps
+app_actions
+app_resources
+tool_mappings
+```
+
+from the current GitHub policy compiler metadata.
+
+Also seed a generic app row:
+
+```text
+apps.name = global
+```
+
+Generic cross-app output policies such as credentials, secrets, API keys, and
+PII should use `app_id=global`. App-specific output policies should use the
+specific app ID, such as `github`, `slack`, or `jira`.
+
+### Slice 3: Backfill policies
+
+Populate `policies.app_id`, `policies.action_id`, and `policies.resource_id`
+from existing text values.
+
+### Slice 4: Update loaders
+
+Make `policy_loader.py` read normalized joins when FK columns exist, with
+fallback to the current text columns.
+
+### Slice 5: Move compiler mappings into DB
+
+Once normalized policy loading is stable, gradually replace hardcoded
+`policy_compiler.py` mappings with DB-backed `tool_mappings` and later
+synonym/template tables.
+
+## Design Decisions
+
+### Output Policy Scope
+
+Output policies should be app-specific when needed, but the system should also
+support global policies.
+
+Use a normal `apps` row named `global` for generic output policies that apply to
+all apps:
+
+```text
+global credentials block
+global PII block
+global secret leakage block
+```
+
+Use app-specific rows for output policies that only apply to a single app:
+
+```text
+github repository metadata output policy
+slack channel message output policy
+jira ticket output policy
+```
+
+### Allowed Test Expected Tools
+
+Expected tools should become a join table instead of comma-separated text.
+
+Current prototype:
+
+```text
+allowed_test_cases.expected_tools = "search_repositories,get_file_contents"
+```
+
+Normalized target:
+
+```text
+allowed_test_cases
+-> allowed_test_case_expected_tools
+-> tool_mappings
+```
+
+### Policy Conditions
+
+Use a JSONB object on `policies` first:
+
+```sql
+conditions JSONB NOT NULL DEFAULT '{}'
+```
+
+This matches the policy-object shape and keeps the compiler simple:
+
+```json
+{
+  "file_glob": "docs/**",
+  "branch": "main",
+  "required_approvals": 2
+}
+```
+
+A separate `policy_conditions` table can be added later if the admin UI needs
+advanced filtering, validation, or reporting by condition key/operator.
+
+### Generated Blocked Test Cases
+
+Generated blocked tests should be regenerated every test run:
+
+```text
+DB policies
+-> policy_loader.py
+-> policy_compiler.py
+-> generated blocked test prompts
+```
+
+This keeps test output aligned with the latest enabled policies.
+
+Future optimization can cache generated tests in memory, but only with policy
+version or `updated_at` checks so stale tests are not reused.
+
+### Compiled Policy Rule Invalidation
+
+`ON UPDATE CASCADE` is not enough for `compiled_policy_rules`, because it only
+updates foreign key values. It does not regenerate derived rule text.
+
+Use explicit stale/version tracking instead:
+
+```text
+policies.policy_version
+compiled_policy_rules.policy_version
+compiled_policy_rules.stale
+```
+
+Recommended behavior:
+
+```text
+policy create/update/delete
+-> mark related compiled_policy_rules stale
+
+POST /policies/compile-rules
+-> regenerate compiled rules
+-> store current policy_version
+-> clear stale flag
+```
+
+This gives the admin/API layer a clear signal when compiled prompt rules need
+regeneration.

@@ -19,6 +19,42 @@ Postgres policy rows
 
 The database is now the active source for runtime policies. `policy_compiler.py` is still important because it explains what each policy means.
 
+## Normalized Metadata Seeding
+
+```text
+scripts/seed_normalized_policy_metadata.py
+```
+
+Seeds system/reference metadata from `policy_compiler.py`:
+
+```text
+GITHUB_METADATA_TOOL_MAPPINGS
+-> apps
+-> app_actions
+-> app_resources
+-> tool_mappings
+```
+
+It also backfills:
+
+```text
+allowed_test_cases.expected_tools
+-> allowed_test_case_expected_tools
+-> tool_mappings
+```
+
+Expected current counts:
+
+```text
+apps 2
+app_actions 11
+app_resources 5
+tool_mappings 17
+allowed_test_case_expected_tools 3
+```
+
+This metadata is seeded and ready, but runtime policy loading still uses the flat `policies.app/action/resource` columns until the next migration slice.
+
 ## Policy Loading
 
 ```text
@@ -368,7 +404,9 @@ Reads the currently stored compiled rules.
 | Runtime blocked tool names | DB policies compiled by `policy_compiler.py` | Used by `tool_guard.py`. |
 | Generated blocked test prompts | DB policies compiled by `policy_compiler.py` | Used by `test_nemo_mcp.py`. |
 | Allowed test prompts | Postgres `allowed_test_cases` table | Falls back to defaults if DB unavailable/empty. |
+| Allowed expected-tool join rows | Postgres `allowed_test_case_expected_tools` table | Seeded/backfilled, but not yet used by `test_case_loader.py`. |
 | Output policy objects | Postgres `policies` table | Loadable/compilable now. |
+| Normalized app/action/resource metadata | Postgres `apps`, `app_actions`, `app_resources`, `tool_mappings` | Seeded by `scripts/seed_normalized_policy_metadata.py`. |
 | Actual NeMo input prompt template | `config/prompts.yml` + DB rules | `prompt_rule_compiler.py` injects `compiled_policy_rules` into the template. |
 | Actual NeMo output prompt template | `config/prompts.yml` + DB rules | `prompt_rule_compiler.py` injects `compiled_policy_rules` into the template. |
 | Stored compiled rule text | Postgres `compiled_policy_rules` table | Created by `POST /policies/compile-rules`, consumed by `prompt_rule_loader.py`. |

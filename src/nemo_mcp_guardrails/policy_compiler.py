@@ -37,7 +37,7 @@ class CompiledInputPolicy:
     test_cases: tuple[TestCase, ...]
 
 
-GITHUB_TOOL_MAPPINGS = {
+GITHUB_WRITE_TOOL_MAPPINGS = {
     ("create", "issue"): ("issue_write",),
     ("update", "issue"): ("issue_write",),
     ("comment", "issue"): ("add_issue_comment",),
@@ -52,6 +52,34 @@ GITHUB_TOOL_MAPPINGS = {
     ("push", "file"): ("push_files",),
     ("create", "repository"): ("create_repository",),
     ("fork", "repository"): ("fork_repository",),
+}
+
+
+GITHUB_READ_TOOL_MAPPINGS = {
+    ("search", "repository"): ("search_repositories",),
+    ("list", "branch"): ("list_branches",),
+    ("read", "file"): ("get_file_contents",),
+}
+
+
+GITHUB_METADATA_TOOL_MAPPINGS = {
+    **GITHUB_WRITE_TOOL_MAPPINGS,
+    **GITHUB_READ_TOOL_MAPPINGS,
+}
+
+
+GITHUB_ACTION_DISPLAY_NAMES = {
+    "create": "Create",
+    "update": "Update",
+    "comment": "Comment",
+    "merge": "Merge",
+    "review": "Review",
+    "delete": "Delete",
+    "push": "Push",
+    "fork": "Fork",
+    "search": "Search",
+    "list": "List",
+    "read": "Read",
 }
 
 
@@ -77,11 +105,11 @@ GITHUB_RESOURCE_SYNONYMS = {
 
 
 GITHUB_RESOURCE_DISPLAY_NAMES = {
-    "issue": "GitHub issue",
-    "pull_request": "GitHub pull request",
-    "branch": "GitHub branch",
-    "file": "GitHub repository file",
-    "repository": "GitHub repository",
+    "issue": "Issue",
+    "pull_request": "Pull Request",
+    "branch": "Branch",
+    "file": "File",
+    "repository": "Repository",
 }
 
 
@@ -283,14 +311,14 @@ def compile_policy(policy: InputPolicyObject) -> CompiledInputPolicy:
 
     policy_key = get_policy_key(policy)
 
-    if policy_key not in GITHUB_TOOL_MAPPINGS:
+    if policy_key not in GITHUB_WRITE_TOOL_MAPPINGS:
         raise ValueError(
             f"No GitHub tool mapping for action/resource: {policy.action}/{policy.resource}"
         )
 
     return CompiledInputPolicy(
         input_rail_rule=compile_input_rail_rule(policy),
-        blocked_tools=GITHUB_TOOL_MAPPINGS[policy_key],
+        blocked_tools=GITHUB_WRITE_TOOL_MAPPINGS[policy_key],
         test_cases=compile_test_cases(policy),
     )
 
