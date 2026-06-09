@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import (
     Boolean,
@@ -9,8 +12,10 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 class Base(DeclarativeBase):
@@ -138,12 +143,44 @@ class PolicyRecord(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     policy_type: Mapped[str] = mapped_column(String(20), index=True)
+    app_id: Mapped[int | None] = mapped_column(
+        ForeignKey("apps.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
+    action_id: Mapped[int | None] = mapped_column(
+        ForeignKey("app_actions.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
+    resource_id: Mapped[int | None] = mapped_column(
+        ForeignKey("app_resources.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
+
+    # Compatibility fields retained until all callers use normalized references.
     app: Mapped[str | None] = mapped_column(String(100), nullable=True)
     action: Mapped[str | None] = mapped_column(String(100), nullable=True)
     resource: Mapped[str | None] = mapped_column(String(100), nullable=True)
     category: Mapped[str | None] = mapped_column(String(100), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     effect: Mapped[str] = mapped_column(String(20), default="block")
+    priority: Mapped[int] = mapped_column(
+        Integer,
+        default=100,
+        server_default="100",
+    )
+    conditions: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        default=dict,
+        server_default=text("'{}'::jsonb"),
+    )
+    policy_version: Mapped[int] = mapped_column(
+        Integer,
+        default=1,
+        server_default="1",
+    )
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -153,6 +190,16 @@ class PolicyRecord(Base):
         DateTime(timezone=True),
         server_default=func.now(),
         onupdate=func.now(),
+    )
+
+    normalized_app: Mapped[AppRecord | None] = relationship(
+        foreign_keys=[app_id],
+    )
+    normalized_action: Mapped[AppActionRecord | None] = relationship(
+        foreign_keys=[action_id],
+    )
+    normalized_resource: Mapped[AppResourceRecord | None] = relationship(
+        foreign_keys=[resource_id],
     )
 
 
@@ -216,6 +263,17 @@ class CompiledPolicyRuleRecord(Base):
     )
     rail_type: Mapped[str] = mapped_column(String(20), index=True)
     rule_text: Mapped[str] = mapped_column(Text)
+    policy_version: Mapped[int] = mapped_column(
+        Integer,
+        default=1,
+        server_default="1",
+    )
+    stale: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        server_default="false",
+        index=True,
+    )
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     generated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

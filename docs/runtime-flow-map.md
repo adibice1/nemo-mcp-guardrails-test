@@ -48,12 +48,22 @@ Expected current counts:
 ```text
 apps 2
 app_actions 11
-app_resources 5
-tool_mappings 17
+app_resources 10
+tool_mappings 33
 allowed_test_case_expected_tools 3
 ```
 
-This metadata is seeded and ready, but runtime policy loading still uses the flat `policies.app/action/resource` columns until the next migration slice.
+The normalized policy-reference migration is now applied:
+
+```text
+policies.app_id/action_id/resource_id
+-> policy_loader.py eagerly loads normalized relationships
+-> normalized names are preferred at runtime
+-> flat app/action/resource strings remain fallback compatibility fields
+```
+
+`compiled_policy_rules` also stores `policy_version` and `stale`. Runtime
+prompt-rule loading ignores stale rows.
 
 ## Policy Loading
 

@@ -478,19 +478,17 @@ once.
 
 ## Migration Plan
 
-Because the local DB can be reset during this prototype, the simplest migration
-path is:
+Current migration status:
 
-1. Create normalized metadata tables: `apps`, `app_actions`, `app_resources`, `tool_mappings`, `allowed_test_case_expected_tools`.
-2. Add normalized columns to `policies`: `app_id`, `action_id`, `resource_id`, `priority`, `conditions`, `policy_version`.
-3. Seed GitHub app/action/resource/tool mapping rows from current compiler data.
-4. Backfill existing `policies.app/action/resource` strings into FK IDs.
-5. Update `policy_loader.py` to prefer normalized FK joins.
-6. Keep old string columns temporarily as fallback/debug fields.
-7. Rerun `POST /policies/compile-rules`.
-8. Rerun `scripts/test_policy_loader.py`.
-9. Rerun `scripts/test_nemo_mcp.py`.
-10. After stable verification, remove old string columns in a later migration.
+1. Completed: create normalized metadata tables.
+2. Completed: add normalized columns to `policies`.
+3. Completed: seed GitHub app/action/resource/tool mapping rows.
+4. Completed: backfill existing policy strings into FK IDs.
+5. Completed: make `policy_loader.py` prefer normalized relationships.
+6. Completed: add `policy_version` and `stale` lifecycle fields.
+7. Transitional: keep old string columns as fallback/debug fields.
+8. Next: move policy create/update requests fully onto normalized IDs.
+9. Later: remove old string columns after stable verification.
 
 ## Proposed Implementation Slices
 
@@ -524,12 +522,13 @@ specific app ID, such as `github`, `slack`, or `jira`.
 ### Slice 3: Backfill policies
 
 Populate `policies.app_id`, `policies.action_id`, and `policies.resource_id`
-from existing text values.
+from existing text values. Completed by
+`scripts/migrate_normalized_policy_references.py`.
 
 ### Slice 4: Update loaders
 
 Make `policy_loader.py` read normalized joins when FK columns exist, with
-fallback to the current text columns.
+fallback to the current text columns. Completed.
 
 ### Slice 5: Move compiler mappings into DB
 

@@ -31,10 +31,22 @@ Completed pieces:
   ```text
   apps: global, github
   app_actions: 11
-  app_resources: 5
+  app_resources: 10
   tool_mappings: 17
   allowed_test_case_expected_tools: 3
   ```
+
+Home-laptop setup warning:
+
+```text
+DBeaver does not read .env and needs no VS Code extension.
+Postgres Docker volumes retain their original database password.
+Changing POSTGRES_PASSWORD in .env does not update an existing volume.
+```
+
+If DBeaver rejects the correct-looking password on another laptop, read
+`docs/troubleshooting.md` under **Home Laptop: DBeaver Password Fails** before
+changing project code.
 
 ## Current Verification Commands
 
@@ -68,47 +80,43 @@ Expected seed counts:
 Normalized policy metadata seeded.
 - apps: global, github
 - github actions: 11
-- github resources: 5
-- github tool mappings: 17
+- github resources: 10
+- github tool mappings: 33
 - allowed test expected-tool links: 3
 ```
 
 ## Recommended Next Step
 
-Add normalized policy foreign-key columns and backfill them while keeping the old flat text columns as fallback.
+Update allowed-test loading to use the normalized expected-tool join table.
 
 Recommended slice:
 
 ```text
-1. Add nullable columns to policies:
-   - app_id
-   - action_id
-   - resource_id
-   - priority
-   - conditions
-   - policy_version
+1. Add ORM relationships for:
+   allowed_test_cases
+   -> allowed_test_case_expected_tools
+   -> tool_mappings
 
-2. Add stale/version columns to compiled_policy_rules:
-   - stale
-   - policy_version
+2. Update test_case_loader.py:
+   prefer normalized expected-tool joins
+   fallback to comma-separated expected_tools
 
-3. Backfill existing policies:
-   policies.app/action/resource
-   -> apps/app_actions/app_resources IDs
+3. Update allowed-test CRUD schemas/endpoints to accept normalized tool mappings.
 
-4. Update policy_loader.py:
-   prefer normalized FK joins
-   fallback to flat app/action/resource strings
-
-5. Rerun:
-   seed_normalized_policy_metadata.py
-   POST /policies/compile-rules
-   test_policy_loader.py
-   test_tool_guard.py
-   test_nemo_mcp.py
+4. Verify allowed tests still call the expected read tools.
 ```
 
-Do not remove the old `policies.app`, `policies.action`, or `policies.resource` columns yet. They are still the compatibility fallback for the current API and loader.
+The normalized policy-reference migration is complete:
+
+```text
+policies.app_id/action_id/resource_id backfilled
+policy_loader.py prefers normalized relationships
+compiled_policy_rules tracks policy_version and stale
+```
+
+Do not remove the old `policies.app`, `policies.action`, or
+`policies.resource` columns yet. They remain the compatibility fallback while
+policy creation and update flows are moved fully onto normalized IDs.
 
 ## After That
 
@@ -116,7 +124,8 @@ Once normalized policy loading is stable:
 
 - Update `test_case_loader.py` to prefer `allowed_test_case_expected_tools` joins, with fallback to comma-separated `expected_tools`.
 - Move more GitHub metadata out of hardcoded compiler constants and into DB metadata tables.
-- Add stale/version handling for `compiled_policy_rules` when policies are edited.
+- Resolve normalized policy IDs directly during policy create/update requests.
+- Remove legacy policy text columns only after all policy writes use normalized IDs.
 - Add argument-policy and workflow-policy schema slices.
 - Keep write-capable MCP tests separate, opt-in, and pointed at a throwaway repo with a limited token.
 

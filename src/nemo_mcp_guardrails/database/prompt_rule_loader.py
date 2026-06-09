@@ -26,7 +26,10 @@ def load_prompt_policy_rules() -> tuple[LoadedPromptRule, ...]:
             records = list(
                 db.scalars(
                     select(CompiledPolicyRuleRecord)
-                    .where(CompiledPolicyRuleRecord.enabled.is_(True))
+                    .where(
+                        CompiledPolicyRuleRecord.enabled.is_(True),
+                        CompiledPolicyRuleRecord.stale.is_(False),
+                    )
                     .order_by(
                         CompiledPolicyRuleRecord.rail_type,
                         CompiledPolicyRuleRecord.id,

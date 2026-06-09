@@ -164,7 +164,7 @@ Expected:
 - `src/nemo_mcp_guardrails/policy_compiler.py` prints all default GitHub write input policy objects, a combined generated tool denylist, and generated output rail rules.
 - `scripts/test_tool_guard.py` reports every DB-derived compiler-generated blocked tool was blocked before execution.
 - `scripts/test_policy_loader.py` reports enabled Postgres input/output policies and their compiled artifacts.
-- `scripts/seed_normalized_policy_metadata.py` reports `apps: global, github`, `github actions: 11`, `github resources: 5`, `github tool mappings: 17`, and `allowed test expected-tool links: 3`.
+- `scripts/seed_normalized_policy_metadata.py` reports `apps: global, github`, `github actions: 11`, `github resources: 10`, `github tool mappings: 33`, and `allowed test expected-tool links: 3`.
 - `scripts/debug_nemo_output_check.py` reports output rail checks passed.
 - `scripts/test_nemo_mcp.py` prints `NeMo prompt policy rules loaded`, `Runtime input policies loaded`, blocks generated DB-policy prompts through NeMo input rails, and prints `NEMO OUTPUT RAIL RESULT` before final responses.
 
@@ -182,6 +182,92 @@ If the database is unavailable or has no valid enabled input rows, `policy_loade
 The current database direction is PostgreSQL. For the first local backend prototype, use the Postgres service in `docker-compose.yml`.
 
 pgAdmin is available as a Docker service, and DBeaver can also connect to the same local Postgres database for inspecting policy rows, running manual queries, and debugging FastAPI CRUD behavior.
+
+## Home Laptop: DBeaver Password Fails
+
+DBeaver does not require a VS Code extension and does not automatically read
+the project's `.env` file. It connects directly to the Postgres server exposed
+by Docker.
+
+Use these DBeaver connection settings:
+
+```text
+Host: localhost
+Port: 5432
+Database: nemo_mcp_guardrails
+Username: nemo_mcp_guardrails
+Password: value of POSTGRES_PASSWORD
+Authentication: Database Native
+```
+
+Important Docker/Postgres behavior:
+
+```text
+POSTGRES_DB
+POSTGRES_USER
+POSTGRES_PASSWORD
+```
+
+are only used when the Postgres data volume is first initialized. This project
+uses the persistent Docker volume:
+
+```yaml
+postgres_data:/var/lib/postgresql/data
+```
+
+Changing `.env` later does not automatically change the password stored inside
+an existing Postgres volume. Therefore, DBeaver can reject the password even
+when the copied `.env` values look correct and the container reports healthy.
+
+Confirm the effective Compose configuration and exposed port:
+
+```powershell
+docker compose config
+docker compose ps
+```
+
+Expected port mapping:
+
+```text
+0.0.0.0:5432->5432/tcp
+```
+
+If the home laptop database has no important local data, recreate its volumes:
+
+```powershell
+docker compose down -v
+docker compose up -d
+```
+
+Warning: `docker compose down -v` deletes that laptop's local Postgres and
+pgAdmin data. It does not affect another laptop's database.
+
+For a non-destructive password reset:
+
+```powershell
+docker compose exec postgres psql -U nemo_mcp_guardrails -d nemo_mcp_guardrails
+```
+
+Then inside `psql`:
+
+```sql
+\password nemo_mcp_guardrails
+```
+
+Set it to the same value as `POSTGRES_PASSWORD`, then exit:
+
+```sql
+\q
+```
+
+After recreating/resetting the home database, rerun:
+
+```powershell
+python scripts/seed_normalized_policy_metadata.py
+```
+
+The database and its rows are local to each laptop unless a shared remote
+Postgres server is configured.
 
 ## Runtime DB Policy Loading
 
@@ -224,8 +310,8 @@ Expected counts:
 ```text
 apps 2
 app_actions 11
-app_resources 5
-tool_mappings 17
+app_resources 10
+tool_mappings 33
 allowed_test_case_expected_tools 3
 ```
 

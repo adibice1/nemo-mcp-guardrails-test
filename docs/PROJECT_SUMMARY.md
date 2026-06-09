@@ -59,8 +59,8 @@ Current normalized metadata counts after seeding:
 ```text
 apps 2
 app_actions 11
-app_resources 5
-tool_mappings 17
+app_resources 10
+tool_mappings 33
 allowed_test_case_expected_tools 3
 ```
 

@@ -291,8 +291,8 @@ Expected output:
 Normalized policy metadata seeded.
 - apps: global, github
 - github actions: 11
-- github resources: 5
-- github tool mappings: 17
+- github resources: 10
+- github tool mappings: 33
 - allowed test expected-tool links: 3
 ```
 

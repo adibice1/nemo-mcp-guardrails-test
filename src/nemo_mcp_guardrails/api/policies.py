@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 
 from nemo_mcp_guardrails.api.policy_schemas import (
@@ -44,11 +44,24 @@ def _require_policy_fields(policy: PolicyRecord, fields: tuple[str, ...]) -> Non
 def _to_input_policy_object(policy: PolicyRecord) -> InputPolicyObject:
     """Convert a stored input policy row into the compiler dataclass."""
 
-    _require_policy_fields(policy, ("app", "action", "resource", "effect"))
+    app = policy.normalized_app.name if policy.normalized_app else policy.app
+    action = policy.normalized_action.name if policy.normalized_action else policy.action
+    resource = (
+        policy.normalized_resource.name
+        if policy.normalized_resource
+        else policy.resource
+    )
+
+    if not (app and action and resource and policy.effect):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Policy {policy.id} is missing required input policy fields",
+        )
+
     return InputPolicyObject(
-        app=policy.app or "",
-        action=policy.action or "",
-        resource=policy.resource or "",
+        app=app,
+        action=action,
+        resource=resource,
         effect=policy.effect,
     )
 
@@ -73,6 +86,8 @@ def _compile_policy_rule_record(policy: PolicyRecord) -> CompiledPolicyRuleRecor
             policy_id=policy.id,
             rail_type="input",
             rule_text=compiled_policy.input_rail_rule,
+            policy_version=policy.policy_version,
+            stale=False,
             enabled=True,
         )
 
@@ -82,6 +97,8 @@ def _compile_policy_rule_record(policy: PolicyRecord) -> CompiledPolicyRuleRecor
             policy_id=policy.id,
             rail_type="output",
             rule_text=output_rules[0],
+            policy_version=policy.policy_version,
+            stale=False,
             enabled=True,
         )
 
@@ -230,9 +247,26 @@ def update_policy(
             detail="Policy not found",
         )
 
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    updates = payload.model_dump(exclude_unset=True)
+
+    if "app" in updates:
+        policy.app_id = None
+        policy.action_id = None
+        policy.resource_id = None
+    if "action" in updates:
+        policy.action_id = None
+    if "resource" in updates:
+        policy.resource_id = None
+
+    for field, value in updates.items():
         setattr(policy, field, value)
 
+    policy.policy_version += 1
+    db.execute(
+        update(CompiledPolicyRuleRecord)
+        .where(CompiledPolicyRuleRecord.policy_id == policy.id)
+        .values(stale=True)
+    )
     db.commit()
     db.refresh(policy)
     return policy

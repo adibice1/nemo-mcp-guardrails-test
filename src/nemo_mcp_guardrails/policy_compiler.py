@@ -59,6 +59,24 @@ GITHUB_READ_TOOL_MAPPINGS = {
     ("search", "repository"): ("search_repositories",),
     ("list", "branch"): ("list_branches",),
     ("read", "file"): ("get_file_contents",),
+    ("search", "file"): ("search_code",),
+    ("read", "commit"): ("get_commit",),
+    ("list", "commit"): ("list_commits",),
+    ("read", "label"): ("get_label",),
+    ("read", "release"): (
+        "get_latest_release",
+        "get_release_by_tag",
+    ),
+    ("list", "release"): ("list_releases",),
+    ("read", "tag"): ("get_tag",),
+    ("list", "tag"): ("list_tags",),
+    ("read", "issue"): ("issue_read",),
+    ("list", "issue"): ("list_issues",),
+    ("search", "issue"): ("search_issues",),
+    ("list", "issue_type"): ("list_issue_types",),
+    ("read", "pull_request"): ("pull_request_read",),
+    ("list", "pull_request"): ("list_pull_requests",),
+    ("search", "pull_request"): ("search_pull_requests",),
 }
 
 
@@ -106,10 +124,15 @@ GITHUB_RESOURCE_SYNONYMS = {
 
 GITHUB_RESOURCE_DISPLAY_NAMES = {
     "issue": "Issue",
+    "issue_type": "Issue Type",
     "pull_request": "Pull Request",
     "branch": "Branch",
     "file": "File",
     "repository": "Repository",
+    "commit": "Commit",
+    "label": "Label",
+    "release": "Release",
+    "tag": "Tag",
 }
 
 

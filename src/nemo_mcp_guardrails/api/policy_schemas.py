@@ -1,7 +1,7 @@
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 PolicyType = Literal["input", "output"]
@@ -18,6 +18,8 @@ class PolicyCreate(BaseModel):
     category: str | None = None
     description: str | None = None
     effect: PolicyEffect = "block"
+    priority: int = 100
+    conditions: dict[str, Any] = Field(default_factory=dict)
     enabled: bool = True
 
 
@@ -31,6 +33,8 @@ class PolicyUpdate(BaseModel):
     category: str | None = None
     description: str | None = None
     effect: PolicyEffect | None = None
+    priority: int | None = None
+    conditions: dict[str, Any] | None = None
     enabled: bool | None = None
 
 
@@ -41,12 +45,18 @@ class PolicyRead(BaseModel):
 
     id: int
     policy_type: str
+    app_id: int | None
+    action_id: int | None
+    resource_id: int | None
     app: str | None
     action: str | None
     resource: str | None
     category: str | None
     description: str | None
     effect: str
+    priority: int
+    conditions: dict[str, Any]
+    policy_version: int
     enabled: bool
     created_at: datetime
     updated_at: datetime
@@ -109,6 +119,8 @@ class CompiledPolicyRuleRead(BaseModel):
     policy_id: int
     rail_type: str
     rule_text: str
+    policy_version: int
+    stale: bool
     enabled: bool
     generated_at: datetime
     created_at: datetime

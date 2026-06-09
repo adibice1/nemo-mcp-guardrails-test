@@ -3,6 +3,7 @@ from dataclasses import dataclass
 
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import selectinload
 
 from nemo_mcp_guardrails.database.connection import SessionLocal
 from nemo_mcp_guardrails.database.models import PolicyRecord
@@ -44,6 +45,11 @@ def _load_enabled_policy_records(policy_type: str) -> list[PolicyRecord] | None:
             return list(
                 db.scalars(
                     select(PolicyRecord)
+                    .options(
+                        selectinload(PolicyRecord.normalized_app),
+                        selectinload(PolicyRecord.normalized_action),
+                        selectinload(PolicyRecord.normalized_resource),
+                    )
                     .where(
                         PolicyRecord.enabled.is_(True),
                         PolicyRecord.policy_type == policy_type,
@@ -58,13 +64,19 @@ def _load_enabled_policy_records(policy_type: str) -> list[PolicyRecord] | None:
 def _to_input_policy_object(record: PolicyRecord) -> InputPolicyObject | None:
     """Convert one enabled database row into an input policy object."""
 
-    if not (record.app and record.action and record.resource and record.effect):
+    app = record.normalized_app.name if record.normalized_app else record.app
+    action = record.normalized_action.name if record.normalized_action else record.action
+    resource = (
+        record.normalized_resource.name if record.normalized_resource else record.resource
+    )
+
+    if not (app and action and resource and record.effect):
         return None
 
     return InputPolicyObject(
-        app=record.app,
-        action=record.action,
-        resource=record.resource,
+        app=app,
+        action=action,
+        resource=resource,
         effect=record.effect,
     )
 
