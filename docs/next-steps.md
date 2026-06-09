@@ -87,23 +87,18 @@ Normalized policy metadata seeded.
 
 ## Recommended Next Step
 
-Update allowed-test loading to use the normalized expected-tool join table.
+Normalize allowed-test writes and add metadata discovery endpoints.
 
 Recommended slice:
 
 ```text
-1. Add ORM relationships for:
-   allowed_test_cases
-   -> allowed_test_case_expected_tools
-   -> tool_mappings
+1. Update allowed-test create/update payloads:
+   accept tool_mapping_ids
+   maintain allowed_test_case_expected_tools rows
 
-2. Update test_case_loader.py:
-   prefer normalized expected-tool joins
-   fallback to comma-separated expected_tools
+2. Add metadata endpoints for frontend dropdowns and API discovery.
 
-3. Update allowed-test CRUD schemas/endpoints to accept normalized tool mappings.
-
-4. Verify allowed tests still call the expected read tools.
+3. Keep legacy text fields temporarily as compatibility fallbacks.
 ```
 
 The normalized policy-reference migration is complete:
@@ -112,6 +107,8 @@ The normalized policy-reference migration is complete:
 policies.app_id/action_id/resource_id backfilled
 policy_loader.py prefers normalized relationships
 compiled_policy_rules tracks policy_version and stale
+policy create/update accepts readable names and resolves normalized IDs
+policy create/update validates combinations against enabled tool mappings
 ```
 
 Do not remove the old `policies.app`, `policies.action`, or
@@ -122,9 +119,7 @@ policy creation and update flows are moved fully onto normalized IDs.
 
 Once normalized policy loading is stable:
 
-- Update `test_case_loader.py` to prefer `allowed_test_case_expected_tools` joins, with fallback to comma-separated `expected_tools`.
 - Move more GitHub metadata out of hardcoded compiler constants and into DB metadata tables.
-- Resolve normalized policy IDs directly during policy create/update requests.
 - Remove legacy policy text columns only after all policy writes use normalized IDs.
 - Add argument-policy and workflow-policy schema slices.
 - Keep write-capable MCP tests separate, opt-in, and pointed at a throwaway repo with a limited token.

@@ -287,6 +287,19 @@ github update file         -> create_or_update_file
 This table is the normalized replacement for hardcoded tool mappings in
 `policy_compiler.py`.
 
+Policy CRUD also uses enabled rows in this table as the capability catalogue.
+After resolving readable app/action/resource names into IDs, the API accepts an
+input policy only when at least one enabled mapping exists for that exact
+combination.
+
+```text
+github + merge + pull_request -> accepted
+github + merge + issue        -> rejected
+```
+
+This scales with the number of supported capabilities, not every theoretical
+combination. Invalid combinations do not need rows.
+
 ## Prompt Rule Artifacts
 
 ### compiled_policy_rules
@@ -487,8 +500,9 @@ Current migration status:
 5. Completed: make `policy_loader.py` prefer normalized relationships.
 6. Completed: add `policy_version` and `stale` lifecycle fields.
 7. Transitional: keep old string columns as fallback/debug fields.
-8. Next: move policy create/update requests fully onto normalized IDs.
-9. Later: remove old string columns after stable verification.
+8. Completed: policy create/update accepts readable names and resolves normalized IDs.
+9. Completed: validate action/resource combinations against enabled tool mappings.
+10. Later: remove old string columns after stable verification.
 
 ## Proposed Implementation Slices
 

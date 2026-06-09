@@ -223,6 +223,23 @@ class AllowedTestCaseRecord(Base):
         onupdate=func.now(),
     )
 
+    expected_tool_links: Mapped[list[AllowedTestCaseExpectedToolRecord]] = relationship(
+        back_populates="allowed_test_case",
+        cascade="all, delete-orphan",
+    )
+
+    @property
+    def normalized_expected_tools(self) -> list[str]:
+        """Return unique expected tool names from normalized mappings."""
+
+        return sorted(
+            {
+                link.tool_mapping.tool_name
+                for link in self.expected_tool_links
+                if link.tool_mapping
+            }
+        )
+
 
 class AllowedTestCaseExpectedToolRecord(Base):
     """Map one allowed test case to one expected tool mapping."""
@@ -249,6 +266,11 @@ class AllowedTestCaseExpectedToolRecord(Base):
         DateTime(timezone=True),
         server_default=func.now(),
     )
+
+    allowed_test_case: Mapped[AllowedTestCaseRecord] = relationship(
+        back_populates="expected_tool_links",
+    )
+    tool_mapping: Mapped[ToolMappingRecord] = relationship()
 
 
 class CompiledPolicyRuleRecord(Base):

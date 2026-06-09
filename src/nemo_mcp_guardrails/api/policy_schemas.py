@@ -105,6 +105,7 @@ class AllowedTestCaseRead(BaseModel):
     name: str
     prompt: str
     expected_tools: str | None
+    normalized_expected_tools: list[str]
     enabled: bool
     created_at: datetime
     updated_at: datetime

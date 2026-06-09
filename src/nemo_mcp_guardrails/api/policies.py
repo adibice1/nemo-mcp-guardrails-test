@@ -13,8 +13,12 @@ from nemo_mcp_guardrails.api.policy_schemas import (
 )
 from nemo_mcp_guardrails.database.connection import get_db
 from nemo_mcp_guardrails.database.models import (
+    AppActionRecord,
+    AppRecord,
+    AppResourceRecord,
     CompiledPolicyRuleRecord,
     PolicyRecord,
+    ToolMappingRecord,
 )
 from nemo_mcp_guardrails.policy_compiler import (
     InputPolicyObject,
@@ -25,6 +29,117 @@ from nemo_mcp_guardrails.policy_compiler import (
 
 
 router = APIRouter(prefix="/policies", tags=["policies"])
+
+
+def _resolve_policy_references(policy: PolicyRecord, db: Session) -> None:
+    """Resolve human-readable policy names into normalized database IDs."""
+
+    if policy.policy_type == "input":
+        missing_fields = [
+            field
+            for field in ("app", "action", "resource")
+            if not getattr(policy, field)
+        ]
+        if missing_fields:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "Input policy is missing required fields: "
+                    + ", ".join(missing_fields)
+                ),
+            )
+
+    if policy.policy_type == "output" and not policy.app:
+        policy.app = "global"
+
+    if not policy.app:
+        policy.app_id = None
+        policy.action_id = None
+        policy.resource_id = None
+        return
+
+    app_name = policy.app.strip().lower()
+    app = db.scalar(select(AppRecord).where(AppRecord.name == app_name))
+
+    if not app:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unknown app: {policy.app}",
+        )
+
+    policy.app = app.name
+    policy.app_id = app.id
+    policy.normalized_app = app
+
+    if policy.action:
+        action_name = policy.action.strip().lower()
+        action = db.scalar(
+            select(AppActionRecord).where(
+                AppActionRecord.app_id == app.id,
+                AppActionRecord.name == action_name,
+            )
+        )
+
+        if not action:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unknown action '{policy.action}' for app '{app.name}'",
+            )
+
+        policy.action = action.name
+        policy.action_id = action.id
+        policy.normalized_action = action
+    else:
+        policy.action_id = None
+        policy.normalized_action = None
+
+    if policy.resource:
+        resource_name = policy.resource.strip().lower()
+        resource = db.scalar(
+            select(AppResourceRecord).where(
+                AppResourceRecord.app_id == app.id,
+                AppResourceRecord.name == resource_name,
+            )
+        )
+
+        if not resource:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"Unknown resource '{policy.resource}' "
+                    f"for app '{app.name}'"
+                ),
+            )
+
+        policy.resource = resource.name
+        policy.resource_id = resource.id
+        policy.normalized_resource = resource
+    else:
+        policy.resource_id = None
+        policy.normalized_resource = None
+
+    if (
+        policy.policy_type == "input"
+        and policy.action_id is not None
+        and policy.resource_id is not None
+    ):
+        tool_mapping = db.scalar(
+            select(ToolMappingRecord).where(
+                ToolMappingRecord.app_id == policy.app_id,
+                ToolMappingRecord.action_id == policy.action_id,
+                ToolMappingRecord.resource_id == policy.resource_id,
+                ToolMappingRecord.enabled.is_(True),
+            )
+        )
+
+        if not tool_mapping:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "Unsupported policy combination: "
+                    f"{policy.app} + {policy.action} + {policy.resource}"
+                ),
+            )
 
 
 def _require_policy_fields(policy: PolicyRecord, fields: tuple[str, ...]) -> None:
@@ -226,6 +341,7 @@ def create_policy(
     """Create one policy record."""
 
     policy = PolicyRecord(**payload.model_dump())
+    _resolve_policy_references(policy, db)
     db.add(policy)
     db.commit()
     db.refresh(policy)
@@ -249,18 +365,10 @@ def update_policy(
 
     updates = payload.model_dump(exclude_unset=True)
 
-    if "app" in updates:
-        policy.app_id = None
-        policy.action_id = None
-        policy.resource_id = None
-    if "action" in updates:
-        policy.action_id = None
-    if "resource" in updates:
-        policy.resource_id = None
-
     for field, value in updates.items():
         setattr(policy, field, value)
 
+    _resolve_policy_references(policy, db)
     policy.policy_version += 1
     db.execute(
         update(CompiledPolicyRuleRecord)

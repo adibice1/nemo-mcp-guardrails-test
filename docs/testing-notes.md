@@ -308,9 +308,10 @@ tool_mappings
 allowed_test_case_expected_tools
 ```
 
-`test_case_loader.py` still reads the old comma-separated
-`allowed_test_cases.expected_tools` field for runtime output. The join table is
-backfilled and ready for the next loader update.
+`test_case_loader.py` now prefers normalized expected-tool links from
+`allowed_test_case_expected_tools` and `tool_mappings`. It falls back to the
+old comma-separated `allowed_test_cases.expected_tools` field only when an
+allowed test has no normalized links.
 
 ## Allowed Test Case API
 

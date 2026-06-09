@@ -65,6 +65,29 @@ policies.app_id/action_id/resource_id
 `compiled_policy_rules` also stores `policy_version` and `stale`. Runtime
 prompt-rule loading ignores stale rows.
 
+Policy CRUD accepts readable names such as:
+
+```text
+github + create + issue
+```
+
+The API resolves and stores the corresponding `app_id`, `action_id`, and
+`resource_id`, while keeping the readable names synchronized for current
+responses and compatibility.
+
+For input policies, the API then checks for an enabled matching
+`tool_mappings` row:
+
+```text
+readable names
+-> normalized IDs
+-> enabled app/action/resource tool mapping exists
+-> save policy
+```
+
+This rejects individually valid names combined into unsupported operations,
+such as `github + merge + issue`.
+
 ## Policy Loading
 
 ```text
@@ -198,12 +221,24 @@ load_allowed_test_cases()
 
 Loads enabled rows from the `allowed_test_cases` table.
 
+Expected tools are loaded through:
+
+```text
+allowed_test_cases
+-> allowed_test_case_expected_tools
+-> tool_mappings.tool_name
+```
+
+If an allowed test has no normalized expected-tool links, the loader falls
+back to its legacy comma-separated `expected_tools` value.
+
 ```text
 -> test_case_loader.py:69
    _to_loaded_allowed_test_case()
 ```
 
-Converts each DB row into a `LoadedAllowedTestCase`, preserving the DB ID for terminal display.
+Converts each DB row into a `LoadedAllowedTestCase`, preserving the DB ID and
+normalized expected tool names for terminal display.
 
 If Postgres is down or there are no enabled allowed test cases, the loader falls back to default allowed read-only GitHub tests. If the DB has only one enabled allowed test case, only that one DB test case is used.
 
@@ -414,7 +449,7 @@ Reads the currently stored compiled rules.
 | Runtime blocked tool names | DB policies compiled by `policy_compiler.py` | Used by `tool_guard.py`. |
 | Generated blocked test prompts | DB policies compiled by `policy_compiler.py` | Used by `test_nemo_mcp.py`. |
 | Allowed test prompts | Postgres `allowed_test_cases` table | Falls back to defaults if DB unavailable/empty. |
-| Allowed expected-tool join rows | Postgres `allowed_test_case_expected_tools` table | Seeded/backfilled, but not yet used by `test_case_loader.py`. |
+| Allowed expected-tool join rows | Postgres `allowed_test_case_expected_tools` table | Preferred by `test_case_loader.py`; legacy text remains a fallback. |
 | Output policy objects | Postgres `policies` table | Loadable/compilable now. |
 | Normalized app/action/resource metadata | Postgres `apps`, `app_actions`, `app_resources`, `tool_mappings` | Seeded by `scripts/seed_normalized_policy_metadata.py`. |
 | Actual NeMo input prompt template | `config/prompts.yml` + DB rules | `prompt_rule_compiler.py` injects `compiled_policy_rules` into the template. |

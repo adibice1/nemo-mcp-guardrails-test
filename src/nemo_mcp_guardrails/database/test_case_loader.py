@@ -2,9 +2,13 @@ from dataclasses import dataclass
 
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import selectinload
 
 from nemo_mcp_guardrails.database.connection import SessionLocal
-from nemo_mcp_guardrails.database.models import AllowedTestCaseRecord
+from nemo_mcp_guardrails.database.models import (
+    AllowedTestCaseExpectedToolRecord,
+    AllowedTestCaseRecord,
+)
 
 
 @dataclass(frozen=True)
@@ -71,12 +75,14 @@ def _to_loaded_allowed_test_case(
 ) -> LoadedAllowedTestCase:
     """Convert one database row into a loaded allowed test case."""
 
+    normalized_tools = tuple(record.normalized_expected_tools)
+
     return LoadedAllowedTestCase(
         source="database",
         source_id=record.id,
         name=record.name,
         prompt=record.prompt,
-        expected_tools=parse_expected_tools(record.expected_tools),
+        expected_tools=normalized_tools or parse_expected_tools(record.expected_tools),
     )
 
 
@@ -88,6 +94,13 @@ def load_allowed_test_cases() -> tuple[LoadedAllowedTestCase, ...]:
             records = list(
                 db.scalars(
                     select(AllowedTestCaseRecord)
+                    .options(
+                        selectinload(
+                            AllowedTestCaseRecord.expected_tool_links
+                        ).selectinload(
+                            AllowedTestCaseExpectedToolRecord.tool_mapping
+                        )
+                    )
                     .where(AllowedTestCaseRecord.enabled.is_(True))
                     .order_by(AllowedTestCaseRecord.id)
                 )

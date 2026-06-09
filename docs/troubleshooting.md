@@ -315,7 +315,7 @@ tool_mappings 33
 allowed_test_case_expected_tools 3
 ```
 
-The join table is currently backfilled for inspection and for the next loader
-slice. Runtime allowed-test loading still uses the old
-`allowed_test_cases.expected_tools` text column until `test_case_loader.py` is
-updated.
+The join table is the preferred runtime source for expected tool names.
+`test_case_loader.py` falls back to the old
+`allowed_test_cases.expected_tools` text column only when no normalized links
+exist for that allowed test.

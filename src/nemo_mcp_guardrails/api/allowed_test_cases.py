@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from nemo_mcp_guardrails.api.policy_schemas import (
     AllowedTestCaseCreate,
@@ -8,10 +8,20 @@ from nemo_mcp_guardrails.api.policy_schemas import (
     AllowedTestCaseUpdate,
 )
 from nemo_mcp_guardrails.database.connection import get_db
-from nemo_mcp_guardrails.database.models import AllowedTestCaseRecord
+from nemo_mcp_guardrails.database.models import (
+    AllowedTestCaseExpectedToolRecord,
+    AllowedTestCaseRecord,
+)
 
 
 router = APIRouter(prefix="/allowed-test-cases", tags=["allowed-test-cases"])
+
+
+EXPECTED_TOOL_OPTIONS = (
+    selectinload(AllowedTestCaseRecord.expected_tool_links).selectinload(
+        AllowedTestCaseExpectedToolRecord.tool_mapping
+    ),
+)
 
 
 @router.get("", response_model=list[AllowedTestCaseRead])
@@ -21,7 +31,11 @@ def list_allowed_test_cases(
     """Return all stored allowed test cases."""
 
     return list(
-        db.scalars(select(AllowedTestCaseRecord).order_by(AllowedTestCaseRecord.id))
+        db.scalars(
+            select(AllowedTestCaseRecord)
+            .options(*EXPECTED_TOOL_OPTIONS)
+            .order_by(AllowedTestCaseRecord.id)
+        )
     )
 
 
@@ -32,7 +46,11 @@ def get_allowed_test_case(
 ) -> AllowedTestCaseRecord:
     """Return one stored allowed test case by ID."""
 
-    test_case = db.get(AllowedTestCaseRecord, test_case_id)
+    test_case = db.scalar(
+        select(AllowedTestCaseRecord)
+        .options(*EXPECTED_TOOL_OPTIONS)
+        .where(AllowedTestCaseRecord.id == test_case_id)
+    )
     if not test_case:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -56,8 +74,11 @@ def create_allowed_test_case(
     test_case = AllowedTestCaseRecord(**payload.model_dump())
     db.add(test_case)
     db.commit()
-    db.refresh(test_case)
-    return test_case
+    return db.scalar(
+        select(AllowedTestCaseRecord)
+        .options(*EXPECTED_TOOL_OPTIONS)
+        .where(AllowedTestCaseRecord.id == test_case.id)
+    )
 
 
 @router.put("/{test_case_id}", response_model=AllowedTestCaseRead)
@@ -79,8 +100,11 @@ def update_allowed_test_case(
         setattr(test_case, field, value)
 
     db.commit()
-    db.refresh(test_case)
-    return test_case
+    return db.scalar(
+        select(AllowedTestCaseRecord)
+        .options(*EXPECTED_TOOL_OPTIONS)
+        .where(AllowedTestCaseRecord.id == test_case.id)
+    )
 
 
 @router.delete("/{test_case_id}", status_code=status.HTTP_204_NO_CONTENT)

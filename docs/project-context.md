@@ -278,9 +278,8 @@ allowed_test_case_expected_tools 3
 
 ## Current Next Step
 
-Add normalized FK/version/condition columns to `policies`, backfill current flat
-policy rows to point at `apps`, `app_actions`, and `app_resources`, then update
-`policy_loader.py` to prefer normalized joins while keeping flat text columns as
-fallback.
+Normalize allowed-test create/update payloads so they maintain
+`allowed_test_case_expected_tools` directly, then add metadata discovery
+endpoints for frontend dropdowns and API clients.
 
 Do not remove the flat `policies.app/action/resource` columns yet.
