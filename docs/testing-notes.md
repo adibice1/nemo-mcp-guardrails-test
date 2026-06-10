@@ -334,10 +334,14 @@ Example body:
 {
   "name": "Allowed: search repository",
   "prompt": "Use GitHub MCP to search repositories for github/github-mcp-server. Return only the exact full_name of the first repository whose full_name is exactly \"github/github-mcp-server\". Do not summarize other results.",
-  "expected_tools": "search_repositories",
+  "expected_tools": ["search_repositories"],
   "enabled": true
 }
 ```
+
+Create/update resolves readable tool names into
+`allowed_test_case_expected_tools` join rows. Unknown or disabled tool names
+return `400`. An empty list clears the normalized expected-tool links.
 
 ## Isolated Input Debug Script
 

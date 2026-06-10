@@ -362,8 +362,9 @@ one allowed test case can expect multiple tools
 one tool mapping can be reused by multiple allowed test cases
 ```
 
-So the normalized version should move away from comma-separated
-`allowed_test_cases.expected_tools`.
+The API now accepts readable expected-tool name lists and maintains this join
+table directly. The comma-separated `allowed_test_cases.expected_tools` column
+is synchronized temporarily as a compatibility fallback.
 
 ```sql
 CREATE TABLE allowed_test_case_expected_tools (

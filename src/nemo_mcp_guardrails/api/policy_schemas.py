@@ -83,7 +83,7 @@ class AllowedTestCaseCreate(BaseModel):
 
     name: str
     prompt: str
-    expected_tools: str | None = None
+    expected_tools: list[str] = Field(default_factory=list)
     enabled: bool = True
 
 
@@ -92,7 +92,7 @@ class AllowedTestCaseUpdate(BaseModel):
 
     name: str | None = None
     prompt: str | None = None
-    expected_tools: str | None = None
+    expected_tools: list[str] | None = None
     enabled: bool | None = None
 
 

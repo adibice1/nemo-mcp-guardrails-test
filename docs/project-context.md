@@ -278,8 +278,7 @@ allowed_test_case_expected_tools 3
 
 ## Current Next Step
 
-Normalize allowed-test create/update payloads so they maintain
-`allowed_test_case_expected_tools` directly, then add metadata discovery
-endpoints for frontend dropdowns and API clients.
+Add metadata discovery endpoints for apps, actions, resources, and tool
+mappings so frontend dropdowns and API clients can discover valid values.
 
 Do not remove the flat `policies.app/action/resource` columns yet.

@@ -232,6 +232,17 @@ allowed_test_cases
 If an allowed test has no normalized expected-tool links, the loader falls
 back to its legacy comma-separated `expected_tools` value.
 
+Allowed-test create/update requests accept readable tool-name lists:
+
+```json
+{
+  "expected_tools": ["search_repositories", "get_file_contents"]
+}
+```
+
+The API resolves enabled `tool_mappings`, replaces the join rows, and keeps the
+legacy text value synchronized temporarily.
+
 ```text
 -> test_case_loader.py:69
    _to_loaded_allowed_test_case()

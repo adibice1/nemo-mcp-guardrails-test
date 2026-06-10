@@ -87,16 +87,18 @@ Normalized policy metadata seeded.
 
 ## Recommended Next Step
 
-Normalize allowed-test writes and add metadata discovery endpoints.
+Add metadata discovery endpoints.
 
 Recommended slice:
 
 ```text
-1. Update allowed-test create/update payloads:
-   accept tool_mapping_ids
-   maintain allowed_test_case_expected_tools rows
+1. Add read-only metadata endpoints:
+   GET /metadata/apps
+   GET /metadata/apps/{app_id}/actions
+   GET /metadata/apps/{app_id}/resources
+   GET /metadata/apps/{app_id}/tool-mappings
 
-2. Add metadata endpoints for frontend dropdowns and API discovery.
+2. Use these endpoints for frontend dropdowns and API discovery.
 
 3. Keep legacy text fields temporarily as compatibility fallbacks.
 ```
@@ -109,6 +111,7 @@ policy_loader.py prefers normalized relationships
 compiled_policy_rules tracks policy_version and stale
 policy create/update accepts readable names and resolves normalized IDs
 policy create/update validates combinations against enabled tool mappings
+allowed-test create/update accepts readable tool-name lists and maintains joins
 ```
 
 Do not remove the old `policies.app`, `policies.action`, or
