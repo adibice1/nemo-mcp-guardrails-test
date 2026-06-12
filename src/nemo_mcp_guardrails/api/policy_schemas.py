@@ -12,7 +12,7 @@ class PolicyCreate(BaseModel):
     """Request body for creating a policy."""
 
     policy_type: PolicyType
-    app: str | None = None
+    connector: str | None = None
     action: str | None = None
     resource: str | None = None
     category: str | None = None
@@ -27,7 +27,7 @@ class PolicyUpdate(BaseModel):
     """Request body for updating a policy."""
 
     policy_type: PolicyType | None = None
-    app: str | None = None
+    connector: str | None = None
     action: str | None = None
     resource: str | None = None
     category: str | None = None
@@ -45,10 +45,10 @@ class PolicyRead(BaseModel):
 
     id: int
     policy_type: str
-    app_id: int | None
+    connector_id: int | None
     action_id: int | None
     resource_id: int | None
-    app: str | None
+    connector: str | None
     action: str | None
     resource: str | None
     category: str | None

@@ -6,6 +6,18 @@ This project tests NVIDIA NeMo Guardrails with GitHub MCP and an LLM.
 
 The goal is to build toward a guardrails management system where administrators can configure app-specific policies, such as blocking GitHub write operations, without manually editing backend guardrail code.
 
+Confirmed target terminology:
+
+- `app` means a client application authorized to consume the Guardrails Management System.
+- `connector` means an external integration such as GitHub MCP, SharePoint, or Outlook.
+- The connector terminology migration is complete: `apps` are GMS client applications, while `connectors`, `connector_actions`, `connector_resources`, and `connector_tool_mappings` model external integrations.
+- Read `docs/target-architecture.md` before proposing the next schema migration.
+- The target GMS is a full proxy that owns input rails, agent/tool execution, and output rails.
+- One app may use multiple connectors; users and apps are many-to-many.
+- Global policies are mandatory across every app.
+- Main-agent and guardrail-classification LLM configurations may differ.
+- Policy rules should compile automatically when rules or assignments change.
+
 ## Current Architecture
 
 The test pipeline is:
@@ -73,8 +85,12 @@ Blocked actions:
 - FastAPI allowed-test CRUD endpoints live under `/allowed-test-cases`. These rows are safe prompts that `scripts/test_nemo_mcp.py` should expect to pass; they are not allow/block policies.
 - `src/nemo_mcp_guardrails/database/policy_loader.py` provides `load_input_policy_objects()` and `load_output_policy_objects()`. Input policies affect runtime tool guarding. Output policies can be compiled and stored in `compiled_policy_rules`; those stored output rules are now injected into the NeMo output prompt by `prompt_rule_compiler.py`.
 - `src/nemo_mcp_guardrails/database/test_case_loader.py` loads enabled DB allowed test cases for `scripts/test_nemo_mcp.py`, falling back to the three default read tests if no enabled DB rows exist.
-- `scripts/seed_normalized_policy_metadata.py` seeds normalized app/action/resource/tool metadata and backfills `allowed_test_case_expected_tools`. Expected counts after seeding are: apps 2, app_actions 11, app_resources 10, tool_mappings 33, allowed_test_case_expected_tools 3.
-- Normalized metadata tables exist now: `apps`, `app_actions`, `app_resources`, `tool_mappings`, and `allowed_test_case_expected_tools`. Runtime policy loading still uses the flat `policies.app/action/resource` columns until the next migration slice.
+- `scripts/seed_normalized_policy_metadata.py` seeds normalized connector metadata and backfills `allowed_test_case_expected_tools`. Expected counts after seeding are: connectors 2, connector_actions 11, connector_resources 10, connector_tool_mappings 33, allowed_test_case_expected_tools 3.
+- Normalized connector metadata tables exist now: `connectors`, `connector_actions`, `connector_resources`, `connector_tool_mappings`, and `allowed_test_case_expected_tools`. Runtime policy loading prefers normalized relationships with flat `policies.connector/action/resource` fallback fields.
+- `app_users` and `app_connectors` now model user/app management roles and app-specific connector access. Connector credentials are represented only by `credential_reference`.
+- `app_policy_assignments` and `global_policy_assignments` reference the existing reusable definitions in `policies`. The connector-independent credential output policy is globally assigned; GitHub write policies remain unassigned.
+- FastAPI client-app CRUD lives under `/apps`; nested app-policy-assignment CRUD lives under `/apps/{app_id}/policy-assignments`; global assignment CRUD lives under `/global-policy-assignments`.
+- App create/update accepts an API key, stores only its SHA-256 hash, and never returns the plaintext key or hash. Runtime API-key verification is not implemented yet.
 - Normal full-run GitHub MCP tests should keep `GITHUB_READ_ONLY=1`. Future write-capable testing should be a separate opt-in harness with a throwaway repo and limited token.
 - Do not add a custom `config/policies.yml` yet unless explicitly choosing to prototype the future admin/backend policy store. It is not a standard NeMo Guardrails file.
 
@@ -89,13 +105,19 @@ Blocked actions:
 
 ## Recommended Next Step
 
-The current guardrail milestone is green, DB prompt-rule injection is implemented, and normalized metadata has been seeded. Continue with normalized policy FK backfill:
+The current guardrail milestone is green. Before further non-doc schema work,
+preview the additive ownership/connector-link migration:
 
 ```text
-commit current normalized metadata milestone
--> add nullable policy FK/version/condition columns
--> backfill policies.app/action/resource to normalized IDs
--> update policy_loader.py to prefer normalized joins with flat-column fallback
+users + apps + llm_configs now exist
+connector terminology migration is complete
+app_users + app_connectors now exist
+app_policy_assignments + global_policy_assignments now exist
+app and assignment CRUD APIs now exist
+-> make policy_loader.py and prompt_rule_loader.py app-aware
+-> add app credential verification
+-> design POST /v1/guardrails/run full-proxy endpoint
+-> automate policy compilation/invalidation
 -> keep normal GitHub MCP tests read-only
 ```
 
@@ -103,6 +125,10 @@ Future write-tool use cases, such as allowing PR merges only in sequence `A -> B
 
 Useful verification commands for the current state:
 
+- `python scripts/migrate_client_app_foundation.py`
+- `python scripts/migrate_connector_terminology.py`
+- `python scripts/migrate_app_relationships.py`
+- `python scripts/migrate_policy_assignments.py`
 - `python src/nemo_mcp_guardrails/policy_compiler.py`
 - `python scripts/seed_normalized_policy_metadata.py`
 - `python scripts/test_tool_guard.py`

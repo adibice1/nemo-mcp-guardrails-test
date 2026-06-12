@@ -11,7 +11,7 @@ from nemo_mcp_guardrails.database.connection import get_db
 from nemo_mcp_guardrails.database.models import (
     AllowedTestCaseExpectedToolRecord,
     AllowedTestCaseRecord,
-    ToolMappingRecord,
+    ConnectorToolMappingRecord,
 )
 
 
@@ -20,15 +20,15 @@ router = APIRouter(prefix="/allowed-test-cases", tags=["allowed-test-cases"])
 
 EXPECTED_TOOL_OPTIONS = (
     selectinload(AllowedTestCaseRecord.expected_tool_links).selectinload(
-        AllowedTestCaseExpectedToolRecord.tool_mapping
+        AllowedTestCaseExpectedToolRecord.connector_tool_mapping
     ),
 )
 
 
-def _resolve_tool_mappings(
+def _resolve_connector_tool_mappings(
     tool_names: list[str],
     db: Session,
-) -> tuple[list[str], list[ToolMappingRecord]]:
+) -> tuple[list[str], list[ConnectorToolMappingRecord]]:
     """Resolve readable tool names into enabled normalized mappings."""
 
     normalized_names = sorted(
@@ -44,12 +44,12 @@ def _resolve_tool_mappings(
 
     mappings = list(
         db.scalars(
-            select(ToolMappingRecord)
+            select(ConnectorToolMappingRecord)
             .where(
-                ToolMappingRecord.tool_name.in_(normalized_names),
-                ToolMappingRecord.enabled.is_(True),
+                ConnectorToolMappingRecord.tool_name.in_(normalized_names),
+                ConnectorToolMappingRecord.enabled.is_(True),
             )
-            .order_by(ToolMappingRecord.id)
+            .order_by(ConnectorToolMappingRecord.id)
         )
     )
 
@@ -72,11 +72,11 @@ def _replace_expected_tool_links(
 ) -> None:
     """Replace normalized expected-tool links for one allowed test."""
 
-    normalized_names, mappings = _resolve_tool_mappings(tool_names, db)
+    normalized_names, mappings = _resolve_connector_tool_mappings(tool_names, db)
 
     test_case.expected_tools = ",".join(normalized_names) or None
     test_case.expected_tool_links = [
-        AllowedTestCaseExpectedToolRecord(tool_mapping=mapping)
+        AllowedTestCaseExpectedToolRecord(connector_tool_mapping=mapping)
         for mapping in mappings
     ]
 

@@ -1,5 +1,12 @@
 # Troubleshooting Notes
 
+## Terminology During Migration
+
+The terminology migration is complete. `apps` represents client applications
+consuming the GMS. `connectors` represents GitHub MCP, SharePoint, Outlook, and
+other integrations. Check `docs/target-architecture.md` before changing schema
+code.
+
 ## GitHub Push Protection
 
 If GitHub blocks push with `GH013` and says an Azure OpenAI key was found, remove the secret from commits.
@@ -164,7 +171,7 @@ Expected:
 - `src/nemo_mcp_guardrails/policy_compiler.py` prints all default GitHub write input policy objects, a combined generated tool denylist, and generated output rail rules.
 - `scripts/test_tool_guard.py` reports every DB-derived compiler-generated blocked tool was blocked before execution.
 - `scripts/test_policy_loader.py` reports enabled Postgres input/output policies and their compiled artifacts.
-- `scripts/seed_normalized_policy_metadata.py` reports `apps: global, github`, `github actions: 11`, `github resources: 10`, `github tool mappings: 33`, and `allowed test expected-tool links: 3`.
+- `scripts/seed_normalized_policy_metadata.py` reports `connectors: global, github`, `github connector actions: 11`, `github connector resources: 10`, `github connector tool mappings: 33`, and `allowed test expected-tool links: 3`.
 - `scripts/debug_nemo_output_check.py` reports output rail checks passed.
 - `scripts/test_nemo_mcp.py` prints `NeMo prompt policy rules loaded`, `Runtime input policies loaded`, blocks generated DB-policy prompts through NeMo input rails, and prints `NEMO OUTPUT RAIL RESULT` before final responses.
 
@@ -172,7 +179,7 @@ If `scripts/test_nemo_mcp.py` passes allowed read prompts but generated policy p
 
 - `src/nemo_mcp_guardrails/database/policy_loader.py` can connect to Postgres.
 - Enabled input policy rows exist in the `policies` table.
-- Rows include `policy_type=input`, `enabled=true`, `app`, `action`, `resource`, and `effect`.
+- Rows include `policy_type=input`, `enabled=true`, `connector`, `action`, `resource`, and `effect`.
 - `scripts/test_nemo_mcp.py` calls `compile_policy_test_prompts(load_input_policy_objects())`.
 
 If the database is unavailable or has no valid enabled input rows, `policy_loader.py` falls back to `DEFAULT_INPUT_POLICY_OBJECTS`.
@@ -183,7 +190,17 @@ The current database direction is PostgreSQL. For the first local backend protot
 
 pgAdmin is available as a Docker service, and DBeaver can also connect to the same local Postgres database for inspecting policy rows, running manual queries, and debugging FastAPI CRUD behavior.
 
-## Home Laptop: DBeaver Password Fails
+## IMPORTANT HANDOVER: Home Laptop DBeaver Fatal Password Error
+
+Read this section first when the home laptop reports:
+
+```text
+FATAL: password authentication failed
+```
+
+The most likely cause is **not DBeaver, VS Code, or an incorrect `.env`
+copy/paste**. PostgreSQL stores its initialized password inside the persistent
+Docker volume. Updating `.env` afterward does not update that stored password.
 
 DBeaver does not require a VS Code extension and does not automatically read
 the project's `.env` file. It connects directly to the Postgres server exposed
@@ -218,6 +235,17 @@ postgres_data:/var/lib/postgresql/data
 Changing `.env` later does not automatically change the password stored inside
 an existing Postgres volume. Therefore, DBeaver can reject the password even
 when the copied `.env` values look correct and the container reports healthy.
+
+Recommended home-computer recovery when no local DB data needs preserving:
+
+```powershell
+docker compose down -v
+docker compose up -d
+docker compose ps
+```
+
+Then reconnect DBeaver using the current `.env` values. This is usually the
+fastest fix on a newly configured home laptop.
 
 Confirm the effective Compose configuration and exposed port:
 
@@ -263,6 +291,10 @@ Set it to the same value as `POSTGRES_PASSWORD`, then exit:
 After recreating/resetting the home database, rerun:
 
 ```powershell
+python scripts/migrate_client_app_foundation.py
+python scripts/migrate_connector_terminology.py
+python scripts/migrate_app_relationships.py
+python scripts/migrate_policy_assignments.py
 python scripts/seed_normalized_policy_metadata.py
 ```
 
@@ -308,10 +340,10 @@ python scripts/seed_normalized_policy_metadata.py
 Expected counts:
 
 ```text
-apps 2
-app_actions 11
-app_resources 10
-tool_mappings 33
+connectors 2
+connector_actions 11
+connector_resources 10
+connector_tool_mappings 33
 allowed_test_case_expected_tools 3
 ```
 

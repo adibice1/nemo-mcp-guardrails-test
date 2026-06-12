@@ -13,12 +13,12 @@ from nemo_mcp_guardrails.api.policy_schemas import (
 )
 from nemo_mcp_guardrails.database.connection import get_db
 from nemo_mcp_guardrails.database.models import (
-    AppActionRecord,
-    AppRecord,
-    AppResourceRecord,
     CompiledPolicyRuleRecord,
+    ConnectorActionRecord,
+    ConnectorRecord,
+    ConnectorResourceRecord,
+    ConnectorToolMappingRecord,
     PolicyRecord,
-    ToolMappingRecord,
 )
 from nemo_mcp_guardrails.policy_compiler import (
     InputPolicyObject,
@@ -37,7 +37,7 @@ def _resolve_policy_references(policy: PolicyRecord, db: Session) -> None:
     if policy.policy_type == "input":
         missing_fields = [
             field
-            for field in ("app", "action", "resource")
+            for field in ("connector", "action", "resource")
             if not getattr(policy, field)
         ]
         if missing_fields:
@@ -49,41 +49,46 @@ def _resolve_policy_references(policy: PolicyRecord, db: Session) -> None:
                 ),
             )
 
-    if policy.policy_type == "output" and not policy.app:
-        policy.app = "global"
+    if policy.policy_type == "output" and not policy.connector:
+        policy.connector = "global"
 
-    if not policy.app:
-        policy.app_id = None
+    if not policy.connector:
+        policy.connector_id = None
         policy.action_id = None
         policy.resource_id = None
         return
 
-    app_name = policy.app.strip().lower()
-    app = db.scalar(select(AppRecord).where(AppRecord.name == app_name))
+    connector_name = policy.connector.strip().lower()
+    connector = db.scalar(
+        select(ConnectorRecord).where(ConnectorRecord.name == connector_name)
+    )
 
-    if not app:
+    if not connector:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unknown app: {policy.app}",
+            detail=f"Unknown connector: {policy.connector}",
         )
 
-    policy.app = app.name
-    policy.app_id = app.id
-    policy.normalized_app = app
+    policy.connector = connector.name
+    policy.connector_id = connector.id
+    policy.normalized_connector = connector
 
     if policy.action:
         action_name = policy.action.strip().lower()
         action = db.scalar(
-            select(AppActionRecord).where(
-                AppActionRecord.app_id == app.id,
-                AppActionRecord.name == action_name,
+            select(ConnectorActionRecord).where(
+                ConnectorActionRecord.connector_id == connector.id,
+                ConnectorActionRecord.name == action_name,
             )
         )
 
         if not action:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Unknown action '{policy.action}' for app '{app.name}'",
+                detail=(
+                    f"Unknown action '{policy.action}' "
+                    f"for connector '{connector.name}'"
+                ),
             )
 
         policy.action = action.name
@@ -96,9 +101,9 @@ def _resolve_policy_references(policy: PolicyRecord, db: Session) -> None:
     if policy.resource:
         resource_name = policy.resource.strip().lower()
         resource = db.scalar(
-            select(AppResourceRecord).where(
-                AppResourceRecord.app_id == app.id,
-                AppResourceRecord.name == resource_name,
+            select(ConnectorResourceRecord).where(
+                ConnectorResourceRecord.connector_id == connector.id,
+                ConnectorResourceRecord.name == resource_name,
             )
         )
 
@@ -107,7 +112,7 @@ def _resolve_policy_references(policy: PolicyRecord, db: Session) -> None:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=(
                     f"Unknown resource '{policy.resource}' "
-                    f"for app '{app.name}'"
+                    f"for connector '{connector.name}'"
                 ),
             )
 
@@ -124,11 +129,11 @@ def _resolve_policy_references(policy: PolicyRecord, db: Session) -> None:
         and policy.resource_id is not None
     ):
         tool_mapping = db.scalar(
-            select(ToolMappingRecord).where(
-                ToolMappingRecord.app_id == policy.app_id,
-                ToolMappingRecord.action_id == policy.action_id,
-                ToolMappingRecord.resource_id == policy.resource_id,
-                ToolMappingRecord.enabled.is_(True),
+            select(ConnectorToolMappingRecord).where(
+                ConnectorToolMappingRecord.connector_id == policy.connector_id,
+                ConnectorToolMappingRecord.action_id == policy.action_id,
+                ConnectorToolMappingRecord.resource_id == policy.resource_id,
+                ConnectorToolMappingRecord.enabled.is_(True),
             )
         )
 
@@ -137,7 +142,7 @@ def _resolve_policy_references(policy: PolicyRecord, db: Session) -> None:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=(
                     "Unsupported policy combination: "
-                    f"{policy.app} + {policy.action} + {policy.resource}"
+                    f"{policy.connector} + {policy.action} + {policy.resource}"
                 ),
             )
 
@@ -159,7 +164,11 @@ def _require_policy_fields(policy: PolicyRecord, fields: tuple[str, ...]) -> Non
 def _to_input_policy_object(policy: PolicyRecord) -> InputPolicyObject:
     """Convert a stored input policy row into the compiler dataclass."""
 
-    app = policy.normalized_app.name if policy.normalized_app else policy.app
+    connector = (
+        policy.normalized_connector.name
+        if policy.normalized_connector
+        else policy.connector
+    )
     action = policy.normalized_action.name if policy.normalized_action else policy.action
     resource = (
         policy.normalized_resource.name
@@ -167,14 +176,14 @@ def _to_input_policy_object(policy: PolicyRecord) -> InputPolicyObject:
         else policy.resource
     )
 
-    if not (app and action and resource and policy.effect):
+    if not (connector and action and resource and policy.effect):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Policy {policy.id} is missing required input policy fields",
         )
 
     return InputPolicyObject(
-        app=app,
+        connector=connector,
         action=action,
         resource=resource,
         effect=policy.effect,

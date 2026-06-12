@@ -12,10 +12,10 @@ from nemo_mcp_guardrails.database.connection import (
 from nemo_mcp_guardrails.database.models import (
     AllowedTestCaseExpectedToolRecord,
     AllowedTestCaseRecord,
-    AppActionRecord,
-    AppRecord,
-    AppResourceRecord,
-    ToolMappingRecord,
+    ConnectorActionRecord,
+    ConnectorRecord,
+    ConnectorResourceRecord,
+    ConnectorToolMappingRecord,
 )
 from nemo_mcp_guardrails.database.test_case_loader import parse_expected_tools
 from nemo_mcp_guardrails.policy_compiler import (
@@ -25,37 +25,41 @@ from nemo_mcp_guardrails.policy_compiler import (
 )
 
 
-def get_or_create_app(
+def get_or_create_connector(
     db: Session,
     name: str,
     display_name: str,
-) -> AppRecord:
-    """Return an existing app row or create it."""
+) -> ConnectorRecord:
+    """Return an existing connector row or create it."""
 
-    app = db.query(AppRecord).filter(AppRecord.name == name).one_or_none()
+    connector = (
+        db.query(ConnectorRecord)
+        .filter(ConnectorRecord.name == name)
+        .one_or_none()
+    )
 
-    if app:
-        return app
+    if connector:
+        return connector
 
-    app = AppRecord(name=name, display_name=display_name)
-    db.add(app)
+    connector = ConnectorRecord(name=name, display_name=display_name)
+    db.add(connector)
     db.flush()
-    return app
+    return connector
 
 
 def get_or_create_action(
     db: Session,
-    app_id: int,
+    connector_id: int,
     name: str,
     display_name: str,
-) -> AppActionRecord:
-    """Return an existing app action row or create it."""
+) -> ConnectorActionRecord:
+    """Return an existing connector action row or create it."""
 
     action = (
-        db.query(AppActionRecord)
+        db.query(ConnectorActionRecord)
         .filter(
-            AppActionRecord.app_id == app_id,
-            AppActionRecord.name == name,
+            ConnectorActionRecord.connector_id == connector_id,
+            ConnectorActionRecord.name == name,
         )
         .one_or_none()
     )
@@ -63,8 +67,8 @@ def get_or_create_action(
     if action:
         return action
 
-    action = AppActionRecord(
-        app_id=app_id,
+    action = ConnectorActionRecord(
+        connector_id=connector_id,
         name=name,
         display_name=display_name,
     )
@@ -75,17 +79,17 @@ def get_or_create_action(
 
 def get_or_create_resource(
     db: Session,
-    app_id: int,
+    connector_id: int,
     name: str,
     display_name: str,
-) -> AppResourceRecord:
-    """Return an existing app resource row or create it."""
+) -> ConnectorResourceRecord:
+    """Return an existing connector resource row or create it."""
 
     resource = (
-        db.query(AppResourceRecord)
+        db.query(ConnectorResourceRecord)
         .filter(
-            AppResourceRecord.app_id == app_id,
-            AppResourceRecord.name == name,
+            ConnectorResourceRecord.connector_id == connector_id,
+            ConnectorResourceRecord.name == name,
         )
         .one_or_none()
     )
@@ -93,8 +97,8 @@ def get_or_create_resource(
     if resource:
         return resource
 
-    resource = AppResourceRecord(
-        app_id=app_id,
+    resource = ConnectorResourceRecord(
+        connector_id=connector_id,
         name=name,
         display_name=display_name,
     )
@@ -103,22 +107,22 @@ def get_or_create_resource(
     return resource
 
 
-def get_or_create_tool_mapping(
+def get_or_create_connector_tool_mapping(
     db: Session,
-    app_id: int,
+    connector_id: int,
     action_id: int,
     resource_id: int,
     tool_name: str,
-) -> ToolMappingRecord:
-    """Return an existing app/action/resource tool mapping or create it."""
+) -> ConnectorToolMappingRecord:
+    """Return an existing connector/action/resource tool mapping or create it."""
 
     mapping = (
-        db.query(ToolMappingRecord)
+        db.query(ConnectorToolMappingRecord)
         .filter(
-            ToolMappingRecord.app_id == app_id,
-            ToolMappingRecord.action_id == action_id,
-            ToolMappingRecord.resource_id == resource_id,
-            ToolMappingRecord.tool_name == tool_name,
+            ConnectorToolMappingRecord.connector_id == connector_id,
+            ConnectorToolMappingRecord.action_id == action_id,
+            ConnectorToolMappingRecord.resource_id == resource_id,
+            ConnectorToolMappingRecord.tool_name == tool_name,
         )
         .one_or_none()
     )
@@ -126,8 +130,8 @@ def get_or_create_tool_mapping(
     if mapping:
         return mapping
 
-    mapping = ToolMappingRecord(
-        app_id=app_id,
+    mapping = ConnectorToolMappingRecord(
+        connector_id=connector_id,
         action_id=action_id,
         resource_id=resource_id,
         tool_name=tool_name,
@@ -140,7 +144,7 @@ def get_or_create_tool_mapping(
 def get_or_create_expected_tool(
     db: Session,
     allowed_test_case_id: int,
-    tool_mapping_id: int,
+    connector_tool_mapping_id: int,
 ) -> AllowedTestCaseExpectedToolRecord:
     """Return an existing allowed-test expected-tool row or create it."""
 
@@ -149,7 +153,8 @@ def get_or_create_expected_tool(
         .filter(
             AllowedTestCaseExpectedToolRecord.allowed_test_case_id
             == allowed_test_case_id,
-            AllowedTestCaseExpectedToolRecord.tool_mapping_id == tool_mapping_id,
+            AllowedTestCaseExpectedToolRecord.connector_tool_mapping_id
+            == connector_tool_mapping_id,
         )
         .one_or_none()
     )
@@ -159,7 +164,7 @@ def get_or_create_expected_tool(
 
     expected_tool = AllowedTestCaseExpectedToolRecord(
         allowed_test_case_id=allowed_test_case_id,
-        tool_mapping_id=tool_mapping_id,
+        connector_tool_mapping_id=connector_tool_mapping_id,
     )
     db.add(expected_tool)
     db.flush()
@@ -176,20 +181,20 @@ def backfill_allowed_test_expected_tools(db: Session) -> int:
 
     for test_case in allowed_test_cases:
         for tool_name in parse_expected_tools(test_case.expected_tools):
-            tool_mappings = list(
+            connector_tool_mappings = list(
                 db.scalars(
-                    select(ToolMappingRecord).where(
-                        ToolMappingRecord.tool_name == tool_name,
-                        ToolMappingRecord.enabled.is_(True),
+                    select(ConnectorToolMappingRecord).where(
+                        ConnectorToolMappingRecord.tool_name == tool_name,
+                        ConnectorToolMappingRecord.enabled.is_(True),
                     )
                 )
             )
 
-            for tool_mapping in tool_mappings:
+            for connector_tool_mapping in connector_tool_mappings:
                 get_or_create_expected_tool(
                     db,
                     test_case.id,
-                    tool_mapping.id,
+                    connector_tool_mapping.id,
                 )
                 backfilled_count += 1
 
@@ -197,18 +202,18 @@ def backfill_allowed_test_expected_tools(db: Session) -> int:
 
 
 def main() -> None:
-    """Seed normalized app/action/resource/tool metadata."""
+    """Seed normalized connector/action/resource/tool metadata."""
 
     create_database_tables()
 
     with SessionLocal() as db:
-        get_or_create_app(db, "global", "Global")
-        github_app = get_or_create_app(db, "github", "GitHub")
+        get_or_create_connector(db, "global", "Global")
+        github_connector = get_or_create_connector(db, "github", "GitHub")
 
         actions = {
             action_name: get_or_create_action(
                 db,
-                github_app.id,
+                github_connector.id,
                 action_name,
                 GITHUB_ACTION_DISPLAY_NAMES[action_name],
             )
@@ -218,7 +223,7 @@ def main() -> None:
         resources = {
             resource_name: get_or_create_resource(
                 db,
-                github_app.id,
+                github_connector.id,
                 resource_name,
                 GITHUB_RESOURCE_DISPLAY_NAMES[resource_name],
             )
@@ -232,9 +237,9 @@ def main() -> None:
             resource_name,
         ), tool_names in GITHUB_METADATA_TOOL_MAPPINGS.items():
             for tool_name in tool_names:
-                get_or_create_tool_mapping(
+                get_or_create_connector_tool_mapping(
                     db,
-                    github_app.id,
+                    github_connector.id,
                     actions[action_name].id,
                     resources[resource_name].id,
                     tool_name,
@@ -246,10 +251,10 @@ def main() -> None:
         db.commit()
 
     print("Normalized policy metadata seeded.")
-    print("- apps: global, github")
-    print(f"- github actions: {len(actions)}")
-    print(f"- github resources: {len(resources)}")
-    print(f"- github tool mappings: {mapping_count}")
+    print("- connectors: global, github")
+    print(f"- github connector actions: {len(actions)}")
+    print(f"- github connector resources: {len(resources)}")
+    print(f"- github connector tool mappings: {mapping_count}")
     print(f"- allowed test expected-tool links: {expected_tool_count}")
 
 

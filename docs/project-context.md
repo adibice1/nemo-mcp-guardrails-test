@@ -1,5 +1,41 @@
 # Project Context: NeMo Guardrails + GitHub MCP
 
+## Confirmed Target Direction
+
+The production target is a full-proxy Guardrails Management System used
+primarily with GitHub and SharePoint, while remaining extensible to Outlook and
+other connectors.
+
+Important terminology change:
+
+```text
+app       = client application consuming the GMS
+connector = external integration such as GitHub MCP, SharePoint, or Outlook
+```
+
+The terminology migration is complete:
+
+```text
+apps                    = client applications consuming the GMS
+connectors              = external integrations
+connector_actions       = actions supported by connectors
+connector_resources     = resources supported by connectors
+connector_tool_mappings = concrete connector tool mappings
+```
+
+Confirmed target behavior:
+
+- one app can use multiple connectors
+- users and apps have a many-to-many relationship
+- main-agent and guardrail-classification LLMs can differ
+- mandatory global policies apply to every app
+- prototype webapp login uses email/password
+- GMS acts as a full proxy for input rail, agent/tool execution, and output rail
+- policy changes automatically compile or invalidate generated rules
+- frontend target is Next.js 13
+
+The authoritative target design is in `docs/target-architecture.md`.
+
 ## Goal
 
 Research NVIDIA NeMo Guardrails and test how guardrails can sit around an LLM that uses GitHub MCP tools.
@@ -62,6 +98,19 @@ The system successfully:
 - Injects enabled compiled rules into `config/prompts.yml` at runtime through `prompt_rule_compiler.py`.
 - Seeds normalized app/action/resource/tool metadata through `scripts/seed_normalized_policy_metadata.py`.
 - Backfills `allowed_test_case_expected_tools` from current allowed test rows.
+- Creates the additive target-foundation tables `users`, `llm_configs`, and
+  `apps`.
+- Uses connector terminology consistently across the normalized database,
+  policy API, policy compiler, loaders, seed scripts, and tests.
+- Creates `app_users` for user/app management roles and `app_connectors` for
+  app-specific connector access and credential references.
+- Creates `app_policy_assignments` and `global_policy_assignments` without
+  duplicating the existing reusable policy definitions in `policies`.
+- Exposes client-app CRUD under `/apps`, app-specific policy assignment CRUD
+  under `/apps/{app_id}/policy-assignments`, and global assignment CRUD under
+  `/global-policy-assignments`.
+- Hashes API keys received by app create/update requests and never returns the
+  plaintext key or stored hash in API responses.
 
 ## Current Runtime Flow
 
@@ -253,10 +302,10 @@ are now injected into the runtime NeMo output prompt by `prompt_rule_compiler.py
 The normalized metadata slice has started. The new tables are:
 
 ```text
-apps
-app_actions
-app_resources
-tool_mappings
+connectors
+connector_actions
+connector_resources
+connector_tool_mappings
 allowed_test_case_expected_tools
 ```
 
@@ -269,16 +318,50 @@ python scripts/seed_normalized_policy_metadata.py
 Latest expected counts:
 
 ```text
-apps 2
-app_actions 11
-app_resources 10
-tool_mappings 33
+connectors 2
+connector_actions 11
+connector_resources 10
+connector_tool_mappings 33
 allowed_test_case_expected_tools 3
 ```
 
+## Client-App Foundation State
+
+The first target-architecture schema slice is additive and complete:
+
+```text
+users
+llm_configs
+apps
+```
+
+Run the idempotent foundation migration with:
+
+```powershell
+python scripts/migrate_client_app_foundation.py
+```
+
+The `apps` table starts empty by design. App CRUD and API-key hashing now exist.
+App authentication, user login, API-key verification middleware, and
+LLM-secret handling do not exist yet.
+
 ## Current Next Step
 
-Add metadata discovery endpoints for apps, actions, resources, and tool
-mappings so frontend dropdowns and API clients can discover valid values.
+Make policy loading assignment-aware:
 
-Do not remove the flat `policies.app/action/resource` columns yet.
+```text
+app_policy_assignments
+global_policy_assignments
+app ID
+-> active global policies + active app policies
+```
+
+The `users`, `apps`, `app_users`, `connectors`, and `app_connectors`
+foundation now exists. The credential output policy is globally assigned;
+GitHub write policies are currently unassigned.
+
+Assignment management APIs now exist. Runtime loaders still intentionally use
+all enabled policies until both `policy_loader.py` and `prompt_rule_loader.py`
+can receive the requesting app ID.
+
+Do not remove the flat `policies.connector/action/resource` columns yet.

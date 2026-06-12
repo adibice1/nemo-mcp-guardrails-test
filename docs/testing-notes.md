@@ -1,5 +1,14 @@
 # Testing Notes
 
+## Target Runtime Note
+
+The current scripts test one GitHub prototype path. The confirmed production
+GMS will be a full proxy that authenticates a client app, loads mandatory
+global rules plus app-specific assignments, runs input rails, executes guarded
+connector tools, runs output rails, and returns the final response.
+
+In target terminology, GitHub MCP is a connector rather than a client app.
+
 ## Current Status
 
 NeMo input rails are working in the full GitHub MCP test path when `LLMRails` is created with the already-working AzureChatOpenAI model:
@@ -11,6 +20,9 @@ rails = LLMRails(rails_config, llm=model)
 ```
 
 The deterministic Python pre-check still exists, but by default it only reports what it would block. It does not stop execution unless `ENFORCE_PYTHON_PRECHECK=true`.
+
+The additive target-foundation and connector terminology migrations have been
+verified without changing the existing runtime behavior.
 
 The runtime wraps MCP tools with `src/nemo_mcp_guardrails/tool_guard.py`. This execution-level safety layer blocks restricted GitHub MCP tool names before the underlying MCP tool can run. Normal tests still keep GitHub MCP in read-only mode with `GITHUB_READ_ONLY=1`, so write tools should not be exposed by the server in the first place.
 
@@ -289,10 +301,10 @@ Expected output:
 
 ```text
 Normalized policy metadata seeded.
-- apps: global, github
-- github actions: 11
-- github resources: 10
-- github tool mappings: 33
+- connectors: global, github
+- github connector actions: 11
+- github connector resources: 10
+- github connector tool mappings: 33
 - allowed test expected-tool links: 3
 ```
 
@@ -301,17 +313,116 @@ The script is idempotent. Running it multiple times should not duplicate rows.
 Current normalized tables:
 
 ```text
-apps
-app_actions
-app_resources
-tool_mappings
+connectors
+connector_actions
+connector_resources
+connector_tool_mappings
 allowed_test_case_expected_tools
 ```
 
 `test_case_loader.py` now prefers normalized expected-tool links from
-`allowed_test_case_expected_tools` and `tool_mappings`. It falls back to the
+`allowed_test_case_expected_tools` and `connector_tool_mappings`. It falls back to the
 old comma-separated `allowed_test_cases.expected_tools` field only when an
 allowed test has no normalized links.
+
+## Client-App Foundation Migration Test
+
+Run:
+
+```powershell
+python scripts/migrate_client_app_foundation.py
+```
+
+Expected on the current unseeded foundation:
+
+```text
+Client-app foundation migration complete.
+- users: 0
+- llm configs: 0
+- apps: 0
+```
+
+The migration is additive and idempotent. Existing policy, connector metadata,
+and allowed-test rows must remain unchanged.
+
+## Connector Terminology Migration Test
+
+Run:
+
+```powershell
+python scripts/migrate_connector_terminology.py
+```
+
+The migration preserves current IDs and rows while renaming the connector
+metadata, policy connector fields, and allowed-test connector-tool join.
+Repeated runs should report that the migration is already applied.
+
+## App Relationship Migration Test
+
+Run:
+
+```powershell
+python scripts/migrate_app_relationships.py
+```
+
+Expected before app/user seed records exist:
+
+```text
+App relationship migration complete.
+- app user links: 0
+- app connector links: 0
+```
+
+`app_users` prevents duplicate user/app links and cascades when either parent
+is deleted. `app_connectors` prevents duplicate app/connector links and stores
+only a connector credential reference.
+
+## Policy Assignment Migration Test
+
+Run:
+
+```powershell
+python scripts/migrate_policy_assignments.py
+```
+
+Expected current result:
+
+```text
+Policy assignment migration complete.
+- app policy assignments: 0
+- global policy assignments: 1
+```
+
+The single global assignment references the existing credential output policy.
+The existing GitHub write policies are intentionally not made global. Runtime
+policy loading still reads all enabled `policies` until the app-aware loader
+slice is implemented.
+
+## App And Policy Assignment API Test
+
+FastAPI now exposes:
+
+```text
+GET/POST/PUT/DELETE /apps
+GET/POST/PUT/DELETE /apps/{app_id}/policy-assignments
+GET/POST/PUT/DELETE /global-policy-assignments
+```
+
+App create/update accepts an `api_key`, hashes it before storage, and never
+returns the plaintext key or hash. Assignment creation validates that the app
+and reusable policy exist. Duplicate assignments return `409`.
+
+Latest focused smoke test passed:
+
+```text
+create temporary app
+-> create/update/delete app policy assignment
+-> create/update/delete global policy assignment
+-> delete temporary app
+-> no temporary records remain
+```
+
+Use Swagger at `http://127.0.0.1:8000/docs` to manage real development rows.
 
 ## Allowed Test Case API
 

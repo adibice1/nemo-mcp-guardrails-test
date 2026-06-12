@@ -98,7 +98,7 @@ def load_allowed_test_cases() -> tuple[LoadedAllowedTestCase, ...]:
                         selectinload(
                             AllowedTestCaseRecord.expected_tool_links
                         ).selectinload(
-                            AllowedTestCaseExpectedToolRecord.tool_mapping
+                            AllowedTestCaseExpectedToolRecord.connector_tool_mapping
                         )
                     )
                     .where(AllowedTestCaseRecord.enabled.is_(True))

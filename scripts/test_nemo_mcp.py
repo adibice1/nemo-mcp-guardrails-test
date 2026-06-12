@@ -165,7 +165,7 @@ def print_runtime_policy_summary(
         blocked_tools = ", ".join(compiled_policy.blocked_tools)
         print(
             f"- {_format_policy_source(loaded_policy)}: "
-            f"{policy.app} {policy.action} {policy.resource} "
+            f"{policy.connector} {policy.action} {policy.resource} "
             f"{policy.effect} -> {blocked_tools}"
         )
 

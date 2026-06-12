@@ -1,5 +1,41 @@
 # Policy Schema Design
 
+## Target Terminology Update
+
+The confirmed production meaning of `app` has changed:
+
+```text
+app       = client application consuming the GMS
+connector = external integration such as GitHub MCP, SharePoint, or Outlook
+```
+
+The terminology migration is complete:
+
+```text
+apps                    = client applications consuming the GMS
+connectors              = external integrations
+connector_actions       = actions supported by connectors
+connector_resources     = resources supported by connectors
+connector_tool_mappings = concrete connector tool mappings
+```
+
+The target schema must also introduce:
+
+```text
+users
+apps
+app_users
+app_connectors
+llm_configs
+policy_rules
+app_policy_assignments
+global_policy_assignments
+```
+
+See `docs/target-architecture.md` for the authoritative confirmed target
+design. Some SQL examples below record the historical pre-rename schema and are
+labelled accordingly.
+
 ## Purpose
 
 This document defines the next normalized database shape for the guardrails
@@ -29,7 +65,7 @@ This is now DB-backed, but the main `policies` table is still flat:
 
 ```text
 policy_type
-app
+connector
 action
 resource
 category
@@ -46,10 +82,10 @@ apps with different actions/resources/tools.
 
 The normalized model should:
 
-- store each app once
-- store valid actions per app
-- store valid resources per app
-- map app/action/resource combinations to concrete tool names
+- store each connector once
+- store valid actions per connector
+- store valid resources per connector
+- map connector/action/resource combinations to concrete tool names
 - keep policies as the source of truth
 - keep compiled NeMo rules as generated artifacts
 - keep allowed test cases separate from block policies
@@ -58,12 +94,12 @@ The normalized model should:
 
 ## Proposed Core Tables
 
-### apps
+### connectors
 
-One row per protected app or connector.
+One row per supported external connector.
 
 ```sql
-CREATE TABLE apps (
+CREATE TABLE connectors (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL UNIQUE,
     display_name VARCHAR(200) NOT NULL,
@@ -81,20 +117,20 @@ jira -> Jira
 slack -> Slack
 ```
 
-### app_actions
+### connector_actions
 
-Actions supported by one app.
+Actions supported by one connector.
 
 ```sql
-CREATE TABLE app_actions (
+CREATE TABLE connector_actions (
     id SERIAL PRIMARY KEY,
-    app_id INTEGER NOT NULL REFERENCES apps(id) ON DELETE CASCADE,
+    connector_id INTEGER NOT NULL REFERENCES connectors(id) ON DELETE CASCADE,
     name VARCHAR(100) NOT NULL,
     display_name VARCHAR(200) NOT NULL,
     enabled BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE (app_id, name)
+    UNIQUE (connector_id, name)
 );
 ```
 
@@ -120,20 +156,20 @@ delete
 invite
 ```
 
-### app_resources
+### connector_resources
 
-Resources supported by one app.
+Resources supported by one connector.
 
 ```sql
-CREATE TABLE app_resources (
+CREATE TABLE connector_resources (
     id SERIAL PRIMARY KEY,
-    app_id INTEGER NOT NULL REFERENCES apps(id) ON DELETE CASCADE,
+    connector_id INTEGER NOT NULL REFERENCES connectors(id) ON DELETE CASCADE,
     name VARCHAR(100) NOT NULL,
     display_name VARCHAR(200) NOT NULL,
     enabled BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE (app_id, name)
+    UNIQUE (connector_id, name)
 );
 ```
 
@@ -160,15 +196,15 @@ user
 ### policies
 
 The policy row says what should be allowed or blocked. It references normalized
-app/action/resource rows instead of storing repeated strings.
+connector/action/resource rows instead of storing repeated strings.
 
 ```sql
 CREATE TABLE policies (
     id SERIAL PRIMARY KEY,
     policy_type VARCHAR(30) NOT NULL,
-    app_id INTEGER REFERENCES apps(id) ON DELETE RESTRICT,
-    action_id INTEGER REFERENCES app_actions(id) ON DELETE RESTRICT,
-    resource_id INTEGER REFERENCES app_resources(id) ON DELETE RESTRICT,
+    connector_id INTEGER REFERENCES connectors(id) ON DELETE RESTRICT,
+    action_id INTEGER REFERENCES connector_actions(id) ON DELETE RESTRICT,
+    resource_id INTEGER REFERENCES connector_resources(id) ON DELETE RESTRICT,
     category VARCHAR(100),
     description TEXT,
     effect VARCHAR(20) NOT NULL DEFAULT 'block',
@@ -251,22 +287,22 @@ Example:
 
 ## Tool Mapping Tables
 
-### tool_mappings
+### connector_tool_mappings
 
-Maps normalized app/action/resource concepts to actual connector or MCP tool
+Maps normalized connector/action/resource concepts to actual connector or MCP tool
 names.
 
 ```sql
-CREATE TABLE tool_mappings (
+CREATE TABLE connector_tool_mappings (
     id SERIAL PRIMARY KEY,
-    app_id INTEGER NOT NULL REFERENCES apps(id) ON DELETE CASCADE,
-    action_id INTEGER NOT NULL REFERENCES app_actions(id) ON DELETE CASCADE,
-    resource_id INTEGER NOT NULL REFERENCES app_resources(id) ON DELETE CASCADE,
+    connector_id INTEGER NOT NULL REFERENCES connectors(id) ON DELETE CASCADE,
+    action_id INTEGER NOT NULL REFERENCES connector_actions(id) ON DELETE CASCADE,
+    resource_id INTEGER NOT NULL REFERENCES connector_resources(id) ON DELETE CASCADE,
     tool_name VARCHAR(200) NOT NULL,
     enabled BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE (app_id, action_id, resource_id, tool_name)
+    UNIQUE (connector_id, action_id, resource_id, tool_name)
 );
 ```
 
@@ -370,9 +406,9 @@ is synchronized temporarily as a compatibility fallback.
 CREATE TABLE allowed_test_case_expected_tools (
     id SERIAL PRIMARY KEY,
     allowed_test_case_id INTEGER NOT NULL REFERENCES allowed_test_cases(id) ON DELETE CASCADE,
-    tool_mapping_id INTEGER NOT NULL REFERENCES tool_mappings(id) ON DELETE CASCADE,
+    connector_tool_mapping_id INTEGER NOT NULL REFERENCES connector_tool_mappings(id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE (allowed_test_case_id, tool_mapping_id)
+    UNIQUE (allowed_test_case_id, connector_tool_mapping_id)
 );
 ```
 
@@ -406,8 +442,8 @@ CREATE TABLE workflow_events (
     workflow_id INTEGER NOT NULL REFERENCES workflow_definitions(id) ON DELETE CASCADE,
     policy_id INTEGER REFERENCES policies(id) ON DELETE SET NULL,
     app_id INTEGER NOT NULL REFERENCES apps(id) ON DELETE CASCADE,
-    action_id INTEGER REFERENCES app_actions(id) ON DELETE SET NULL,
-    resource_id INTEGER REFERENCES app_resources(id) ON DELETE SET NULL,
+    action_id INTEGER REFERENCES connector_actions(id) ON DELETE SET NULL,
+    resource_id INTEGER REFERENCES connector_resources(id) ON DELETE SET NULL,
     actor VARCHAR(200),
     event_payload JSONB NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -427,20 +463,20 @@ Block GitHub pull request merges.
 Normalized rows:
 
 ```text
-apps
+connectors
 - id=1, name=github
 
-app_actions
-- id=6, app_id=1, name=merge
+connector_actions
+- id=6, connector_id=1, name=merge
 
-app_resources
-- id=2, app_id=1, name=pull_request
+connector_resources
+- id=2, connector_id=1, name=pull_request
 
 policies
-- policy_type=input, app_id=1, action_id=6, resource_id=2, effect=block
+- policy_type=input, connector_id=1, action_id=6, resource_id=2, effect=block
 
-tool_mappings
-- app_id=1, action_id=6, resource_id=2, tool_name=merge_pull_request
+connector_tool_mappings
+- connector_id=1, action_id=6, resource_id=2, tool_name=merge_pull_request
 
 compiled_policy_rules
 - policy_id=<policy id>, rail_type=input, rule_text=Answer "yes" when...
@@ -452,16 +488,16 @@ compiled_policy_rules
 
 ```text
 policies
--> apps
--> app_actions
--> app_resources
+-> connectors
+-> connector_actions
+-> connector_resources
 ```
 
 and still return the same compiler object:
 
 ```python
 InputPolicyObject(
-    app="github",
+    connector="github",
     action="merge",
     resource="pull_request",
     effect="block",
@@ -484,13 +520,18 @@ Long term:
 
 ```text
 policy_loader.py joins normalized tables
--> policy_compiler.py reads DB tool_mappings and synonym/template tables
+-> policy_compiler.py reads DB connector_tool_mappings and synonym/template tables
 ```
 
 So normalization can happen in stages without rewriting the whole compiler at
 once.
 
 ## Migration Plan
+
+The previous normalization migration is complete for the GitHub prototype.
+Before further production-schema work, a new migration plan must separate
+client apps from connectors and preserve the existing GitHub metadata during
+the rename.
 
 Current migration status:
 
@@ -503,7 +544,10 @@ Current migration status:
 7. Transitional: keep old string columns as fallback/debug fields.
 8. Completed: policy create/update accepts readable names and resolves normalized IDs.
 9. Completed: validate action/resource combinations against enabled tool mappings.
-10. Later: remove old string columns after stable verification.
+10. Completed: add `app_policy_assignments` and `global_policy_assignments`.
+11. Completed: add app and policy-assignment CRUD APIs.
+12. Next: make policy and compiled-prompt-rule loading assignment-aware.
+13. Later: remove old string columns after stable verification.
 
 ## Proposed Implementation Slices
 
@@ -516,27 +560,31 @@ Add new ORM models and create metadata/test join tables. Keep existing flat colu
 Seed:
 
 ```text
-apps
-app_actions
-app_resources
-tool_mappings
+connectors
+connector_actions
+connector_resources
+connector_tool_mappings
 ```
 
 from the current GitHub policy compiler metadata.
 
-Also seed a generic app row:
+The current prototype also seeds a generic row:
 
 ```text
-apps.name = global
+connectors.name = global
 ```
 
 Generic cross-app output policies such as credentials, secrets, API keys, and
-PII should use `app_id=global`. App-specific output policies should use the
-specific app ID, such as `github`, `slack`, or `jira`.
+PII currently uses `connector_id=global`. Connector-specific output policies
+use the relevant connector ID, such as `github`, `sharepoint`, or `outlook`.
+
+This is transitional prototype behavior. In the confirmed target schema,
+mandatory global policies belong in `global_policy_assignments`; they should
+not be represented by a fake client app or connector named `global`.
 
 ### Slice 3: Backfill policies
 
-Populate `policies.app_id`, `policies.action_id`, and `policies.resource_id`
+Populate `policies.connector_id`, `policies.action_id`, and `policies.resource_id`
 from existing text values. Completed by
 `scripts/migrate_normalized_policy_references.py`.
 
@@ -548,18 +596,72 @@ fallback to the current text columns. Completed.
 ### Slice 5: Move compiler mappings into DB
 
 Once normalized policy loading is stable, gradually replace hardcoded
-`policy_compiler.py` mappings with DB-backed `tool_mappings` and later
+`policy_compiler.py` mappings with DB-backed `connector_tool_mappings` and later
 synonym/template tables.
 
 ## Design Decisions
 
+### Client Apps And Connectors
+
+One client app can use multiple connectors, and one connector can be used by
+multiple client apps:
+
+```text
+apps
+-> app_connectors
+-> connectors
+```
+
+Connector credentials are app-specific because App A and App B may use the
+same GitHub or SharePoint connector with different permissions.
+
+### Reusable Rules And App Assignments
+
+Reusable rules should be stored separately from app-specific assignments:
+
+```text
+policies
+-> app_policy_assignments
+-> apps
+```
+
+This lets multiple apps share the same rule while enabling or deleting that
+rule assignment independently for each app.
+
+Mandatory rules use `global_policy_assignments` and apply to every app.
+
+Current implementation keeps `policies` as the reusable rule-definition table
+instead of copying the same definitions into a second `policy_rules` table.
+The table can be renamed later if the clearer name becomes worthwhile.
+
+Current management endpoints:
+
+```text
+/apps
+/apps/{app_id}/policy-assignments
+/global-policy-assignments
+```
+
+These endpoints manage assignment rows. Runtime filtering by assignment is the
+next implementation slice.
+
+### Automatic Compilation
+
+The target system should not require administrators to manually call
+`POST /policies/compile-rules`.
+
+```text
+rule or assignment changes
+-> mark compiled artifacts stale
+-> compile active rules
+-> store current artifacts
+-> invalidate runtime cache
+```
+
 ### Output Policy Scope
 
-Output policies should be app-specific when needed, but the system should also
-support global policies.
-
-Use a normal `apps` row named `global` for generic output policies that apply to
-all apps:
+Output policies can be assigned to specific client apps when needed, while
+mandatory cross-app policies use `global_policy_assignments`:
 
 ```text
 global credentials block
@@ -567,12 +669,14 @@ global PII block
 global secret leakage block
 ```
 
-Use app-specific rows for output policies that only apply to a single app:
+Use app-specific assignments for output policies that only apply to one client
+app. Connector-specific rule definitions can still identify the relevant
+connector:
 
 ```text
 github repository metadata output policy
-slack channel message output policy
-jira ticket output policy
+sharepoint document output policy
+outlook email output policy
 ```
 
 ### Allowed Test Expected Tools
@@ -590,7 +694,7 @@ Normalized target:
 ```text
 allowed_test_cases
 -> allowed_test_case_expected_tools
--> tool_mappings
+-> connector_tool_mappings
 ```
 
 ### Policy Conditions

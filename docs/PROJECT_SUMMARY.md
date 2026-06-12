@@ -1,5 +1,25 @@
 # Guardrails Management System — Project Summary and Flow
 
+## Confirmed Production Direction
+
+The target GMS is a full proxy used primarily with GitHub and SharePoint while
+remaining extensible to Outlook and other connectors.
+
+Confirmed terminology:
+
+```text
+app       = client application authorized to consume the GMS
+connector = external integration such as GitHub MCP or SharePoint
+```
+
+One app may use multiple connectors. Users and apps are many-to-many. Main-agent
+and guardrail-classification LLMs may differ. Mandatory global policies apply
+to every app. Reusable policy rules are assigned independently to client apps.
+
+The terminology migration is complete. `apps` now represent GMS client
+applications, while connector metadata lives in `connectors`,
+`connector_actions`, `connector_resources`, and `connector_tool_mappings`.
+
 ## Current Handoff - 2026-06-05
 
 The current prototype is DB-backed through the main guardrail path. Enabled
@@ -27,6 +47,12 @@ Current backend/API state:
 - DBeaver can connect to the same local Postgres database.
 - FastAPI starts with `python scripts/run_api.py`.
 - Policy CRUD is available under `/policies`.
+- Client-app CRUD is available under `/apps`.
+- App-specific policy assignment CRUD is available under
+  `/apps/{app_id}/policy-assignments`.
+- Global policy assignment CRUD is available under
+  `/global-policy-assignments`.
+- App API keys are hashed before persistence and omitted from API responses.
 - `POST /policies/compile-preview` previews compiler output from enabled DB rows.
 - `POST /policies/compile-rules` stores generated NeMo rule text in `compiled_policy_rules`.
 - `src/nemo_mcp_guardrails/database/policy_loader.py` loads enabled input/output policy rows for runtime/debug code.
@@ -57,20 +83,20 @@ Normal full-run GitHub MCP tests should stay in read-only mode with `GITHUB_READ
 Current normalized metadata counts after seeding:
 
 ```text
-apps 2
-app_actions 11
-app_resources 10
-tool_mappings 33
+connectors 2
+connector_actions 11
+connector_resources 10
+connector_tool_mappings 33
 allowed_test_case_expected_tools 3
 ```
 
 Immediate next step:
 
 ```text
-commit current normalized metadata milestone
--> add nullable normalized policy columns
--> backfill policies.app/action/resource to app/action/resource IDs
--> update policy_loader.py to prefer normalized joins with flat-column fallback
+pass app ID into policy_loader.py and prompt_rule_loader.py
+-> load active global + active app-specific assignments
+-> add app ID/API-key verification
+-> implement the full-proxy runtime endpoint
 ```
 
 Future write-tool policies will need more than a tool denylist. For example, allowing merges only in sequence `A -> B -> C` requires policy conditions, tool arguments, workflow state, and history checks before allowing tool execution.
@@ -657,7 +683,7 @@ Important architectural decisions:
 - Keep `config/prompts.yml` as the stable NeMo input/output prompt template.
 - Keep `src/nemo_mcp_guardrails/tool_guard.py` as the execution-level tool guard.
 - Use `src/nemo_mcp_guardrails/policy_compiler.py` as a prototype of the future backend/admin policy compiler.
-- Use `scripts/seed_normalized_policy_metadata.py` to seed normalized metadata before inspecting `apps`, `app_actions`, `app_resources`, `tool_mappings`, or `allowed_test_case_expected_tools`.
+- Use `scripts/seed_normalized_policy_metadata.py` to seed normalized metadata before inspecting `connectors`, `connector_actions`, `connector_resources`, `connector_tool_mappings`, or `allowed_test_case_expected_tools`.
 - In the final system, policy objects, tool mappings, synonyms, templates, versions, active mappings, and audit logs should move into Postgres.
 - Use the normal Postgres Docker image for local development.
 - Use pgAdmin in Docker or DBeaver to inspect and manage the local database.

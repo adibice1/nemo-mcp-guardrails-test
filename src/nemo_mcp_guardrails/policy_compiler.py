@@ -5,7 +5,7 @@ from dataclasses import dataclass
 class InputPolicyObject:
     """Represent one admin-created input policy rule in structured form."""
 
-    app: str
+    connector: str
     action: str
     resource: str
     effect: str
@@ -162,85 +162,85 @@ DEFAULT_OUTPUT_POLICY_OBJECTS = (
 
 DEFAULT_INPUT_POLICY_OBJECTS = (
     InputPolicyObject(
-        app="github",
+        connector="github",
         action="create",
         resource="issue",
         effect="block",
     ),
     InputPolicyObject(
-        app="github",
+        connector="github",
         action="update",
         resource="issue",
         effect="block",
     ),
     InputPolicyObject(
-        app="github",
+        connector="github",
         action="comment",
         resource="issue",
         effect="block",
     ),
     InputPolicyObject(
-        app="github",
+        connector="github",
         action="create",
         resource="pull_request",
         effect="block",
     ),
     InputPolicyObject(
-        app="github",
+        connector="github",
         action="update",
         resource="pull_request",
         effect="block",
     ),
     InputPolicyObject(
-        app="github",
+        connector="github",
         action="merge",
         resource="pull_request",
         effect="block",
     ),
     InputPolicyObject(
-        app="github",
+        connector="github",
         action="review",
         resource="pull_request",
         effect="block",
     ),
     InputPolicyObject(
-        app="github",
+        connector="github",
         action="create",
         resource="branch",
         effect="block",
     ),
     InputPolicyObject(
-        app="github",
+        connector="github",
         action="create",
         resource="file",
         effect="block",
     ),
     InputPolicyObject(
-        app="github",
+        connector="github",
         action="update",
         resource="file",
         effect="block",
     ),
     InputPolicyObject(
-        app="github",
+        connector="github",
         action="delete",
         resource="file",
         effect="block",
     ),
     InputPolicyObject(
-        app="github",
+        connector="github",
         action="push",
         resource="file",
         effect="block",
     ),
     InputPolicyObject(
-        app="github",
+        connector="github",
         action="create",
         resource="repository",
         effect="block",
     ),
     InputPolicyObject(
-        app="github",
+        connector="github",
         action="fork",
         resource="repository",
         effect="block",
@@ -326,8 +326,8 @@ def compile_test_cases(policy: InputPolicyObject) -> tuple[TestCase, ...]:
 def compile_policy(policy: InputPolicyObject) -> CompiledInputPolicy:
     """Compile one structured policy object into guardrail and test artifacts."""
 
-    if policy.app != "github":
-        raise ValueError(f"Unsupported app: {policy.app}")
+    if policy.connector != "github":
+        raise ValueError(f"Unsupported connector: {policy.connector}")
 
     if policy.effect != "block":
         raise ValueError(f"Unsupported effect: {policy.effect}")
@@ -406,7 +406,7 @@ def print_compiled_policy(
     """Print compiled policy artifacts in a human-readable preview format."""
 
     print("INPUT POLICY OBJECT")
-    print(f"- app: {policy.app}")
+    print(f"- connector: {policy.connector}")
     print(f"- action: {policy.action}")
     print(f"- resource: {policy.resource}")
     print(f"- effect: {policy.effect}")

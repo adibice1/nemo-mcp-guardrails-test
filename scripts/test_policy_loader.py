@@ -29,7 +29,7 @@ def main() -> None:
     print_section("Loaded input policies")
     for policy in input_policies:
         print(
-            f"- {policy.app} {policy.action} {policy.resource} "
+            f"- {policy.connector} {policy.action} {policy.resource} "
             f"{policy.effect}"
         )
 

@@ -6,6 +6,10 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from nemo_mcp_guardrails.api.allowed_test_cases import router as allowed_test_cases_router
+from nemo_mcp_guardrails.api.apps import router as apps_router
+from nemo_mcp_guardrails.api.global_policy_assignments import (
+    router as global_policy_assignments_router,
+)
 from nemo_mcp_guardrails.api.policies import router as policies_router
 from nemo_mcp_guardrails.database.connection import create_database_tables, get_db
 
@@ -25,6 +29,8 @@ app = FastAPI(
 )
 
 app.include_router(allowed_test_cases_router)
+app.include_router(apps_router)
+app.include_router(global_policy_assignments_router)
 app.include_router(policies_router)
 
 

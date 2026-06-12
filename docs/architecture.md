@@ -1,5 +1,37 @@
 # Architecture Diagram
 
+## Confirmed Target Architecture Update
+
+The diagram below was created before the confirmed terminology update. In the
+production target:
+
+```text
+app       = client application consuming the GMS
+connector = GitHub MCP, SharePoint, Outlook, or another external integration
+```
+
+The target GMS acts as a full proxy:
+
+```text
+Client app request
+-> authenticate app ID and API key
+-> load global and app-specific rules
+-> input rail
+-> GMS agent and selected main LLM
+-> tool guard
+-> connector tool execution
+-> output rail
+-> response returned to client app
+```
+
+One app can use multiple connectors. One user can manage multiple apps, and one
+app can be managed by multiple users. Main-agent and guardrail-classification
+LLMs can use separate configurations.
+
+See `docs/target-architecture.md` for the authoritative target tables and
+runtime flow. The large diagram below remains useful conceptually, but labels
+such as "App Adapter" should now be read as "Connector Adapter".
+
 ```mermaid
 flowchart TB
 
@@ -290,6 +322,19 @@ Admin-style policy row
 -> prompt_rule_compiler.py injects stored compiled rules into NeMo prompts
 ```
 
+Current management API slice:
+
+```text
+/apps
+-> create/manage GMS client apps with hashed API keys
+
+/apps/{app_id}/policy-assignments
+-> assign reusable policies to one app
+
+/global-policy-assignments
+-> manage mandatory global policy assignments
+```
+
 Latest verified enabled input policy sample:
 
 ```text
@@ -320,10 +365,10 @@ Current normalized metadata step:
 
 ```text
 scripts/seed_normalized_policy_metadata.py
--> apps: global, github
--> app_actions
--> app_resources
--> tool_mappings
+-> connectors: global, github
+-> connector_actions
+-> connector_resources
+-> connector_tool_mappings
 -> allowed_test_case_expected_tools
 ```
 
@@ -340,9 +385,9 @@ Postgres policy/template/tool/synonym tables
 Next implementation direction:
 
 ```text
-commit current normalized metadata milestone
--> add/backfill normalized policy FK columns
--> update policy_loader.py to prefer normalized joins
+pass requesting app ID into policy_loader.py and prompt_rule_loader.py
+-> load enabled global + enabled app-specific assignments
+-> add app credential verification
 -> keep normal GitHub MCP tests read-only
 -> later OpenShift deployment
 ```

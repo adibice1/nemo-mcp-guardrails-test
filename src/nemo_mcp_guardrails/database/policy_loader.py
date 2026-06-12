@@ -46,7 +46,7 @@ def _load_enabled_policy_records(policy_type: str) -> list[PolicyRecord] | None:
                 db.scalars(
                     select(PolicyRecord)
                     .options(
-                        selectinload(PolicyRecord.normalized_app),
+                        selectinload(PolicyRecord.normalized_connector),
                         selectinload(PolicyRecord.normalized_action),
                         selectinload(PolicyRecord.normalized_resource),
                     )
@@ -64,17 +64,21 @@ def _load_enabled_policy_records(policy_type: str) -> list[PolicyRecord] | None:
 def _to_input_policy_object(record: PolicyRecord) -> InputPolicyObject | None:
     """Convert one enabled database row into an input policy object."""
 
-    app = record.normalized_app.name if record.normalized_app else record.app
+    connector = (
+        record.normalized_connector.name
+        if record.normalized_connector
+        else record.connector
+    )
     action = record.normalized_action.name if record.normalized_action else record.action
     resource = (
         record.normalized_resource.name if record.normalized_resource else record.resource
     )
 
-    if not (app and action and resource and record.effect):
+    if not (connector and action and resource and record.effect):
         return None
 
     return InputPolicyObject(
-        app=app,
+        connector=connector,
         action=action,
         resource=resource,
         effect=record.effect,

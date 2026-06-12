@@ -1,5 +1,56 @@
 # Runtime Flow Map
 
+## Target Full-Proxy Flow
+
+The current flow documented below is the GitHub research prototype. The
+confirmed production target adds client-app authentication and makes the GMS a
+full proxy:
+
+```text
+client app + app ID/API key
+-> authenticate authorized app
+-> load mandatory global rules
+-> load app-specific rule assignments
+-> load app connectors and LLM configurations
+-> input rail
+-> GMS agent
+-> tool guard
+-> connector tool
+-> agent final response
+-> output rail
+-> client app and user
+```
+
+Target terminology:
+
+```text
+app       = client application using GMS
+connector = GitHub MCP, SharePoint, Outlook, etc.
+```
+
+The connector terminology migration is complete. `apps` represent GMS client
+applications and `connectors` represent external integrations.
+
+## Current Management API Flow
+
+```text
+POST /apps
+-> hash submitted API key
+-> store client app without plaintext credentials
+
+POST /apps/{app_id}/policy-assignments
+-> validate app and reusable policy
+-> create app-specific assignment
+
+POST /global-policy-assignments
+-> validate reusable policy
+-> create mandatory global assignment
+```
+
+These assignment APIs manage scope, but the runtime loaders are not
+assignment-aware yet. The current no-app integration runner still loads all
+enabled policies.
+
 This is a concise map of how the current project moves from database policies to the terminal output shown by `scripts/test_nemo_mcp.py`.
 
 ## Big Picture
@@ -29,10 +80,10 @@ Seeds system/reference metadata from `policy_compiler.py`:
 
 ```text
 GITHUB_METADATA_TOOL_MAPPINGS
--> apps
--> app_actions
--> app_resources
--> tool_mappings
+-> connectors
+-> connector_actions
+-> connector_resources
+-> connector_tool_mappings
 ```
 
 It also backfills:
@@ -40,23 +91,23 @@ It also backfills:
 ```text
 allowed_test_cases.expected_tools
 -> allowed_test_case_expected_tools
--> tool_mappings
+-> connector_tool_mappings
 ```
 
 Expected current counts:
 
 ```text
-apps 2
-app_actions 11
-app_resources 10
-tool_mappings 33
+connectors 2
+connector_actions 11
+connector_resources 10
+connector_tool_mappings 33
 allowed_test_case_expected_tools 3
 ```
 
 The normalized policy-reference migration is now applied:
 
 ```text
-policies.app_id/action_id/resource_id
+policies.connector_id/action_id/resource_id
 -> policy_loader.py eagerly loads normalized relationships
 -> normalized names are preferred at runtime
 -> flat app/action/resource strings remain fallback compatibility fields
@@ -76,7 +127,7 @@ The API resolves and stores the corresponding `app_id`, `action_id`, and
 responses and compatibility.
 
 For input policies, the API then checks for an enabled matching
-`tool_mappings` row:
+`connector_tool_mappings` row:
 
 ```text
 readable names
@@ -226,7 +277,7 @@ Expected tools are loaded through:
 ```text
 allowed_test_cases
 -> allowed_test_case_expected_tools
--> tool_mappings.tool_name
+-> connector_tool_mappings.tool_name
 ```
 
 If an allowed test has no normalized expected-tool links, the loader falls
@@ -240,7 +291,7 @@ Allowed-test create/update requests accept readable tool-name lists:
 }
 ```
 
-The API resolves enabled `tool_mappings`, replaces the join rows, and keeps the
+The API resolves enabled `connector_tool_mappings`, replaces the join rows, and keeps the
 legacy text value synchronized temporarily.
 
 ```text
@@ -456,13 +507,15 @@ Reads the currently stored compiled rules.
 
 | Thing | Current Source | Notes |
 | --- | --- | --- |
-| Runtime input policies | Postgres `policies` table | Loaded by `policy_loader.py`. |
+| Runtime input policies | Postgres `policies` table | Loaded by `policy_loader.py`; app assignment filtering is the next slice. |
+| App policy scope | Postgres `app_policy_assignments` | CRUD exists; runtime filtering is next. |
+| Global policy scope | Postgres `global_policy_assignments` | CRUD exists; runtime filtering is next. |
 | Runtime blocked tool names | DB policies compiled by `policy_compiler.py` | Used by `tool_guard.py`. |
 | Generated blocked test prompts | DB policies compiled by `policy_compiler.py` | Used by `test_nemo_mcp.py`. |
 | Allowed test prompts | Postgres `allowed_test_cases` table | Falls back to defaults if DB unavailable/empty. |
 | Allowed expected-tool join rows | Postgres `allowed_test_case_expected_tools` table | Preferred by `test_case_loader.py`; legacy text remains a fallback. |
 | Output policy objects | Postgres `policies` table | Loadable/compilable now. |
-| Normalized app/action/resource metadata | Postgres `apps`, `app_actions`, `app_resources`, `tool_mappings` | Seeded by `scripts/seed_normalized_policy_metadata.py`. |
+| Normalized connector/action/resource metadata | Postgres `connectors`, `connector_actions`, `connector_resources`, `connector_tool_mappings` | Seeded by `scripts/seed_normalized_policy_metadata.py`. |
 | Actual NeMo input prompt template | `config/prompts.yml` + DB rules | `prompt_rule_compiler.py` injects `compiled_policy_rules` into the template. |
 | Actual NeMo output prompt template | `config/prompts.yml` + DB rules | `prompt_rule_compiler.py` injects `compiled_policy_rules` into the template. |
 | Stored compiled rule text | Postgres `compiled_policy_rules` table | Created by `POST /policies/compile-rules`, consumed by `prompt_rule_loader.py`. |
