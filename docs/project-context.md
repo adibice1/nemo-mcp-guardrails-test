@@ -111,6 +111,16 @@ The system successfully:
   `/global-policy-assignments`.
 - Hashes API keys received by app create/update requests and never returns the
   plaintext key or stored hash in API responses.
+- Authenticates runtime HTTP requests through the reusable
+  `require_authenticated_app` FastAPI dependency using `X-App-ID` and
+  `X-API-Key`.
+- Exposes `GET /v1/guardrails/auth-check` as a protected proof endpoint and
+  verifies it through the self-cleaning `scripts/test_app_auth_http.py`.
+- Exposes `POST /v1/guardrails/run` as an authenticated runtime-context
+  scaffold that prepares app-scoped policies, prompt-rule counts, and blocked
+  tools without executing the submitted message yet.
+- Uses `src/nemo_mcp_guardrails/guarded_execution.py` for reusable one-message
+  input-rail, agent/guarded-tool, and output-rail coordination.
 
 ## Current Runtime Flow
 
@@ -341,27 +351,47 @@ Run the idempotent foundation migration with:
 python scripts/migrate_client_app_foundation.py
 ```
 
-The `apps` table starts empty by design. App CRUD and API-key hashing now exist.
-App authentication, user login, API-key verification middleware, and
-LLM-secret handling do not exist yet.
+The `apps` table starts empty by design. App CRUD, centralized API-key hashing,
+reusable app authentication, and the first protected HTTP runtime endpoint now
+exist. User login, admin-route authorization, and LLM-secret handling do not
+exist yet.
 
 ## Current Next Step
 
-Make policy loading assignment-aware:
+Connect the reusable guarded execution to the authenticated full-proxy endpoint:
 
 ```text
-app_policy_assignments
-global_policy_assignments
-app ID
+POST /v1/guardrails/run
+-> require_authenticated_app
+-> authenticated app ID
+-> app_policy_assignments + global_policy_assignments
 -> active global policies + active app policies
+-> app-scoped NeMo prompt rules
+-> app-scoped tool guard
+-> next: execute input rail + guarded agent/tools + output rail
 ```
 
 The `users`, `apps`, `app_users`, `connectors`, and `app_connectors`
 foundation now exists. The credential output policy is globally assigned;
 GitHub write policies are currently unassigned.
 
-Assignment management APIs now exist. Runtime loaders still intentionally use
-all enabled policies until both `policy_loader.py` and `prompt_rule_loader.py`
-can receive the requesting app ID.
+Assignment management APIs exist. `policy_loader.py`, `prompt_rule_loader.py`,
+and `build_rails_config_with_prompt_rules()` now accept an optional app ID.
+With an app ID, they load enabled global assignments plus enabled assignments
+for that app. Without an app ID, they intentionally preserve the current
+all-enabled testing behavior and print a warning in the main diagnostics.
+
+`tool_guard.py` can compile a blocked-tool set for an optional app ID and apply
+that set to wrapped tools. `scripts/test_app_policy_scope.py` proves real
+temporary DB assignments scope both NeMo rules and blocked tools, then cleans
+up. `scripts/test_nemo_mcp.py --app-id ...` passes a testing-only app scope
+through the full read-only runner.
+
+`app_auth.py` verifies app credentials at the service layer.
+`api/auth.py` exposes that verifier through `require_authenticated_app`, and
+`GET /v1/guardrails/auth-check` proves invalid requests are rejected before
+runtime work. `POST /v1/guardrails/run` now reuses the authenticated scope to
+prepare the correct policy context. The remaining runtime work is to execute
+the submitted message through `execute_guarded_message()`.
 
 Do not remove the flat `policies.connector/action/resource` columns yet.

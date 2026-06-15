@@ -1,10 +1,9 @@
-import hashlib
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from nemo_mcp_guardrails.app_auth import hash_api_key
 from nemo_mcp_guardrails.api.app_schemas import (
     AppCreate,
     AppPolicyAssignmentRead,
@@ -23,12 +22,6 @@ from nemo_mcp_guardrails.database.models import (
 
 
 router = APIRouter(prefix="/apps", tags=["apps"])
-
-
-def hash_api_key(api_key: str) -> str:
-    """Hash one client app API key before persistence."""
-
-    return hashlib.sha256(api_key.encode("utf-8")).hexdigest()
 
 
 def _require_app(app_id: int, db: Session) -> AppRecord:

@@ -11,6 +11,7 @@ from nemo_mcp_guardrails.api.global_policy_assignments import (
     router as global_policy_assignments_router,
 )
 from nemo_mcp_guardrails.api.policies import router as policies_router
+from nemo_mcp_guardrails.api.runtime import router as runtime_router
 from nemo_mcp_guardrails.database.connection import create_database_tables, get_db
 
 
@@ -32,6 +33,7 @@ app.include_router(allowed_test_cases_router)
 app.include_router(apps_router)
 app.include_router(global_policy_assignments_router)
 app.include_router(policies_router)
+app.include_router(runtime_router)
 
 
 @app.get("/")

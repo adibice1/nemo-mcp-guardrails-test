@@ -60,10 +60,35 @@ async def main() -> None:
     }
     assert allowed_tool.calls == [{}]
 
+    app_a_issue_tool = FakeTool("issue_write")
+    app_b_issue_tool = FakeTool("issue_write")
+
+    app_a_guard = guard_mcp_tool(
+        app_a_issue_tool,
+        blocked_tool_names=frozenset({"issue_write"}),
+    )
+    app_b_guard = guard_mcp_tool(
+        app_b_issue_tool,
+        blocked_tool_names=frozenset(),
+    )
+
+    app_a_result = await app_a_guard.ainvoke({})
+    app_b_result = await app_b_guard.ainvoke({})
+
+    assert app_a_result == expected_blocked_result
+    assert app_a_issue_tool.calls == []
+    assert app_b_result == {
+        "tool": "issue_write",
+        "called": True,
+    }
+    assert app_b_issue_tool.calls == [{}]
+
     print("Tool guard checks passed.")
     for blocked_tool in sorted(BLOCKED_GITHUB_MCP_TOOLS):
         print(f"- Blocked tool was not executed: {blocked_tool}")
     print("- Allowed tool executed normally: search_repositories")
+    print("- App A blocked issue_write using its scoped tool set")
+    print("- App B allowed issue_write using its scoped tool set")
 
 
 if __name__ == "__main__":

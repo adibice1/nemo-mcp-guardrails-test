@@ -4,14 +4,18 @@ import os
 from _bootstrap import bootstrap_src
 from dotenv import load_dotenv
 from langchain_openai import AzureChatOpenAI
-from nemoguardrails import LLMRails, RailsConfig
+from nemoguardrails import LLMRails
 from nemoguardrails.llm.types import Task
 from nemoguardrails.rails.llm.options import RailStatus, RailType
+from openai import BadRequestError
 
 bootstrap_src()
 
 from nemo_mcp_guardrails.database.policy_loader import load_output_policy_objects
 from nemo_mcp_guardrails.policy_compiler import compile_output_rail_rules
+from nemo_mcp_guardrails.prompt_rule_compiler import (
+    build_rails_config_with_prompt_rules,
+)
 
 
 TEST_OUTPUTS = [
@@ -57,6 +61,14 @@ def require_env(name: str) -> str:
     return value
 
 
+def is_azure_content_filter_error(error: BadRequestError) -> bool:
+    """Return whether Azure rejected the request through its content filter."""
+
+    body = error.body if isinstance(error.body, dict) else {}
+    error_details = body.get("error", body)
+    return error_details.get("code") == "content_filter"
+
+
 async def main() -> None:
     """Run isolated NeMo output rail diagnostics without GitHub MCP."""
 
@@ -70,7 +82,8 @@ async def main() -> None:
     os.environ["OPENAI_API_KEY"] = azure_api_key
     os.environ["AZURE_OPENAI_API_KEY"] = azure_api_key
 
-    config = RailsConfig.from_path("config")
+    prompt_rule_config = build_rails_config_with_prompt_rules("config")
+    config = prompt_rule_config.rails_config
 
     model = AzureChatOpenAI(
         azure_deployment=azure_deployment,
@@ -100,53 +113,64 @@ async def main() -> None:
             },
         )
 
-        raw_response = await model.ainvoke(
-            raw_prompt,
-            temperature=config.lowest_temperature,
-            max_tokens=3,
-        )
-        parsed_response = rails.runtime.llm_task_manager.parse_task_output(
-            Task.SELF_CHECK_OUTPUT,
-            output=raw_response.content,
-            forced_output_parser="is_content_safe",
-        )
-        is_safe = parsed_response[0]
+        try:
+            raw_response = await model.ainvoke(
+                raw_prompt,
+                temperature=config.lowest_temperature,
+                max_tokens=3,
+            )
+            parsed_response = rails.runtime.llm_task_manager.parse_task_output(
+                Task.SELF_CHECK_OUTPUT,
+                output=raw_response.content,
+                forced_output_parser="is_content_safe",
+            )
+            is_safe = parsed_response[0]
 
-        print("\nRAW SELF-CHECK OUTPUT PROMPT:")
-        print(raw_prompt)
-        print("\nRAW SELF-CHECK OUTPUT RESPONSE:")
-        print(raw_response.content)
-        print("\nPARSED SELF-CHECK OUTPUT RESULT:")
-        print(parsed_response)
+            print("\nRAW SELF-CHECK OUTPUT PROMPT:")
+            print(raw_prompt)
+            print("\nRAW SELF-CHECK OUTPUT RESPONSE:")
+            print(raw_response.content)
+            print("\nPARSED SELF-CHECK OUTPUT RESULT:")
+            print(parsed_response)
 
-        rail_result = await rails.check_async(
-            [
-                {
-                    "role": "user",
-                    "content": test["user_input"],
-                },
-                {
-                    "role": "assistant",
-                    "content": test["bot_response"],
-                },
-            ],
-            rail_types=[RailType.OUTPUT],
-        )
+            rail_result = await rails.check_async(
+                [
+                    {
+                        "role": "user",
+                        "content": test["user_input"],
+                    },
+                    {
+                        "role": "assistant",
+                        "content": test["bot_response"],
+                    },
+                ],
+                rail_types=[RailType.OUTPUT],
+            )
 
-        print("\nNEMO OUTPUT RAIL RESULT:")
-        print(f"Status: {rail_result.status}")
-        if rail_result.rail:
-            print(f"Rail: {rail_result.rail}")
-        if rail_result.content:
-            print("Content:")
-            print(rail_result.content)
+            print("\nNEMO OUTPUT RAIL RESULT:")
+            print(f"Status: {rail_result.status}")
+            if rail_result.rail:
+                print(f"Rail: {rail_result.rail}")
+            if rail_result.content:
+                print("Content:")
+                print(rail_result.content)
 
-        expected_status = (
-            RailStatus.PASSED if test["expected_safe"] else RailStatus.BLOCKED
-        )
+            expected_status = (
+                RailStatus.PASSED if test["expected_safe"] else RailStatus.BLOCKED
+            )
 
-        assert is_safe == test["expected_safe"]
-        assert rail_result.status == expected_status
+            assert is_safe == test["expected_safe"]
+            assert rail_result.status == expected_status
+        except BadRequestError as error:
+            if not is_azure_content_filter_error(error):
+                raise
+            if test["expected_safe"]:
+                raise AssertionError(
+                    "Azure content filtering unexpectedly blocked a safe output."
+                ) from error
+
+            print("\nAZURE CONTENT FILTER RESULT:")
+            print("Blocked the expected unsafe output before NeMo classification.")
 
     print_separator("Output rail checks passed")
 

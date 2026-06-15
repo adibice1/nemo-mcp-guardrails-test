@@ -83,6 +83,11 @@ jailbreak: detected=True
 
 then the self-check prompt may look too much like a jailbreak or policy-bypass prompt to Azure.
 
+The isolated input/output diagnostic scripts now report expected unsafe
+Azure-filtered cases separately from completed NeMo classifications. An Azure
+filter block means the request entered the NeMo rail, but Azure rejected the
+rail's internal LLM call before NeMo could return its own decision.
+
 What worked:
 
 - Avoid example-heavy prompts containing explicit token-like phrases.
@@ -97,6 +102,11 @@ Current parser-compatible convention:
 ## NeMo Input Rail Blocks Safe GitHub Reads
 
 If read-only prompts like "list branches" are blocked, inspect the raw self-check response with `scripts/debug_nemo_self_check.py`.
+
+The diagnostic uses `build_rails_config_with_prompt_rules("config")` so it
+loads the same DB-injected prompt configuration as the full runner. The latest
+home-computer run allowed the safe read-only input and blocked write and
+credential inputs through NeMo.
 
 Expected for read-only prompt:
 
@@ -147,10 +157,18 @@ scripts/debug_nemo_output_check.py
 It injects the same `AzureChatOpenAI` model into `LLMRails`, then verifies:
 
 - safe normal assistant output passes
-- fake token/secret-like assistant output blocks
+- fake token/secret-like assistant output blocks through NeMo or Azure
 - NeMo does not use the old `openai.ChatCompletion` path
 
 If Azure returns `content_filter` during output checks, inspect `config/prompts.yml`. The `self_check_output` prompt should only include `{{ bot_response }}`. Do not echo `{{ user_input }}` in the output prompt unless you are deliberately retesting Azure filtering behavior.
+
+Current home-computer result:
+
+```text
+safe GitHub summary: passed by NeMo
+fake GitHub token: blocked by NeMo output rail
+fake environment variable: blocked by NeMo output rail
+```
 
 ## Policy Compiler / Tool Guard Sanity Checks
 
@@ -162,7 +180,7 @@ python scripts/seed_normalized_policy_metadata.py
 python scripts/test_tool_guard.py
 python scripts/test_policy_loader.py
 python scripts/debug_nemo_output_check.py
-python -m py_compile src/nemo_mcp_guardrails/policy_compiler.py src/nemo_mcp_guardrails/tool_guard.py src/nemo_mcp_guardrails/database/models.py src/nemo_mcp_guardrails/database/policy_loader.py src/nemo_mcp_guardrails/database/test_case_loader.py src/nemo_mcp_guardrails/database/prompt_rule_loader.py src/nemo_mcp_guardrails/prompt_rule_compiler.py scripts/seed_normalized_policy_metadata.py scripts/test_nemo_mcp.py scripts/test_tool_guard.py scripts/test_policy_loader.py scripts/debug_nemo_self_check.py scripts/debug_nemo_output_check.py
+python -m py_compile src/nemo_mcp_guardrails/app_auth.py src/nemo_mcp_guardrails/guarded_execution.py src/nemo_mcp_guardrails/api/auth.py src/nemo_mcp_guardrails/api/runtime.py src/nemo_mcp_guardrails/api/runtime_schemas.py src/nemo_mcp_guardrails/policy_compiler.py src/nemo_mcp_guardrails/tool_guard.py src/nemo_mcp_guardrails/database/models.py src/nemo_mcp_guardrails/database/policy_loader.py src/nemo_mcp_guardrails/database/test_case_loader.py src/nemo_mcp_guardrails/database/prompt_rule_loader.py src/nemo_mcp_guardrails/prompt_rule_compiler.py scripts/seed_normalized_policy_metadata.py scripts/test_nemo_mcp.py scripts/test_tool_guard.py scripts/test_policy_loader.py scripts/test_app_policy_scope.py scripts/test_app_auth.py scripts/test_app_auth_http.py scripts/debug_nemo_self_check.py scripts/debug_nemo_output_check.py
 python scripts/test_nemo_mcp.py
 ```
 
@@ -206,16 +224,30 @@ DBeaver does not require a VS Code extension and does not automatically read
 the project's `.env` file. It connects directly to the Postgres server exposed
 by Docker.
 
-Use these DBeaver connection settings:
+The confirmed home-computer cause was a port conflict: a Windows PostgreSQL
+service already owns host port `5432`. The project Docker Postgres service
+therefore uses host port `5433`.
+
+Use these DBeaver connection settings on the home computer:
 
 ```text
 Host: localhost
-Port: 5432
+Port: 5433
 Database: nemo_mcp_guardrails
 Username: nemo_mcp_guardrails
 Password: value of POSTGRES_PASSWORD
 Authentication: Database Native
 ```
+
+Use these home-computer `.env` values:
+
+```env
+POSTGRES_PORT=5433
+DATABASE_URL=postgresql+psycopg://nemo_mcp_guardrails:nemo_mcp_guardrails_dev_password@localhost:5433/nemo_mcp_guardrails
+```
+
+Do not change the container's internal Postgres port. Docker maps home host
+port `5433` to container port `5432`.
 
 Important Docker/Postgres behavior:
 
@@ -257,7 +289,7 @@ docker compose ps
 Expected port mapping:
 
 ```text
-0.0.0.0:5432->5432/tcp
+0.0.0.0:5433->5432/tcp
 ```
 
 If the home laptop database has no important local data, recreate its volumes:
@@ -307,10 +339,57 @@ Current runtime input/tool policy flow:
 
 ```text
 Postgres policies table
--> load_input_policy_objects()
+-> load_input_policy_objects(app_id=optional_app_id)
 -> compile_blocked_tools()
 -> tool_guard.py
 ```
+
+No-app calls preserve the current all-enabled test behavior. App-scoped calls
+load enabled global assignments plus enabled assignments for that app.
+
+Inspect both scopes with:
+
+```powershell
+python scripts/test_policy_loader.py
+python scripts/test_policy_loader.py --app-id 999999
+python scripts/test_app_policy_scope.py
+python scripts/test_app_auth.py
+python scripts/test_app_auth_http.py
+```
+
+`tool_guard.py` preserves a no-app all-enabled compatibility constant, but it
+can also compile and apply per-app blocked-tool sets. `POST /v1/guardrails/run`
+now passes the authenticated app into blocked-tool compilation while preparing
+its context. The next slice applies that set to real connector tools during
+guarded execution.
+
+The full runner also accepts testing-only app scope:
+
+```powershell
+python scripts/test_nemo_mcp.py --app-id 999999
+```
+
+This does not enforce app authentication. Although service-level credential
+verification now exists, the runner accepts nonexistent IDs for scope-testing
+purposes because it does not call the verifier.
+
+Credential verification itself can be checked with:
+
+```powershell
+python scripts/test_app_auth.py
+```
+
+The service verifier rejects wrong keys, unknown client IDs, and unauthorized
+apps with the same result. HTTP enforcement can be checked with:
+
+```powershell
+python scripts/test_app_auth_http.py
+```
+
+`GET /v1/guardrails/auth-check` returns the same generic `401` for missing
+headers and all invalid credential cases. If Swagger marks the two headers as
+optional, that is intentional: the dependency accepts missing values so it can
+return the uniform `401` instead of FastAPI returning a distinct `422`.
 
 To inspect what runtime code sees:
 

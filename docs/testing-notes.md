@@ -161,7 +161,14 @@ Expected final line:
 
 ```text
 - Allowed tool executed normally: search_repositories
+- App A blocked issue_write using its scoped tool set
+- App B allowed issue_write using its scoped tool set
 ```
+
+This isolated proof passes different immutable blocked-tool sets into two
+wrappers for the same `issue_write` tool. It proves the execution guard can
+enforce different app scopes without requiring Docker, Postgres, or persistent
+test app rows.
 
 ## Policy Loader Test
 
@@ -171,7 +178,144 @@ Run:
 
 ```powershell
 python scripts/test_policy_loader.py
+python scripts/test_policy_loader.py --app-id 999999
 ```
+
+Without `--app-id`, the diagnostic prints a warning and loads every enabled
+policy for current implementation/testing compatibility. With `--app-id`, it
+loads enabled global assignments plus enabled assignments for that app.
+
+Latest home-computer results:
+
+```text
+no app ID: 4 input policies/rules + 1 output policy/rule
+app ID 999999: 0 input policies/rules + 1 global output policy/rule
+```
+
+## App Policy Scope Integration Test
+
+`scripts/test_app_policy_scope.py` creates two temporary real Postgres app
+rows, assigns the existing GitHub issue-creation policy only to App A, verifies
+app-scoped NeMo rules and blocked tools, then deletes both apps and assignments
+in `finally`.
+
+Run:
+
+```powershell
+python scripts/test_app_policy_scope.py
+```
+
+Latest result:
+
+```text
+App A: issue_write blocked
+App B: issue_write allowed
+Both apps received the same global output policies
+Temporary apps and assignments deleted
+before/after app count: 0
+before/after app-assignment count: 0
+```
+
+The full read-only runner also accepts a testing-only app scope:
+
+```powershell
+python scripts/test_nemo_mcp.py --app-id 999999
+```
+
+This flag does not authenticate the app yet. The latest unassigned-app run
+loaded `0` input rules and `1` global output rule.
+
+## App Authentication Test
+
+`src/nemo_mcp_guardrails/app_auth.py` centralizes SHA-256 API-key hashing and
+uses constant-time comparison when verifying an app. `authenticate_app()`
+returns an app only when the client ID exists, its API key matches, and
+`authorized=true`.
+
+Run:
+
+```powershell
+python scripts/test_app_auth.py
+```
+
+Latest result:
+
+```text
+Valid authorized app accepted
+Wrong API key rejected
+Unknown client ID rejected
+Unauthorized app rejected
+Temporary authentication-test apps deleted
+before/after app count: 0
+```
+
+All invalid cases return the same `None` result so callers do not reveal
+whether a client ID exists.
+
+## HTTP App Authentication Test
+
+`src/nemo_mcp_guardrails/api/auth.py` provides the reusable
+`require_authenticated_app` dependency. It reads `X-App-ID` and `X-API-Key`
+and returns the same generic `401` response for missing or invalid
+credentials.
+
+`GET /v1/guardrails/auth-check` is a protected proof endpoint. It returns only
+the authenticated app identity and intentionally does not load policies,
+NeMo, Docker, or MCP tools.
+
+`POST /v1/guardrails/run` is the next protected proof. It validates the message
+body and prepares the authenticated app's scoped input policies, compiled
+prompt-rule counts, and blocked-tool set. It intentionally does not execute
+the message through NeMo, Azure OpenAI, an agent, or MCP tools yet.
+
+Run:
+
+```powershell
+python scripts/test_app_auth_http.py
+```
+
+Latest result:
+
+```text
+Missing headers rejected
+Wrong API key rejected
+Unknown client ID rejected
+Unauthorized app rejected
+Valid authorized app accepted
+Authenticated app-scoped runtime context prepared
+Temporary HTTP authentication-test apps deleted
+before/after app count: 0
+```
+
+The headers appear optional in generated OpenAPI because the dependency must
+receive missing values itself to return the same generic `401`. Declaring the
+headers required would let FastAPI return a distinguishable `422` before the
+authentication logic runs.
+
+The admin CRUD endpoints remain unprotected. The dependency currently protects
+both runtime endpoints. The next slice makes the run endpoint call the reusable
+guarded execution.
+
+## Reusable Guarded Execution
+
+`src/nemo_mcp_guardrails/guarded_execution.py` now owns the single-message
+execution sequence:
+
+```text
+input rail
+-> stop before action execution when blocked
+-> otherwise run agent with guarded tools
+-> output rail
+-> GuardedExecutionResult
+```
+
+`scripts/test_nemo_mcp.py` still owns the test list, legacy Python-precheck
+comparison, and terminal formatting. It now calls `execute_guarded_message()`
+and prints the returned full rail results, called tools, and final response.
+
+The latest full read-only run passed after extraction. Allowed prompts called
+only expected read tools, all DB-generated write prompts were blocked by the
+input rail, and the familiar terminal workflow sections remained visible.
 
 Expected with the latest verified DB rows:
 
@@ -279,9 +423,9 @@ policies table
 ```
 
 With the current GitHub policy set, `POST /policies/compile-rules` should
-store 15 rules:
+store 5 rules:
 
-- 14 input rail rules for GitHub write policies
+- 4 input rail rules for GitHub write policies
 - 1 output rail rule for credential/secret leakage
 
 Runtime NeMo rails now consume enabled rows from `compiled_policy_rules`.
@@ -464,6 +608,12 @@ It helped prove:
 - The self-check prompt must align with NeMo's parser semantics.
 - The current yes/no self-check prompt correctly allows read-only GitHub prompts and blocks write/credential prompts.
 
+The diagnostic now distinguishes Azure `content_filter` blocks from completed
+NeMo classifications and uses `build_rails_config_with_prompt_rules("config")`
+to load the same DB-injected prompt configuration as the full runner. The
+latest home-computer run allowed the safe read-only input and blocked the
+write and credential inputs through NeMo.
+
 ## Output Rail Test
 
 `config/config.yml` enables the output rail:
@@ -485,11 +635,19 @@ python scripts/debug_nemo_output_check.py
 Expected:
 
 - safe normal assistant output passes
-- fake token-like assistant output blocks
-- fake environment-variable-like assistant output blocks
+- fake token-like assistant output blocks through NeMo or Azure
+- fake environment-variable-like assistant output blocks through NeMo or Azure
 - NeMo uses the injected AzureChatOpenAI model and not the old OpenAI client path
 
 The output self-check prompt intentionally checks only `{{ bot_response }}`. Do not add `{{ user_input }}` back unless retesting Azure content filtering, because token-like user prompts can cause Azure to reject the self-check prompt before NeMo can classify the assistant output.
+
+Current home-computer result:
+
+```text
+safe GitHub summary: passed by NeMo
+fake GitHub token: blocked by NeMo output rail
+fake environment variable: blocked by NeMo output rail
+```
 
 The full `scripts/test_nemo_mcp.py` run now includes `NEMO OUTPUT RAIL RESULT` before each final response.
 

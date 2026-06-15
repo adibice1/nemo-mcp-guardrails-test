@@ -546,8 +546,17 @@ Current migration status:
 9. Completed: validate action/resource combinations against enabled tool mappings.
 10. Completed: add `app_policy_assignments` and `global_policy_assignments`.
 11. Completed: add app and policy-assignment CRUD APIs.
-12. Next: make policy and compiled-prompt-rule loading assignment-aware.
-13. Later: remove old string columns after stable verification.
+12. Completed: make policy and compiled-prompt-rule loading assignment-aware.
+13. Completed: make `tool_guard.py` capable of applying per-app blocked-tool sets.
+14. Completed: wire testing-only app scope through NeMo rails and the tool guard.
+15. Completed: add reusable app credential hashing and verification.
+16. Completed: enforce app authentication at the HTTP runtime boundary.
+17. Completed: scaffold authenticated `POST /v1/guardrails/run` and pass its
+    app ID through prompt-rule, policy, and blocked-tool context loading.
+18. Completed: extract reusable one-message guarded execution from the full
+    test runner.
+19. Next: execute that guarded pipeline behind the run endpoint.
+20. Later: remove old string columns after stable verification.
 
 ## Proposed Implementation Slices
 
@@ -642,8 +651,11 @@ Current management endpoints:
 /global-policy-assignments
 ```
 
-These endpoints manage assignment rows. Runtime filtering by assignment is the
-next implementation slice.
+These endpoints manage assignment rows. Policy and compiled-rule loaders now
+filter by assignment when an app ID is supplied. The reusable HTTP dependency
+authenticates an app before runtime work begins, and the next implementation
+slice connects the reusable guarded execution now used by the full test runner
+to the authenticated context already prepared by `POST /v1/guardrails/run`.
 
 ### Automatic Compilation
 

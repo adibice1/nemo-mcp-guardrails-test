@@ -51,11 +51,12 @@ def indent_continuation_lines(text: str, spaces: int) -> str:
 
 def build_rails_config_with_prompt_rules(
     config_path: str = "config",
+    app_id: int | None = None,
 ) -> PromptRuleConfig:
-    """Build a RailsConfig using config files plus compiled DB prompt rules."""
+    """Build a RailsConfig using compiled DB rules, optionally scoped to one app."""
 
     config_dir = Path(config_path)
-    prompt_rules = load_prompt_policy_rules()
+    prompt_rules = load_prompt_policy_rules(app_id=app_id)
 
     config_yaml = yaml.safe_load((config_dir / "config.yml").read_text())
     prompts_text = (config_dir / "prompts.yml").read_text()

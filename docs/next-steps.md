@@ -31,9 +31,37 @@ Completed pieces:
   global-policy-assignment CRUD.
 - GitHub MCP full-run tests stay read-only with `GITHUB_READ_ONLY=1`.
 - NeMo input and output rails are enabled.
+- Input/output rail diagnostics now use the same DB-injected prompt
+  configuration as the full runner and distinguish a NeMo decision from an
+  Azure `content_filter` block.
+- The latest home-computer diagnostic run passed fully through NeMo: the safe
+  input/output cases passed, and write, credential, fake-token, and fake
+  environment-variable cases were blocked by NeMo.
 - `scripts/test_nemo_mcp.py` injects DB compiled prompt rules into NeMo config.
+- FastAPI now has a reusable `require_authenticated_app` dependency that reads
+  `X-App-ID` and `X-API-Key` and rejects every invalid case with the same
+  generic `401`.
+- `GET /v1/guardrails/auth-check` proves invalid requests are rejected before
+  loading policies, rails, Docker, or MCP tools.
+- `POST /v1/guardrails/run` now authenticates the caller and prepares its
+  app-scoped input policies, compiled prompt-rule counts, and blocked-tool set.
+  It returns a context preview and does not execute the message yet.
+- `src/nemo_mcp_guardrails/guarded_execution.py` now coordinates one message
+  through the input rail, early block, agent/guarded tools, and output rail.
+  `scripts/test_nemo_mcp.py` consumes its structured result and preserves the
+  existing terminal workflow display.
+- `scripts/test_app_auth_http.py` verifies the protected HTTP boundary and
+  cleans up all temporary app rows.
 - Runtime input policies come from Postgres through `policy_loader.py`.
+- Policy and compiled-rule loaders now accept an optional app ID. App-scoped
+  calls load enabled global assignments plus enabled assignments for that app.
+- No-app calls intentionally preserve the current all-enabled testing behavior
+  and the main test runners print a warning explaining that production must
+  require an authenticated app ID.
 - `tool_guard.py` blocks DB-derived restricted tool names before execution.
+- `blocked_tool_names_for_app(app_id=...)` compiles an optional per-app
+  blocked-tool set, and `guard_mcp_tool(..., blocked_tool_names=...)` applies
+  that same set to each wrapped MCP tool.
 - Allowed read tests come from `allowed_test_cases`, with fallback defaults.
 - Blocked tests are generated from enabled DB policies.
 - FastAPI exposes policy CRUD, allowed-test CRUD, compile-preview, compile-rules, and compiled-rules endpoints.
@@ -50,6 +78,9 @@ Completed pieces:
 Home-laptop setup warning:
 
 ```text
+DBeaver and DATABASE_URL must use localhost:5433 on the home computer.
+The Docker Postgres container still listens on port 5432 internally.
+Host port 5432 belongs to the home computer's Windows PostgreSQL service.
 DBeaver does not read .env and needs no VS Code extension.
 Postgres Docker volumes retain their original database password.
 Changing POSTGRES_PASSWORD in .env does not update an existing volume.
@@ -68,18 +99,23 @@ Run these from the repo root:
 .\.venv\Scripts\python.exe scripts\migrate_connector_terminology.py
 .\.venv\Scripts\python.exe scripts\migrate_app_relationships.py
 .\.venv\Scripts\python.exe scripts\migrate_policy_assignments.py
-.\.venv\Scripts\python.exe -m py_compile src\nemo_mcp_guardrails\policy_compiler.py src\nemo_mcp_guardrails\tool_guard.py src\nemo_mcp_guardrails\database\models.py src\nemo_mcp_guardrails\database\policy_loader.py src\nemo_mcp_guardrails\database\test_case_loader.py src\nemo_mcp_guardrails\database\prompt_rule_loader.py src\nemo_mcp_guardrails\prompt_rule_compiler.py scripts\seed_normalized_policy_metadata.py scripts\test_nemo_mcp.py scripts\test_tool_guard.py scripts\test_policy_loader.py scripts\debug_nemo_self_check.py scripts\debug_nemo_output_check.py
+.\.venv\Scripts\python.exe -m py_compile src\nemo_mcp_guardrails\app_auth.py src\nemo_mcp_guardrails\guarded_execution.py src\nemo_mcp_guardrails\api\auth.py src\nemo_mcp_guardrails\api\runtime.py src\nemo_mcp_guardrails\api\runtime_schemas.py src\nemo_mcp_guardrails\policy_compiler.py src\nemo_mcp_guardrails\tool_guard.py src\nemo_mcp_guardrails\database\models.py src\nemo_mcp_guardrails\database\policy_loader.py src\nemo_mcp_guardrails\database\test_case_loader.py src\nemo_mcp_guardrails\database\prompt_rule_loader.py src\nemo_mcp_guardrails\prompt_rule_compiler.py scripts\seed_normalized_policy_metadata.py scripts\test_nemo_mcp.py scripts\test_tool_guard.py scripts\test_policy_loader.py scripts\test_app_policy_scope.py scripts\test_app_auth.py scripts\test_app_auth_http.py scripts\debug_nemo_self_check.py scripts\debug_nemo_output_check.py
 .\.venv\Scripts\python.exe scripts\seed_normalized_policy_metadata.py
 .\.venv\Scripts\python.exe scripts\test_policy_loader.py
+.\.venv\Scripts\python.exe scripts\test_policy_loader.py --app-id 999999
+.\.venv\Scripts\python.exe scripts\test_app_policy_scope.py
+.\.venv\Scripts\python.exe scripts\test_app_auth.py
+.\.venv\Scripts\python.exe scripts\test_app_auth_http.py
 .\.venv\Scripts\python.exe scripts\test_tool_guard.py
 .\.venv\Scripts\python.exe scripts\test_nemo_mcp.py
+.\.venv\Scripts\python.exe scripts\test_nemo_mcp.py --app-id 999999
 ```
 
 Expected `scripts/test_nemo_mcp.py` proof lines:
 
 ```text
 NeMo prompt policy rules loaded
-- input rules from compiled_policy_rules: 14
+- input rules from compiled_policy_rules: 4
 - output rules from compiled_policy_rules: 1
 
 Runtime input policies loaded
@@ -102,26 +138,20 @@ Normalized policy metadata seeded.
 
 ## Recommended Next Step
 
-Make runtime policy loading and management assignment-aware.
+Connect reusable guarded execution to the authenticated runtime endpoint.
 
 Recommended slice:
 
 ```text
-1. Update `policy_loader.py` to accept an app ID and load:
-   enabled global assignments
-   + enabled assignments for the requesting app
+1. Build the authenticated request's Azure model, app-scoped NeMo rails, and
+   read-only guarded GitHub MCP tools.
 
-2. Update `prompt_rule_loader.py` to apply the same app-specific policy scope,
-   so NeMo rails and the tool guard enforce the same rules.
+2. Make `POST /v1/guardrails/run` call `execute_guarded_message()` for the
+   authenticated app's input rail, guarded agent/tools, and output rail.
 
-3. Keep the current no-app test runner on the legacy all-enabled-policy path
-   until an app-aware integration harness exists.
+3. Define the final run response fields for passed and blocked requests.
 
-4. Add app credential verification for `client_id` and API key.
-
-5. Design `POST /v1/guardrails/run` for the full-proxy runtime.
-
-6. Automate policy compilation/invalidation when rules or assignments change.
+4. Keep GitHub MCP read-only and automate compilation/invalidation afterward.
 ```
 
 The normalized policy-reference migration is complete:
@@ -138,6 +168,19 @@ connector terminology migration complete
 app_users and app_connectors relationship tables exist
 app_policy_assignments and global_policy_assignments exist
 app and assignment CRUD endpoints exist
+policy and compiled-rule loaders accept optional app IDs
+tool guard accepts optional app-scoped blocked-tool sets
+test_app_policy_scope.py verifies real temporary app assignments and cleanup
+test_nemo_mcp.py accepts testing-only --app-id scope
+app_auth.py verifies authorized client ID/API-key pairs
+test_app_auth.py verifies valid and rejected cases with cleanup
+api/auth.py provides reusable HTTP credential enforcement
+GET /v1/guardrails/auth-check proves the protected runtime boundary
+test_app_auth_http.py verifies valid and rejected HTTP cases with cleanup
+POST /v1/guardrails/run prepares authenticated app-scoped runtime context
+runtime_schemas.py defines the run request and context-preview response
+guarded_execution.py owns reusable one-message guardrail coordination
+test_nemo_mcp.py prints GuardedExecutionResult while preserving terminal output
 ```
 
 Current assignment counts:
@@ -149,6 +192,22 @@ global policy assignments: 1
 
 The global assignment points to the connector-independent credential output
 policy. Existing GitHub write policies remain unassigned.
+
+Latest assignment-aware loader verification:
+
+```text
+legacy no-app scope: 4 input rules + 1 output rule
+unassigned/nonexistent app scope: 0 input rules + 1 global output rule
+temporary App A: issue_write blocked
+temporary App B: issue_write allowed
+temporary apps/assignments after cleanup: 0
+valid authorized app credentials: accepted
+wrong key / unknown client / unauthorized app: rejected
+temporary authentication-test apps after cleanup: 0
+missing headers / wrong key / unknown client / unauthorized app over HTTP: 401
+valid authorized app over HTTP: accepted
+temporary HTTP authentication-test apps after cleanup: 0
+```
 
 Latest foundation migration result:
 
@@ -179,6 +238,7 @@ Once normalized policy loading is stable:
 
 ## Files To Read First On Another Machine
 
+- `docs/work-computer-handoff.md`
 - `AGENTS.md`
 - `docs/runtime-flow-map.md`
 - `docs/project-context.md`
@@ -190,3 +250,9 @@ Once normalized policy loading is stable:
 - `src/nemo_mcp_guardrails/policy_compiler.py`
 - `src/nemo_mcp_guardrails/database/policy_loader.py`
 - `src/nemo_mcp_guardrails/prompt_rule_compiler.py`
+- `src/nemo_mcp_guardrails/guarded_execution.py`
+- `src/nemo_mcp_guardrails/api/runtime.py`
+- `src/nemo_mcp_guardrails/api/auth.py`
+
+Before switching machines, commit and push the current milestone. Confirm
+`.env` is not staged.

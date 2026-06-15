@@ -7,23 +7,35 @@ from nemo_mcp_guardrails.policy_compiler import compile_blocked_tools
 
 STATIC_BLOCKED_GITHUB_MCP_TOOLS: frozenset[str] = frozenset()
 
-BLOCKED_GITHUB_MCP_TOOLS = STATIC_BLOCKED_GITHUB_MCP_TOOLS | compile_blocked_tools(
-    load_input_policy_objects()
-)
-
 TOOL_GUARD_REFUSAL = (
     "I can inspect GitHub information, but I cannot perform write actions "
     "or reveal credentials."
 )
 
 
-def guard_mcp_tool(tool: Any) -> Any:
+def blocked_tool_names_for_app(
+    app_id: int | None = None,
+) -> frozenset[str]:
+    """Compile blocked MCP tool names for the optional client-app scope."""
+
+    return STATIC_BLOCKED_GITHUB_MCP_TOOLS | compile_blocked_tools(
+        load_input_policy_objects(app_id=app_id)
+    )
+
+
+BLOCKED_GITHUB_MCP_TOOLS = blocked_tool_names_for_app()
+
+
+def guard_mcp_tool(
+    tool: Any,
+    blocked_tool_names: frozenset[str] = BLOCKED_GITHUB_MCP_TOOLS,
+) -> Any:
     """Wrap an MCP tool so restricted tool names cannot execute."""
 
     async def guarded_coroutine(**kwargs: Any) -> Any:
         """Block restricted tools and forward allowed calls to the real MCP tool."""
 
-        if tool.name in BLOCKED_GITHUB_MCP_TOOLS:
+        if tool.name in blocked_tool_names:
             return f"Tool call blocked by guard: {TOOL_GUARD_REFUSAL}"
 
         return await tool.ainvoke(kwargs)

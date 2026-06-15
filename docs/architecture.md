@@ -287,7 +287,7 @@ subgraph ExampleFlow["Example Policy Flow"]
 end
 ```
 
-## Current Prototype Overlay - 2026-06-05
+## Current Prototype Overlay - 2026-06-16
 
 The full architecture above is still the target direction. The current research prototype is a smaller GitHub-only slice.
 
@@ -333,6 +333,29 @@ Current management API slice:
 
 /global-policy-assignments
 -> manage mandatory global policy assignments
+
+GET /v1/guardrails/auth-check
+-> authenticate X-App-ID + X-API-Key before runtime work
+
+POST /v1/guardrails/run
+-> authenticate client app
+-> prepare app-scoped policies, compiled prompt rules, and blocked tools
+-> currently return a context preview without executing the message
+```
+
+Current reusable execution slice:
+
+```text
+src/nemo_mcp_guardrails/guarded_execution.py
+-> execute_guarded_message()
+-> NeMo input rail
+-> stop before action execution when blocked
+-> otherwise run LangChain agent with guarded MCP tools
+-> NeMo output rail
+-> GuardedExecutionResult
+
+scripts/test_nemo_mcp.py
+-> choose test prompts and print GuardedExecutionResult
 ```
 
 Latest verified enabled input policy sample:
@@ -385,9 +408,10 @@ Postgres policy/template/tool/synonym tables
 Next implementation direction:
 
 ```text
-pass requesting app ID into policy_loader.py and prompt_rule_loader.py
--> load enabled global + enabled app-specific assignments
--> add app credential verification
+authenticated POST /v1/guardrails/run context already exists
+-> build app-scoped Azure model, NeMo rails, and read-only guarded MCP tools
+-> call execute_guarded_message() with the submitted message
+-> return final structured execution JSON
 -> keep normal GitHub MCP tests read-only
 -> later OpenShift deployment
 ```

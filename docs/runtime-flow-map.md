@@ -47,11 +47,66 @@ POST /global-policy-assignments
 -> create mandatory global assignment
 ```
 
-These assignment APIs manage scope, but the runtime loaders are not
-assignment-aware yet. The current no-app integration runner still loads all
-enabled policies.
+These assignment APIs manage scope. Policy and compiled-rule loaders now
+accept an optional app ID and filter to enabled global assignments plus enabled
+assignments for that app. The current no-app integration runner still loads all
+enabled policies and prints an explicit testing-only warning.
 
 This is a concise map of how the current project moves from database policies to the terminal output shown by `scripts/test_nemo_mcp.py`.
+
+The full runner accepts optional testing-only scope through
+`scripts/test_nemo_mcp.py --app-id ...`. It passes that app ID into compiled
+prompt-rule loading, runtime input-policy loading, and blocked-tool
+compilation. It does not authenticate the app yet.
+
+`scripts/test_app_policy_scope.py` creates two temporary real DB apps, assigns
+issue creation only to App A, verifies App A/App B scope differences, and
+deletes its temporary rows in `finally`.
+
+`src/nemo_mcp_guardrails/app_auth.py` centralizes API-key hashing and
+constant-time verification. `authenticate_app()` returns only an authorized app
+whose client ID and API key match. `scripts/test_app_auth.py` proves valid and
+rejected cases with self-cleaning temporary rows.
+
+## Current Protected Runtime Boundary
+
+```text
+GET /v1/guardrails/auth-check
+-> require_authenticated_app()
+-> read X-App-ID and X-API-Key
+-> authenticate_app()
+-> reject invalid requests with generic 401
+-> return authenticated app identity
+```
+
+The proof endpoint deliberately stops after authentication. It does not load
+policies, create NeMo rails, start Docker, or expose MCP tools.
+`scripts/test_app_auth_http.py` verifies missing headers, wrong keys, unknown
+clients, unauthorized apps, and valid credentials, then removes its temporary
+rows.
+
+`POST /v1/guardrails/run` now reuses the dependency and passes `app.id` into
+app-scoped prompt rules, runtime policies, and tool blocking. It validates a
+message and returns a context preview; it does not execute NeMo, an agent, or
+connector tools yet.
+
+Reusable guarded execution has now been extracted:
+
+```text
+guarded_execution.py
+-> execute_guarded_message()
+-> input rail
+-> early block or agent with guarded tools
+-> output rail
+-> GuardedExecutionResult
+
+test_nemo_mcp.py
+-> selects test prompts
+-> calls execute_guarded_message()
+-> prints the familiar workflow sections
+```
+
+The next slice connects the same function to `POST /v1/guardrails/run`.
 
 ## Big Picture
 
@@ -437,7 +492,9 @@ src/nemo_mcp_guardrails/tool_guard.py:10
 BLOCKED_GITHUB_MCP_TOOLS = ...
 ```
 
-At import time, loads DB-backed input policies and compiles them into blocked MCP tool names.
+The backward-compatible constant loads the no-app all-enabled blocked-tool set.
+`blocked_tool_names_for_app(app_id=...)` can instead compile a per-app set once
+for a request.
 
 ```text
 -> policy_loader.py:121
@@ -456,11 +513,12 @@ create_or_update_file
 ```
 
 ```text
-tool_guard.py:20
+tool_guard.py
 guard_mcp_tool()
 ```
 
-Wraps each MCP tool. If the tool name is blocked, it raises an error before the real GitHub MCP tool can run.
+Wraps each MCP tool with the supplied immutable blocked-tool set. If the tool
+name is blocked, it returns a refusal before the real MCP tool can run.
 
 ```text
 tool_guard.py:23
@@ -507,10 +565,13 @@ Reads the currently stored compiled rules.
 
 | Thing | Current Source | Notes |
 | --- | --- | --- |
-| Runtime input policies | Postgres `policies` table | Loaded by `policy_loader.py`; app assignment filtering is the next slice. |
-| App policy scope | Postgres `app_policy_assignments` | CRUD exists; runtime filtering is next. |
-| Global policy scope | Postgres `global_policy_assignments` | CRUD exists; runtime filtering is next. |
-| Runtime blocked tool names | DB policies compiled by `policy_compiler.py` | Used by `tool_guard.py`. |
+| Runtime input policies | Postgres `policies` table | `policy_loader.py` accepts optional app scope. |
+| App policy scope | Postgres `app_policy_assignments` | App-scoped loader filtering implemented. |
+| Global policy scope | Postgres `global_policy_assignments` | Included in every app-scoped loader query. |
+| Runtime HTTP app identity | `X-App-ID` + `X-API-Key` verified against Postgres `apps` | `require_authenticated_app` protects `/v1/guardrails/auth-check` and `/v1/guardrails/run`. |
+| Runtime context preview | `POST /v1/guardrails/run` | Authenticates and returns app-scoped policy/rule/tool counts without executing the message yet. |
+| Reusable guarded message coordination | `guarded_execution.py` | Returns full rail results, final response, agent result, and called tools. |
+| Runtime blocked tool names | DB policies compiled by `policy_compiler.py` | `blocked_tool_names_for_app(app_id=...)` receives the authenticated app ID in the run context. |
 | Generated blocked test prompts | DB policies compiled by `policy_compiler.py` | Used by `test_nemo_mcp.py`. |
 | Allowed test prompts | Postgres `allowed_test_cases` table | Falls back to defaults if DB unavailable/empty. |
 | Allowed expected-tool join rows | Postgres `allowed_test_case_expected_tools` table | Preferred by `test_case_loader.py`; legacy text remains a fallback. |

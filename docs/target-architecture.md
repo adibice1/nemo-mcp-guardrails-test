@@ -293,8 +293,10 @@ The additive foundation schema is created by:
 python scripts/migrate_client_app_foundation.py
 ```
 
-It currently creates empty tables only. Authentication, API-key issuance, and
-LLM credential management are intentionally not implemented yet.
+It initially created empty tables. App CRUD, API-key hashing, reusable app
+authentication, and the first protected runtime proof endpoint are now
+implemented. User login, API-key issuance/rotation workflows, and LLM
+credential management are not implemented yet.
 
 Current credential-storage decisions:
 
@@ -440,6 +442,10 @@ completed: migrate connector metadata to connector terminology
 completed: add app_users and app_connectors
 completed: add app/global assignments referencing policies
 completed: add client-app and assignment CRUD APIs
-next:      add app-aware policy and prompt-rule loading
-then:      implement POST /v1/guardrails/run
+completed: add app-aware policy and prompt-rule loading
+completed: add reusable app authentication and protected auth-check endpoint
+completed: scaffold authenticated POST /v1/guardrails/run runtime context
+completed: extract reusable one-message guarded execution
+next:      connect reusable guarded execution to the run endpoint
+then:      automate policy compilation and invalidation
 ```

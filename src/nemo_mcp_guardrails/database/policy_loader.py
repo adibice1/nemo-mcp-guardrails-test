@@ -1,12 +1,16 @@
 import os
 from dataclasses import dataclass
 
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import selectinload
 
 from nemo_mcp_guardrails.database.connection import SessionLocal
-from nemo_mcp_guardrails.database.models import PolicyRecord
+from nemo_mcp_guardrails.database.models import (
+    AppPolicyAssignmentRecord,
+    GlobalPolicyAssignmentRecord,
+    PolicyRecord,
+)
 from nemo_mcp_guardrails.policy_compiler import (
     DEFAULT_INPUT_POLICY_OBJECTS,
     DEFAULT_OUTPUT_POLICY_OBJECTS,
@@ -37,26 +41,44 @@ def default_policy_source_requested() -> bool:
     }
 
 
-def _load_enabled_policy_records(policy_type: str) -> list[PolicyRecord] | None:
-    """Load enabled policy rows of one type, returning None if the DB is unavailable."""
+def _load_enabled_policy_records(
+    policy_type: str,
+    app_id: int | None = None,
+) -> list[PolicyRecord] | None:
+    """Load enabled policies, optionally scoped to global and app assignments."""
 
     try:
         with SessionLocal() as db:
-            return list(
-                db.scalars(
-                    select(PolicyRecord)
-                    .options(
-                        selectinload(PolicyRecord.normalized_connector),
-                        selectinload(PolicyRecord.normalized_action),
-                        selectinload(PolicyRecord.normalized_resource),
-                    )
-                    .where(
-                        PolicyRecord.enabled.is_(True),
-                        PolicyRecord.policy_type == policy_type,
-                    )
-                    .order_by(PolicyRecord.id)
+            statement = (
+                select(PolicyRecord)
+                .options(
+                    selectinload(PolicyRecord.normalized_connector),
+                    selectinload(PolicyRecord.normalized_action),
+                    selectinload(PolicyRecord.normalized_resource),
                 )
+                .where(
+                    PolicyRecord.enabled.is_(True),
+                    PolicyRecord.policy_type == policy_type,
+                )
+                .order_by(PolicyRecord.id)
             )
+
+            if app_id is not None:
+                statement = statement.where(
+                    or_(
+                        PolicyRecord.global_assignment.has(
+                            GlobalPolicyAssignmentRecord.enabled.is_(True)
+                        ),
+                        PolicyRecord.app_assignments.any(
+                            and_(
+                                AppPolicyAssignmentRecord.app_id == app_id,
+                                AppPolicyAssignmentRecord.enabled.is_(True),
+                            )
+                        ),
+                    )
+                )
+
+            return list(db.scalars(statement))
     except SQLAlchemyError:
         return None
 
@@ -111,13 +133,15 @@ def _default_input_policy_entries() -> tuple[LoadedInputPolicy, ...]:
     )
 
 
-def load_input_policy_entries() -> tuple[LoadedInputPolicy, ...]:
-    """Load enabled input policies with database/default source metadata."""
+def load_input_policy_entries(
+    app_id: int | None = None,
+) -> tuple[LoadedInputPolicy, ...]:
+    """Load enabled input policies, optionally scoped to one app."""
 
     if default_policy_source_requested():
         return _default_input_policy_entries()
 
-    records = _load_enabled_policy_records("input")
+    records = _load_enabled_policy_records("input", app_id=app_id)
     if records is None:
         return _default_input_policy_entries()
 
@@ -131,22 +155,31 @@ def load_input_policy_entries() -> tuple[LoadedInputPolicy, ...]:
         if (policy := _to_input_policy_object(record)) is not None
     )
 
+    if app_id is not None:
+        return entries
+
     return entries or _default_input_policy_entries()
 
 
-def load_input_policy_objects() -> tuple[InputPolicyObject, ...]:
-    """Load enabled input policies from Postgres, falling back to default policies."""
+def load_input_policy_objects(
+    app_id: int | None = None,
+) -> tuple[InputPolicyObject, ...]:
+    """Load enabled input policy objects, optionally scoped to one app."""
 
-    return tuple(entry.policy for entry in load_input_policy_entries())
+    return tuple(
+        entry.policy for entry in load_input_policy_entries(app_id=app_id)
+    )
 
 
-def load_output_policy_objects() -> tuple[OutputPolicyObject, ...]:
-    """Load enabled output policies from Postgres, falling back to default policies."""
+def load_output_policy_objects(
+    app_id: int | None = None,
+) -> tuple[OutputPolicyObject, ...]:
+    """Load enabled output policy objects, optionally scoped to one app."""
 
     if default_policy_source_requested():
         return DEFAULT_OUTPUT_POLICY_OBJECTS
 
-    records = _load_enabled_policy_records("output")
+    records = _load_enabled_policy_records("output", app_id=app_id)
     if records is None:
         return DEFAULT_OUTPUT_POLICY_OBJECTS
 
@@ -155,5 +188,8 @@ def load_output_policy_objects() -> tuple[OutputPolicyObject, ...]:
         for record in records
         if (policy := _to_output_policy_object(record)) is not None
     )
+
+    if app_id is not None:
+        return policies
 
     return policies or DEFAULT_OUTPUT_POLICY_OBJECTS
