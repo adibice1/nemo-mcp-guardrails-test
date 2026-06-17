@@ -553,10 +553,14 @@ Current migration status:
 16. Completed: enforce app authentication at the HTTP runtime boundary.
 17. Completed: scaffold authenticated `POST /v1/guardrails/run` and pass its
     app ID through prompt-rule, policy, and blocked-tool context loading.
-18. Completed: extract reusable one-message guarded execution from the full
+18. Completed: extract reusable single-request guarded execution from the full
     test runner.
-19. Next: execute that guarded pipeline behind the run endpoint.
-20. Later: remove old string columns after stable verification.
+19. Completed: execute that guarded pipeline behind the run endpoint.
+20. Completed: add hybrid runtime conversation history with Postgres-backed
+    `conversation_messages`, client bootstrap history, character-budget
+    trimming, and history metadata in `/v1/guardrails/run`.
+21. Next: add HTTP integration coverage for allowed and blocked runtime cases.
+22. Later: remove old string columns after stable verification.
 
 ## Proposed Implementation Slices
 
@@ -653,9 +657,9 @@ Current management endpoints:
 
 These endpoints manage assignment rows. Policy and compiled-rule loaders now
 filter by assignment when an app ID is supplied. The reusable HTTP dependency
-authenticates an app before runtime work begins, and the next implementation
-slice connects the reusable guarded execution now used by the full test runner
-to the authenticated context already prepared by `POST /v1/guardrails/run`.
+authenticates an app before runtime work begins. The run endpoint now builds
+runtime objects and calls the same reusable guarded execution used by the full
+test runner.
 
 ### Automatic Compilation
 

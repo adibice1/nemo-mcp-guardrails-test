@@ -43,11 +43,16 @@ Completed pieces:
   generic `401`.
 - `GET /v1/guardrails/auth-check` proves invalid requests are rejected before
   loading policies, rails, Docker, or MCP tools.
-- `POST /v1/guardrails/run` now authenticates the caller and prepares its
-  app-scoped input policies, compiled prompt-rule counts, and blocked-tool set.
-  It returns a context preview and does not execute the message yet.
+- `POST /v1/guardrails/run` now authenticates the caller, builds app-scoped
+  rails and read-only guarded GitHub MCP tools, calls `execute_guarded_message()`,
+  and returns a JSON execution response.
+- `/v1/guardrails/run` now supports hybrid conversation history. Stored
+  `conversation_messages` are loaded by `app_id + conversation_id`; client
+  `conversation_history` bootstraps new conversations; older turns are trimmed
+  by `NEMO_MAX_RUNTIME_CONTEXT_CHARS`.
 - `src/nemo_mcp_guardrails/guarded_execution.py` now coordinates one message
-  through the input rail, early block, agent/guarded tools, and output rail.
+  through the input rail, early block, agent/guarded tools with trimmed history,
+  and output rail.
   `scripts/test_nemo_mcp.py` consumes its structured result and preserves the
   existing terminal workflow display.
 - `scripts/test_app_auth_http.py` verifies the protected HTTP boundary and
@@ -138,20 +143,27 @@ Normalized policy metadata seeded.
 
 ## Recommended Next Step
 
-Connect reusable guarded execution to the authenticated runtime endpoint.
+Use `docs/open-work-backlog.md` as the source of truth for unfinished work.
+
+The immediate top priority is to remove hardcoded GitHub/credential-specific
+behavior from `config/prompts.yml` and leave it as a generic self-check
+classifier shell. Actual policy behavior should come from Postgres policy rows
+and `compiled_policy_rules`.
+
+After that, add HTTP-level integration coverage for the authenticated runtime
+endpoint.
 
 Recommended slice:
 
 ```text
-1. Build the authenticated request's Azure model, app-scoped NeMo rails, and
-   read-only guarded GitHub MCP tools.
-
-2. Make `POST /v1/guardrails/run` call `execute_guarded_message()` for the
-   authenticated app's input rail, guarded agent/tools, and output rail.
-
-3. Define the final run response fields for passed and blocked requests.
-
-4. Keep GitHub MCP read-only and automate compilation/invalidation afterward.
+1. Make self-check input/output prompts generic.
+2. Confirm harmless assistant output no longer false-positive blocks.
+3. Create a temporary authorized app and assign a GitHub input policy to it.
+4. Call POST /v1/guardrails/run with an allowed read prompt.
+5. Call POST /v1/guardrails/run with a blocked write prompt.
+6. Include `conversation_id` and assert history metadata is returned.
+7. Assert final response status, rail statuses, called tools, and cleanup.
+8. Keep GitHub MCP read-only and automate compilation/invalidation afterward.
 ```
 
 The normalized policy-reference migration is complete:
@@ -177,10 +189,11 @@ test_app_auth.py verifies valid and rejected cases with cleanup
 api/auth.py provides reusable HTTP credential enforcement
 GET /v1/guardrails/auth-check proves the protected runtime boundary
 test_app_auth_http.py verifies valid and rejected HTTP cases with cleanup
-POST /v1/guardrails/run prepares authenticated app-scoped runtime context
-runtime_schemas.py defines the run request and context-preview response
-guarded_execution.py owns reusable one-message guardrail coordination
+POST /v1/guardrails/run executes authenticated app-scoped guarded requests
+runtime_schemas.py defines the run request and execution response
+guarded_execution.py owns reusable single-request guardrail coordination
 test_nemo_mcp.py prints GuardedExecutionResult while preserving terminal output
+runtime_factory.py selects app main/guardrail LLM configs, then builds NeMo rails, read-only GitHub MCP tools, and the LangChain agent
 ```
 
 Current assignment counts:

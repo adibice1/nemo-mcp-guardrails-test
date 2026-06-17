@@ -339,8 +339,11 @@ GET /v1/guardrails/auth-check
 
 POST /v1/guardrails/run
 -> authenticate client app
--> prepare app-scoped policies, compiled prompt rules, and blocked tools
--> currently return a context preview without executing the message
+-> load stored conversation history or bootstrap supplied history
+-> trim older turns by NEMO_MAX_RUNTIME_CONTEXT_CHARS
+-> build app-scoped policies, compiled prompt rules, blocked tools, rails, and tools
+-> execute trimmed history + submitted message through guarded runtime
+-> store latest user/assistant turn when conversation_id exists
 ```
 
 Current reusable execution slice:
@@ -408,9 +411,9 @@ Postgres policy/template/tool/synonym tables
 Next implementation direction:
 
 ```text
-authenticated POST /v1/guardrails/run context already exists
--> build app-scoped Azure model, NeMo rails, and read-only guarded MCP tools
--> call execute_guarded_message() with the submitted message
+authenticated POST /v1/guardrails/run execution already exists
+-> runtime_factory.py builds Azure, NeMo rails, read-only guarded MCP tools, and agent objects
+-> execute_guarded_message() runs the submitted message
 -> return final structured execution JSON
 -> keep normal GitHub MCP tests read-only
 -> later OpenShift deployment

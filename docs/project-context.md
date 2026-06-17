@@ -116,11 +116,19 @@ The system successfully:
   `X-API-Key`.
 - Exposes `GET /v1/guardrails/auth-check` as a protected proof endpoint and
   verifies it through the self-cleaning `scripts/test_app_auth_http.py`.
-- Exposes `POST /v1/guardrails/run` as an authenticated runtime-context
-  scaffold that prepares app-scoped policies, prompt-rule counts, and blocked
-  tools without executing the submitted message yet.
-- Uses `src/nemo_mcp_guardrails/guarded_execution.py` for reusable one-message
-  input-rail, agent/guarded-tool, and output-rail coordination.
+- Exposes `POST /v1/guardrails/run` as an authenticated runtime endpoint that
+  builds app-scoped policies, prompt rules, blocked tools, NeMo rails, and
+  read-only GitHub MCP tools, then executes the submitted message. When
+  `conversation_id` is present, it persists the latest user/assistant turn in
+  `conversation_messages`; when stored history exists, it is loaded and passed
+  to the agent after trimming older turns by `NEMO_MAX_RUNTIME_CONTEXT_CHARS`.
+- Runtime LLM selection is app-aware. The authenticated app's
+  `guardrail_llm_config_id` is used for NeMo rails, and
+  `main_llm_config_id` is used for the LangChain agent. Missing config IDs use
+  the `.env` Azure OpenAI deployment. Non-Azure provider rows are allowed as
+  future metadata but are not executable yet.
+- Uses `src/nemo_mcp_guardrails/guarded_execution.py` for reusable
+  single-request input-rail, agent/guarded-tool, and output-rail coordination.
 
 ## Current Runtime Flow
 
@@ -128,12 +136,12 @@ The system successfully:
 User prompt
 -> Python pre-check report only
 -> compiled_policy_rules are injected into config/prompts.yml template
--> NeMo self_check_input using AzureChatOpenAI injected into LLMRails
+-> NeMo self_check_input using the app guardrail AzureChatOpenAI config
 -> if blocked: safe refusal and no MCP tool call
 -> if passed: LangChain agent
 -> src/nemo_mcp_guardrails/tool_guard.py wraps MCP tools and blocks restricted tool names before execution
 -> GitHub MCP read-only tools
--> NeMo self_check_output using AzureChatOpenAI injected into LLMRails
+-> NeMo self_check_output using the app guardrail AzureChatOpenAI config
 -> final answer
 ```
 
@@ -358,7 +366,7 @@ exist yet.
 
 ## Current Next Step
 
-Connect the reusable guarded execution to the authenticated full-proxy endpoint:
+Add stronger HTTP integration coverage for the authenticated full-proxy endpoint:
 
 ```text
 POST /v1/guardrails/run
@@ -368,7 +376,8 @@ POST /v1/guardrails/run
 -> active global policies + active app policies
 -> app-scoped NeMo prompt rules
 -> app-scoped tool guard
--> next: execute input rail + guarded agent/tools + output rail
+-> execute input rail + guarded agent/tools + output rail
+-> next: assert allowed and blocked HTTP runtime cases end to end
 ```
 
 The `users`, `apps`, `app_users`, `connectors`, and `app_connectors`
@@ -390,8 +399,7 @@ through the full read-only runner.
 `app_auth.py` verifies app credentials at the service layer.
 `api/auth.py` exposes that verifier through `require_authenticated_app`, and
 `GET /v1/guardrails/auth-check` proves invalid requests are rejected before
-runtime work. `POST /v1/guardrails/run` now reuses the authenticated scope to
-prepare the correct policy context. The remaining runtime work is to execute
-the submitted message through `execute_guarded_message()`.
+runtime work. `POST /v1/guardrails/run` now reuses the authenticated scope and
+executes the submitted message through `execute_guarded_message()`.
 
 Do not remove the flat `policies.connector/action/resource` columns yet.

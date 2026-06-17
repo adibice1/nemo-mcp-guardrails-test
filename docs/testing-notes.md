@@ -11,7 +11,8 @@ In target terminology, GitHub MCP is a connector rather than a client app.
 
 ## Current Status
 
-NeMo input rails are working in the full GitHub MCP test path when `LLMRails` is created with the already-working AzureChatOpenAI model:
+NeMo input rails are working in the full GitHub MCP test path when `LLMRails`
+is created with an injected AzureChatOpenAI model:
 
 ```python
 prompt_rule_config = build_rails_config_with_prompt_rules("config")
@@ -23,6 +24,13 @@ The deterministic Python pre-check still exists, but by default it only reports 
 
 The additive target-foundation and connector terminology migrations have been
 verified without changing the existing runtime behavior.
+
+`POST /v1/guardrails/run` now selects runtime LLMs from the authenticated
+app's `main_llm_config_id` and `guardrail_llm_config_id`. The guardrail config
+is injected into NeMo rails, while the main config is used by the LangChain
+agent. Missing config IDs fall back to `.env` Azure OpenAI settings. Only
+Azure OpenAI providers are executable in the current prototype; unsupported
+providers fail clearly.
 
 The runtime wraps MCP tools with `src/nemo_mcp_guardrails/tool_guard.py`. This execution-level safety layer blocks restricted GitHub MCP tool names before the underlying MCP tool can run. Normal tests still keep GitHub MCP in read-only mode with `GITHUB_READ_ONLY=1`, so write tools should not be exposed by the server in the first place.
 
@@ -39,6 +47,12 @@ Current safety layers:
 - `src/nemo_mcp_guardrails/database/policy_loader.py`: loads enabled DB policy rows for runtime/debug code.
 - `src/nemo_mcp_guardrails/prompt_rule_compiler.py`: injects enabled `compiled_policy_rules` into NeMo prompt templates.
 - `scripts/seed_normalized_policy_metadata.py`: seeds normalized app/action/resource/tool metadata and backfills allowed-test expected-tool links.
+
+Isolated LLM selection check:
+
+```powershell
+python scripts/test_runtime_llm_selection.py
+```
 
 ## Stage 1: Allowed Read-Only Tests
 
@@ -263,10 +277,15 @@ credentials.
 the authenticated app identity and intentionally does not load policies,
 NeMo, Docker, or MCP tools.
 
-`POST /v1/guardrails/run` is the next protected proof. It validates the message
-body and prepares the authenticated app's scoped input policies, compiled
-prompt-rule counts, and blocked-tool set. It intentionally does not execute
-the message through NeMo, Azure OpenAI, an agent, or MCP tools yet.
+`POST /v1/guardrails/run` is the protected runtime endpoint. It validates the
+message and authenticated app, loads stored conversation history when
+`conversation_id` is provided, trims older history by
+`NEMO_MAX_RUNTIME_CONTEXT_CHARS`, builds app-scoped input policies, prompt
+rules, blocked-tool set, NeMo rails, read-only GitHub MCP tools, and executes
+the message through the guarded runtime. Connector `ToolException` failures now
+return a controlled `tool_error` result, and Azure `content_filter` failures
+during output self-checks now return a controlled blocked response instead of
+crashing the API.
 
 Run:
 
@@ -282,10 +301,23 @@ Wrong API key rejected
 Unknown client ID rejected
 Unauthorized app rejected
 Valid authorized app accepted
-Authenticated app-scoped runtime context prepared
+Authenticated app-scoped runtime execution reached
+Conversation history stored and reloaded
+Oversized history truncated
+Oversized latest message rejected
+Tool errors return controlled runtime responses
+Azure output content filters return controlled runtime responses
 Temporary HTTP authentication-test apps deleted
 before/after app count: 0
 ```
+
+The HTTP test uses a fake runtime builder so it does not start Docker or Azure.
+It still verifies that `/v1/guardrails/run` rejects unauthenticated calls,
+stores bootstrap history for a new `conversation_id`, reloads that history on
+the second request, truncates old history when the context budget is small, and
+returns `413` when the latest message alone exceeds the configured budget. It
+also directly tests controlled responses for connector tool failures and Azure
+output content-filter failures.
 
 The headers appear optional in generated OpenAPI because the dependency must
 receive missing values itself to return the same generic `401`. Declaring the
@@ -293,12 +325,12 @@ headers required would let FastAPI return a distinguishable `422` before the
 authentication logic runs.
 
 The admin CRUD endpoints remain unprotected. The dependency currently protects
-both runtime endpoints. The next slice makes the run endpoint call the reusable
-guarded execution.
+both runtime endpoints. The run endpoint now calls the reusable guarded
+execution.
 
 ## Reusable Guarded Execution
 
-`src/nemo_mcp_guardrails/guarded_execution.py` now owns the single-message
+`src/nemo_mcp_guardrails/guarded_execution.py` now owns the single-request
 execution sequence:
 
 ```text

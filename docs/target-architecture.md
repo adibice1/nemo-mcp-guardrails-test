@@ -14,6 +14,8 @@ external integrations.
 
 - The GMS will primarily support GitHub and SharePoint, while remaining
   extensible to Outlook and other external tools.
+- The near-term presentation/demo scope only needs GitHub MCP support.
+  SharePoint, Outlook, and other connectors are lower-priority extensions.
 - An **app** is a client application that consumes the GMS.
 - A **connector** is an external system or tool integration used by an app,
   such as GitHub MCP, SharePoint, or Outlook.
@@ -95,10 +97,15 @@ assignment.
 Client app sends request with app ID and API key
 -> GMS authenticates app ID/API-key pair
 -> verify app is authorized
+-> load stored conversation history for the app conversation
+-> bootstrap from client-supplied history when no stored history exists
+-> trim older history to stay within the runtime context budget
 -> load mandatory global policies
 -> load app-specific policy assignments
 -> load app connector access and credentials
 -> load main-agent and guardrail LLM configurations
+-> build NeMo rails with the selected guardrail LLM
+-> build the GMS agent with the selected main-agent LLM
 -> NeMo input rail checks user request
 -> if passed, GMS agent decides whether to call a connector tool
 -> tool guard checks proposed tool name, arguments, and context
@@ -112,6 +119,13 @@ Client app sends request with app ID and API key
 The tool guard is required even when input rails pass because it checks what the
 agent actually attempts to execute, rather than only what the user appeared to
 request.
+
+Current implementation note: the runtime now respects separate
+`main_llm_config_id` and `guardrail_llm_config_id` selections on each app.
+Only Azure OpenAI-compatible provider rows are executable in the prototype.
+Rows for providers such as Gemini can be stored as target metadata, but runtime
+execution returns a clear unsupported-provider error until provider adapters are
+implemented.
 
 ## Proposed Runtime Endpoint
 
@@ -133,7 +147,11 @@ Example request:
 ```json
 {
   "message": "Summarize the latest pull requests.",
-  "conversation_id": "optional-conversation-id"
+  "conversation_id": "optional-conversation-id",
+  "conversation_history": [
+    {"role": "user", "content": "List recent pull requests."},
+    {"role": "assistant", "content": "PR #1 and PR #2 are recent."}
+  ]
 }
 ```
 
@@ -143,12 +161,22 @@ Example response:
 {
   "status": "passed",
   "response": "Here is the pull request summary...",
+  "history_truncated": false,
+  "history_messages_received": 2,
+  "history_messages_loaded": 0,
+  "history_messages_used": 2,
   "matched_rule_ids": []
 }
 ```
 
 The endpoint must return safe refusal content when an input rail, tool guard,
 or output rail blocks the sequence.
+
+For the current implementation, runtime context sizing uses the configured
+`NEMO_MAX_RUNTIME_CONTEXT_CHARS` character budget. If the latest message alone
+exceeds that budget, the endpoint returns `413`. Otherwise, it keeps the newest
+conversation history turns that fit and reports truncation metadata in the
+response.
 
 ## Target Core Tables
 
@@ -444,8 +472,14 @@ completed: add app/global assignments referencing policies
 completed: add client-app and assignment CRUD APIs
 completed: add app-aware policy and prompt-rule loading
 completed: add reusable app authentication and protected auth-check endpoint
-completed: scaffold authenticated POST /v1/guardrails/run runtime context
-completed: extract reusable one-message guarded execution
-next:      connect reusable guarded execution to the run endpoint
+completed: extract reusable single-request guarded execution
+completed: execute authenticated POST /v1/guardrails/run through guarded runtime
+completed: add conversation history persistence/truncation to runtime endpoint
+completed: select separate app main-agent and guardrail LLM configs
+next:      make prompts.yml generic and DB-policy driven
+then:      add allowed/blocked HTTP runtime integration coverage
 then:      automate policy compilation and invalidation
 ```
+
+See `docs/open-work-backlog.md` for the active backlog and unfinished
+implementation slices.

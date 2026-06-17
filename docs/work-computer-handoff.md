@@ -48,17 +48,23 @@ X-App-ID + X-API-Key
 -> app-scoped blocked MCP tool names
 ```
 
-`POST /v1/guardrails/run` currently prepares and returns that runtime context.
-It validates the submitted message but intentionally does not execute it yet.
+`POST /v1/guardrails/run` now builds that runtime context and executes the
+submitted message through the reusable guarded flow. It also supports hybrid
+conversation history: stored turns for `(app_id, conversation_id)` are loaded
+when available, client-supplied `conversation_history` bootstraps a new
+conversation, and older turns are trimmed by `NEMO_MAX_RUNTIME_CONTEXT_CHARS`
+before the agent sees them.
 
-Reusable one-message guardrail coordination is also implemented:
+Reusable single-request guardrail coordination is also implemented:
 
 ```text
 execute_guarded_message()
 -> NeMo input rail
 -> stop before action execution when blocked
 -> otherwise run LangChain agent with guarded MCP tools
+-> return status=tool_error when a connector tool raises ToolException
 -> NeMo output rail
+-> return controlled blocked response when Azure filters output self-check
 -> GuardedExecutionResult
 ```
 
@@ -70,12 +76,15 @@ passed after the extraction.
 
 - `src/nemo_mcp_guardrails/app_auth.py`: API-key hashing and app verification.
 - `src/nemo_mcp_guardrails/api/auth.py`: `require_authenticated_app`.
-- `src/nemo_mcp_guardrails/api/runtime.py`: protected auth-check and run-context endpoints.
-- `src/nemo_mcp_guardrails/api/runtime_schemas.py`: runtime request/context response models.
-- `src/nemo_mcp_guardrails/guarded_execution.py`: reusable one-message guardrail workflow.
+- `src/nemo_mcp_guardrails/api/runtime.py`: protected auth-check and run endpoints.
+- `src/nemo_mcp_guardrails/api/runtime_schemas.py`: runtime request/execution response models.
+- `src/nemo_mcp_guardrails/database/conversation_store.py`: conversation history load/append helpers.
+- `src/nemo_mcp_guardrails/database/models.py`: includes `conversation_messages`.
+- `src/nemo_mcp_guardrails/runtime_factory.py`: Azure, NeMo, MCP, and agent construction. It uses the authenticated app's `guardrail_llm_config_id` for NeMo rails and `main_llm_config_id` for the LangChain agent, with `.env` Azure fallback when either ID is missing.
+- `src/nemo_mcp_guardrails/guarded_execution.py`: reusable single-request guardrail workflow.
 - `src/nemo_mcp_guardrails/tool_guard.py`: app-scoped execution-level MCP tool guard.
 - `scripts/test_nemo_mcp.py`: full read-only integration runner and terminal display.
-- `scripts/test_app_auth_http.py`: protected HTTP boundary and context-scaffold test.
+- `scripts/test_app_auth_http.py`: protected HTTP boundary and runtime-execution reachability test.
 - `scripts/test_app_policy_scope.py`: real temporary app-assignment scope test.
 
 ## Verified Current Results
@@ -83,7 +92,12 @@ passed after the extraction.
 ```text
 service app authentication: passed
 HTTP app authentication: passed
-authenticated runtime-context preparation: passed
+authenticated runtime execution reachability: passed
+runtime LLM selection: passed
+conversation history storage/reload/truncation: passed
+oversized latest-message rejection: passed
+controlled connector tool-error responses: passed
+controlled Azure output-filter responses: passed
 temporary authentication rows cleanup: passed
 temporary app policy-scope rows cleanup: passed
 App A issue_write blocked / App B issue_write allowed: passed
@@ -108,18 +122,32 @@ into `execute_guarded_message()`.
 
 ## Exact Next Implementation Step
 
-Connect `POST /v1/guardrails/run` to `execute_guarded_message()`.
+Read `docs/open-work-backlog.md` first. It is the source of truth for
+unfinished plans and prevents half-completed ideas from being lost between
+machines.
+
+Immediate top priority: make `config/prompts.yml` a generic self-check shell
+instead of hardcoding GitHub/credential-specific behavior. Active policy
+behavior should come from Postgres policies and `compiled_policy_rules`.
+
+After that, add end-to-end HTTP coverage for real
+`POST /v1/guardrails/run` execution.
 
 Recommended incremental slice:
 
 ```text
-1. Extract reusable Azure model and read-only GitHub MCP guarded-tool builders
-   from scripts/test_nemo_mcp.py.
-2. For the authenticated app, build app-scoped NeMo rails and guarded tools.
-3. Call execute_guarded_message() with the request message.
-4. Replace the context-preview response with a final JSON execution response:
-   status, response, input rail status, output rail status, and tool names.
-5. Test an allowed read request and a blocked request through the HTTP endpoint.
+1. Make self-check templates generic and DB-rule driven.
+2. Confirm harmless assistant output passes the output rail.
+3. Create a temporary authorized app.
+4. Assign one GitHub input policy to that app.
+5. Call POST /v1/guardrails/run with an allowed read prompt.
+6. Call POST /v1/guardrails/run with a blocked write prompt.
+7. Include a `conversation_id` and verify stored history is available on the
+   next request.
+8. Run `python scripts/test_runtime_llm_selection.py` to verify main/guardrail
+   LLM selection behavior.
+9. Assert response status, rail statuses, called tools, history metadata, and
+   cleanup.
 ```
 
 Keep `GITHUB_READ_ONLY=1`. Do not add write-capable endpoint testing to the
@@ -127,7 +155,6 @@ normal harness.
 
 ## Boundaries Not Yet Implemented
 
-- `/v1/guardrails/run` does not execute the message yet.
 - Admin CRUD endpoints are not authenticated.
 - User login and role authorization are not implemented.
 - Automatic policy compilation/invalidation is not implemented.

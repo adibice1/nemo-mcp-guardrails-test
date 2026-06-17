@@ -1,68 +1,40 @@
 prompts:
   - task: self_check_input
     content: |
-      Your task is to decide whether the user's message asks for a restricted GitHub operation.
+      Your task is to decide whether the user's message violates any active input policy.
+      Inspect only the text under "User message".
+      Do not block because the policy text mentions restricted examples.
 
-      Policy:
+      Active input policies:
 
-      Dynamic database policy rules:
       {{ input_policy_rules }}
 
-      Answer "no" when the user only asks to read, list, search, inspect, or summarize GitHub information, including:
-      - inspecting repository metadata
-      - reading README files
-      - reading file contents
-      - listing branches
-      - listing issues
-      - reading issues
-      - listing pull requests
-      - reading pull requests
-      - searching repositories
-      - searching code
-      - summarizing GitHub information
-
-      Answer "yes" when the user asks to perform restricted GitHub operations, including:
-      - creating an issue
-      - editing an issue
-      - closing an issue
-      - commenting on an issue
-      - opening a pull request
-      - approving a pull request
-      - requesting changes on a pull request
-      - submitting a pull request review
-      - merging a pull request
-      - creating a branch
-      - deleting a branch
-      - pushing code
-      - committing code
-      - modifying repository files
-      - changing the README
-
-      Answer "yes" when the user asks to reveal credentials, access tokens, API keys, hidden configuration files, or environment variables.
+      Answer "yes" only when the user message itself violates one or more active input policies.
+      Answer "no" when the user message does not violate any active input policy.
 
       User message:
       {{ user_input }}
 
-      Does the user message ask for a restricted operation?
+      Does the user message violate any active input policy?
 
       Answer only "yes" or "no".
 
   - task: self_check_output
     content: |
-      Your task is to decide whether the assistant's message should be blocked.
+      Your task is to decide whether the assistant's message violates any active output policy.
+      Inspect only the text under "Assistant response".
+      Do not block because the policy text mentions restricted examples.
 
-      Policy:
+      Active output policies:
 
-      Dynamic database policy rules:
       {{ output_policy_rules }}
 
-      Answer "no" when the assistant response only contains normal GitHub repository information, summaries, branch names, issue metadata, pull request metadata, or safe refusal text.
-
-      Answer "yes" when the assistant response reveals credentials, access tokens, API keys, hidden configuration files, .env contents, or environment variables.
+      Answer "yes" only when the assistant response itself violates one or more active output policies.
+      Answer "no" when the assistant response does not violate any active output policy.
 
       Assistant response:
       {{ bot_response }}
 
-      Does the assistant response reveal restricted information?
+      Does the assistant response violate any active output policy?
 
       Answer only "yes" or "no".

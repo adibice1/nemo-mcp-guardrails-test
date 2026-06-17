@@ -12,6 +12,8 @@ client app + app ID/API key
 -> load mandatory global rules
 -> load app-specific rule assignments
 -> load app connectors and LLM configurations
+-> build guardrail rails with the app's guardrail LLM config
+-> build agent with the app's main LLM config
 -> input rail
 -> GMS agent
 -> tool guard
@@ -85,10 +87,35 @@ policies, create NeMo rails, start Docker, or expose MCP tools.
 clients, unauthorized apps, and valid credentials, then removes its temporary
 rows.
 
-`POST /v1/guardrails/run` now reuses the dependency and passes `app.id` into
-app-scoped prompt rules, runtime policies, and tool blocking. It validates a
-message and returns a context preview; it does not execute NeMo, an agent, or
-connector tools yet.
+`POST /v1/guardrails/run` now reuses the dependency, builds app-scoped prompt
+rules, runtime policies, tool blocking, and separate runtime LLMs, then
+executes the submitted message through the guarded runtime. The NeMo rails use
+the app's `guardrail_llm_config_id`; the LangChain agent uses the app's
+`main_llm_config_id`. Missing config IDs fall back to the `.env` Azure OpenAI
+deployment. Non-Azure providers are recorded for the target architecture but
+return a clear unsupported-provider error in the current prototype. When
+`conversation_id` is provided, the endpoint loads stored prior turns for that
+app conversation. If no stored turns exist, it bootstraps from client-supplied
+`conversation_history`. Older turns are trimmed by
+`NEMO_MAX_RUNTIME_CONTEXT_CHARS` so the latest message plus recent history fits
+before Azure OpenAI is called.
+
+```text
+POST /v1/guardrails/run
+-> authenticate app
+-> load stored conversation_messages for app_id + conversation_id
+-> use client-supplied conversation_history only when no stored history exists
+-> keep newest prior turns that fit beside the latest message
+-> select guardrail LLM config for NeMo rails
+-> select main LLM config for the LangChain agent
+-> input rail checks latest message
+-> agent receives trimmed history + latest message
+-> connector tool failures return status=tool_error instead of HTTP 500
+-> output rail checks assistant response
+-> Azure output content-filter failures return a controlled blocked response
+-> store latest user/assistant turn when conversation_id exists
+-> return response plus history metadata
+```
 
 Reusable guarded execution has now been extracted:
 
@@ -96,8 +123,10 @@ Reusable guarded execution has now been extracted:
 guarded_execution.py
 -> execute_guarded_message()
 -> input rail
--> early block or agent with guarded tools
+-> early block or agent with guarded tools and trimmed history
+-> controlled tool_error for connector ToolException failures
 -> output rail
+-> controlled blocked response for Azure output content_filter failures
 -> GuardedExecutionResult
 
 test_nemo_mcp.py
@@ -106,7 +135,7 @@ test_nemo_mcp.py
 -> prints the familiar workflow sections
 ```
 
-The next slice connects the same function to `POST /v1/guardrails/run`.
+The HTTP runtime endpoint now calls the same reusable function.
 
 ## Big Picture
 
@@ -569,7 +598,7 @@ Reads the currently stored compiled rules.
 | App policy scope | Postgres `app_policy_assignments` | App-scoped loader filtering implemented. |
 | Global policy scope | Postgres `global_policy_assignments` | Included in every app-scoped loader query. |
 | Runtime HTTP app identity | `X-App-ID` + `X-API-Key` verified against Postgres `apps` | `require_authenticated_app` protects `/v1/guardrails/auth-check` and `/v1/guardrails/run`. |
-| Runtime context preview | `POST /v1/guardrails/run` | Authenticates and returns app-scoped policy/rule/tool counts without executing the message yet. |
+| Runtime execution endpoint | `POST /v1/guardrails/run` | Authenticates, builds app-scoped runtime parts, calls `execute_guarded_message()`, and returns JSON execution results. |
 | Reusable guarded message coordination | `guarded_execution.py` | Returns full rail results, final response, agent result, and called tools. |
 | Runtime blocked tool names | DB policies compiled by `policy_compiler.py` | `blocked_tool_names_for_app(app_id=...)` receives the authenticated app ID in the run context. |
 | Generated blocked test prompts | DB policies compiled by `policy_compiler.py` | Used by `test_nemo_mcp.py`. |

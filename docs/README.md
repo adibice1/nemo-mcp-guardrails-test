@@ -36,13 +36,21 @@ Current handoff status:
   `X-API-Key` HTTP authentication with a generic `401` for invalid requests.
 - `GET /v1/guardrails/auth-check` is the first protected runtime proof
   endpoint; `scripts/test_app_auth_http.py` verifies it and cleans up.
-- `POST /v1/guardrails/run` now authenticates and prepares app-scoped rules,
-  policies, and blocked tools, but does not execute the submitted message yet.
+- `POST /v1/guardrails/run` now authenticates, builds app-scoped rules,
+  policies, rails, and guarded tools, then executes the submitted message.
+  It supports stored conversation history through `conversation_id`, accepts
+  `conversation_history` for bootstrapping, trims older turns by
+  `NEMO_MAX_RUNTIME_CONTEXT_CHARS`, and returns history metadata.
 - `src/nemo_mcp_guardrails/guarded_execution.py` coordinates reusable
   input-rail, agent/tool, and output-rail execution. The full test runner now
   uses it while preserving the same terminal display.
-- Admin CRUD endpoints remain unprotected. The next slice makes the run
-  endpoint call the reusable execution function.
+- `src/nemo_mcp_guardrails/runtime_factory.py` respects separate app
+  `main_llm_config_id` and `guardrail_llm_config_id` selections for the agent
+  and NeMo rails.
+- Admin CRUD endpoints remain unprotected. The next cleanup is to make
+  `config/prompts.yml` generic so policy behavior comes from database rules,
+  followed by real HTTP integration coverage for allowed and blocked
+  `/v1/guardrails/run` requests.
 - `scripts/seed_normalized_policy_metadata.py` seeds normalized connector/action/resource/tool metadata and backfills allowed-test expected-tool links.
 - Normalized metadata tables now include `connectors`, `connector_actions`, `connector_resources`, `connector_tool_mappings`, and `allowed_test_case_expected_tools`.
 - Input/output diagnostic scripts now distinguish Azure `content_filter`
@@ -51,6 +59,7 @@ Current handoff status:
 Start here for current project context:
 
 - `work-computer-handoff.md`: exact 2026-06-16 continuation point and next slice
+- `open-work-backlog.md`: active unfinished work tracker
 - `project-context.md`: current architecture and implementation state
 - `testing-notes.md`: verified tests and commands
 - `next-steps.md`: recommended next work item
