@@ -21,6 +21,17 @@ TOOL_ERROR_RESPONSE = (
 OUTPUT_FILTER_RESPONSE = (
     "I could not return that response because it was blocked by the output safety check."
 )
+SECRET_OUTPUT_PATTERNS = (
+    "GITHUB_PAT_",
+    "GHP_",
+    "SK-",
+    "BEGIN PRIVATE KEY",
+    "PRIVATE KEY-----",
+    "TOKEN=",
+    "API_KEY=",
+    "SECRET=",
+    "PASSWORD=",
+)
 
 
 @dataclass(frozen=True)
@@ -29,6 +40,7 @@ class SyntheticRailResult:
 
     status: RailStatus
     content: str
+    source: str = "synthetic"
 
 
 @dataclass(frozen=True)
@@ -43,6 +55,8 @@ class GuardedExecutionResult:
     agent_result: dict[str, Any] | None
     input_rail_result: Any
     output_rail_result: Any | None
+    raw_agent_response: str | None
+    output_rail_source: str | None
 
 
 def build_agent_messages(
@@ -82,6 +96,13 @@ def is_azure_content_filter_error(error: BaseException) -> bool:
     return error_details.get("code") == "content_filter"
 
 
+def contains_obvious_secret_value(text: str) -> bool:
+    """Return whether text contains obvious secret-like output."""
+
+    upper_text = text.upper()
+    return any(pattern in upper_text for pattern in SECRET_OUTPUT_PATTERNS)
+
+
 def extract_tool_names(result: dict[str, Any]) -> tuple[str, ...]:
     """Return tool names observed in an agent result."""
 
@@ -105,6 +126,27 @@ def extract_tool_names(result: dict[str, Any]) -> tuple[str, ...]:
     return tuple(tool_names)
 
 
+def get_output_rail_source(output_result: Any | None) -> str | None:
+    """Return a compact debug label for the output-rail outcome."""
+
+    if output_result is None:
+        return None
+
+    source = getattr(output_result, "source", None)
+    if source:
+        return str(source)
+
+    status = getattr(output_result, "status", None)
+    if status == RailStatus.BLOCKED:
+        return "nemo_blocked"
+    if status == RailStatus.PASSED:
+        return "nemo_passed"
+    if status == RailStatus.MODIFIED:
+        return "nemo_modified"
+
+    return str(status)
+
+
 async def apply_output_rail(
     rails: LLMRails,
     user_prompt: str,
@@ -124,9 +166,17 @@ async def apply_output_rail(
         if not is_azure_content_filter_error(error):
             raise
 
+        if not contains_obvious_secret_value(response):
+            return response, SyntheticRailResult(
+                status=RailStatus.PASSED,
+                content=response,
+                source="azure_content_filter_fallback_passed",
+            )
+
         return OUTPUT_FILTER_RESPONSE, SyntheticRailResult(
             status=RailStatus.BLOCKED,
             content=OUTPUT_FILTER_RESPONSE,
+            source="azure_content_filter",
         )
 
     if result.status == RailStatus.BLOCKED:
@@ -172,6 +222,8 @@ async def execute_guarded_message(
             agent_result=None,
             input_rail_result=input_result,
             output_rail_result=output_result,
+            raw_agent_response=None,
+            output_rail_source=get_output_rail_source(output_result),
         )
 
     prompt_for_agent = (
@@ -209,9 +261,12 @@ async def execute_guarded_message(
             agent_result=None,
             input_rail_result=input_result,
             output_rail_result=output_result,
+            raw_agent_response=None,
+            output_rail_source=get_output_rail_source(output_result),
         )
 
-    response = str(agent_result["messages"][-1].content)
+    raw_agent_response = str(agent_result["messages"][-1].content)
+    response = raw_agent_response
     output_result = None
 
     if output_rail_enabled:
@@ -236,4 +291,6 @@ async def execute_guarded_message(
         agent_result=agent_result,
         input_rail_result=input_result,
         output_rail_result=output_result,
+        raw_agent_response=raw_agent_response,
+        output_rail_source=get_output_rail_source(output_result),
     )

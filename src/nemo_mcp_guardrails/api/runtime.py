@@ -21,6 +21,7 @@ from nemo_mcp_guardrails.runtime_factory import build_guardrails_runtime_parts
 
 
 DEFAULT_MAX_RUNTIME_CONTEXT_CHARS = 24000
+RUNTIME_DEBUG_ENV = "NEMO_RUNTIME_DEBUG"
 
 router = APIRouter(prefix="/v1/guardrails", tags=["guardrails-runtime"])
 
@@ -56,6 +57,17 @@ def _rail_status_text(status: object | None) -> str | None:
         return None
 
     return str(getattr(status, "value", status))
+
+
+def _runtime_debug_enabled() -> bool:
+    """Return whether local runtime debug fields should be exposed."""
+
+    return os.getenv(RUNTIME_DEBUG_ENV, "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
 
 
 def _max_runtime_context_chars() -> int:
@@ -228,6 +240,8 @@ async def run_guardrails(
         db=db,
     )
 
+    debug_enabled = _runtime_debug_enabled()
+
     return GuardrailsRunResponse(
         status=execution_result.status,
         app_id=app.id,
@@ -245,4 +259,19 @@ async def run_guardrails(
         history_messages_received=history_context.received_count,
         history_messages_loaded=history_context.loaded_count,
         history_messages_used=len(history_context.selected_turns),
+        debug_agent_response=(
+            execution_result.raw_agent_response if debug_enabled else None
+        ),
+        debug_output_rail_source=(
+            execution_result.output_rail_source if debug_enabled else None
+        ),
+        debug_output_rule_texts=(
+            [
+                rule.rule_text
+                for rule in runtime_parts.prompt_rule_config.prompt_rules
+                if rule.rail_type == "output"
+            ]
+            if debug_enabled
+            else None
+        ),
     )

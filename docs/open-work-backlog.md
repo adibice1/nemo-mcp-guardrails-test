@@ -16,6 +16,8 @@ The GMS backend prototype now has these core runtime pieces:
 - Separate app-selected LLM configs for guardrail rails and the main agent.
 - Controlled runtime responses for connector tool errors and Azure output
   content-filter failures.
+- Centralized single/bulk policy assignment payloads for app and global
+  assignments, with readable app and policy labels in API responses.
 
 Current presentation/demo scope:
 
@@ -54,6 +56,14 @@ Follow-up verification:
 - Confirm the harmless hello response passes output rails for an app with only
   the global credential output policy.
 - Keep DB rules as the source of actual policy behavior.
+- If the runtime still blocks unexpectedly, set `NEMO_RUNTIME_DEBUG=true` before
+  starting `scripts/run_api.py`. The `/v1/guardrails/run` response will include
+  debug-only fields for the raw agent response, output-rail source, and active
+  output rule texts.
+- If Azure content-filters the output self-check prompt, runtime now falls back
+  to a deterministic local secret-pattern scan. Obvious secret-like output still
+  blocks; harmless output passes with
+  `debug_output_rail_source=azure_content_filter_fallback_passed`.
 
 Future extension:
 
@@ -201,6 +211,7 @@ Future enhancements:
 .\.venv\Scripts\python.exe scripts\test_runtime_llm_selection.py
 .\.venv\Scripts\python.exe scripts\test_app_auth_http.py
 .\.venv\Scripts\python.exe scripts\test_app_auth.py
+.\.venv\Scripts\python.exe scripts\test_policy_assignment_api.py
 .\.venv\Scripts\python.exe scripts\test_app_policy_scope.py
 .\.venv\Scripts\python.exe scripts\test_tool_guard.py
 .\.venv\Scripts\python.exe scripts\debug_nemo_output_check.py

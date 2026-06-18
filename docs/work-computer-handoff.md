@@ -14,6 +14,7 @@ Before starting new implementation:
 git pull
 docker compose up -d postgres
 python scripts/test_app_auth_http.py
+python scripts/test_policy_assignment_api.py
 python scripts/test_app_policy_scope.py
 python scripts/test_tool_guard.py
 python scripts/test_nemo_mcp.py
@@ -47,6 +48,19 @@ X-App-ID + X-API-Key
 -> app-scoped compiled NeMo prompt rules
 -> app-scoped blocked MCP tool names
 ```
+
+App/global policy assignment POST bodies now use `policy_ids`, so one endpoint
+handles both single and bulk assignment:
+
+```json
+{
+  "policy_ids": [26, 12, 13],
+  "enabled": true
+}
+```
+
+Assignment responses include readable app and policy labels beside numeric IDs
+for Swagger and the future frontend.
 
 `POST /v1/guardrails/run` now builds that runtime context and executes the
 submitted message through the reusable guarded flow. It also supports hybrid

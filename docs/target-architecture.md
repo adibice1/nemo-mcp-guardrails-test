@@ -366,7 +366,10 @@ updated_at
 
 Current implementation status: created. It references the existing `policies`
 table, which currently serves as the reusable policy-definition table.
-FastAPI CRUD is available under `/apps/{app_id}/policy-assignments`.
+FastAPI CRUD is available under `/apps/{app_id}/policy-assignments`. The POST
+body accepts `policy_ids` so one endpoint handles both single and bulk
+assignment. Existing assignments are updated in place instead of duplicating
+rows.
 
 ### global_policy_assignments
 
@@ -383,7 +386,8 @@ Global rules cannot be overridden by app owners.
 Current implementation status: created. The existing connector-independent
 credential output policy is globally assigned. Existing GitHub write policies
 remain unassigned until they are explicitly linked to an app or made global.
-FastAPI CRUD is available under `/global-policy-assignments`.
+FastAPI CRUD is available under `/global-policy-assignments`. The POST body
+also accepts `policy_ids` for single or bulk global assignment.
 
 ### compiled_policy_rules
 

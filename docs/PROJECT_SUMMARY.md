@@ -55,6 +55,9 @@ Current backend/API state:
   `/apps/{app_id}/policy-assignments`.
 - Global policy assignment CRUD is available under
   `/global-policy-assignments`.
+- Assignment POST bodies use `policy_ids`, so the same endpoints handle single
+  and bulk assignment. Responses include readable app/policy labels beside
+  numeric IDs.
 - App API keys are hashed before persistence and omitted from API responses.
 - `require_authenticated_app` verifies `X-App-ID` and `X-API-Key` before
   protected runtime work and returns a generic `401` for invalid requests.

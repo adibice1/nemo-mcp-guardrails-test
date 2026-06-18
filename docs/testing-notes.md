@@ -32,6 +32,17 @@ agent. Missing config IDs fall back to `.env` Azure OpenAI settings. Only
 Azure OpenAI providers are executable in the current prototype; unsupported
 providers fail clearly.
 
+For local debugging only, start the API with `NEMO_RUNTIME_DEBUG=true` to expose
+`debug_agent_response`, `debug_output_rail_source`, and
+`debug_output_rule_texts` from `POST /v1/guardrails/run`. Do not enable this in
+production because raw agent output may include content later blocked by output
+rails.
+
+When Azure content-filters an output self-check prompt, runtime applies a
+deterministic local secret-pattern fallback to the raw assistant response.
+Obvious secret-like output remains blocked; harmless output is allowed and the
+debug source is `azure_content_filter_fallback_passed`.
+
 The runtime wraps MCP tools with `src/nemo_mcp_guardrails/tool_guard.py`. This execution-level safety layer blocks restricted GitHub MCP tool names before the underlying MCP tool can run. Normal tests still keep GitHub MCP in read-only mode with `GITHUB_READ_ONLY=1`, so write tools should not be exposed by the server in the first place.
 
 `src/nemo_mcp_guardrails/policy_compiler.py` now generates GitHub write-action policy tests from structured policy objects plus adapter-style metadata. `scripts/test_nemo_mcp.py` consumes curated generated prompts through `compile_policy_test_prompts()`.
@@ -585,17 +596,56 @@ GET/POST/PUT/DELETE /global-policy-assignments
 ```
 
 App create/update accepts an `api_key`, hashes it before storage, and never
-returns the plaintext key or hash. Assignment creation validates that the app
-and reusable policy exist. Duplicate assignments return `409`.
+returns the plaintext key or hash. App responses include `display_label` so
+the frontend can show a readable app name beside the numeric ID.
+
+Assignment creation validates that the app and reusable policies exist. The
+POST body uses `policy_ids` for both single and bulk assignment:
+
+```json
+{
+  "policy_ids": [26],
+  "enabled": true
+}
+```
+
+```json
+{
+  "policy_ids": [26, 12, 13],
+  "enabled": true
+}
+```
+
+Existing assignments are updated in place instead of returning a duplicate
+conflict. Assignment responses include `app_label`, `policy_label`,
+`policy_type`, `connector`, `action`, `resource`, and `category` so users do
+not need to manually look up every ID in DBeaver.
 
 Latest focused smoke test passed:
 
 ```text
 create temporary app
--> create/update/delete app policy assignment
--> create/update/delete global policy assignment
+-> create/update/delete single and bulk app policy assignments
+-> create/update/delete single and bulk global policy assignments
 -> delete temporary app
 -> no temporary records remain
+```
+
+Focused API check:
+
+```powershell
+python scripts/test_policy_assignment_api.py
+```
+
+Expected output:
+
+```text
+Policy assignment API checks passed.
+- App responses include display_label.
+- App policy assignments support single and bulk policy_ids.
+- Global policy assignments support single and bulk policy_ids.
+- Existing assignments update in place instead of duplicating rows.
+- Assignment responses include readable labels.
 ```
 
 Use Swagger at `http://127.0.0.1:8000/docs` to manage real development rows.

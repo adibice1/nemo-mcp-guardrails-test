@@ -3,6 +3,9 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from nemo_mcp_guardrails.api.assignment_serializers import (
+    serialize_global_policy_assignment,
+)
 from nemo_mcp_guardrails.api.app_schemas import (
     GlobalPolicyAssignmentRead,
     PolicyAssignmentCreate,
@@ -24,40 +27,79 @@ router = APIRouter(
 @router.get("", response_model=list[GlobalPolicyAssignmentRead])
 def list_global_policy_assignments(
     db: Session = Depends(get_db),
-) -> list[GlobalPolicyAssignmentRecord]:
+) -> list[dict[str, object]]:
     """Return all mandatory global policy assignments."""
 
-    return list(
+    assignments = list(
         db.scalars(
             select(GlobalPolicyAssignmentRecord).order_by(
                 GlobalPolicyAssignmentRecord.id
             )
         )
     )
+    return [
+        serialize_global_policy_assignment(assignment) for assignment in assignments
+    ]
+
+
+def _unique_policy_ids(policy_ids: list[int]) -> list[int]:
+    """Return unique policy IDs while preserving request order."""
+
+    return list(dict.fromkeys(policy_ids))
+
+
+def _require_policies(policy_ids: list[int], db: Session) -> None:
+    """Raise a not-found response if any requested policy ID is missing."""
+
+    unique_ids = _unique_policy_ids(policy_ids)
+    existing_ids = set(
+        db.scalars(select(PolicyRecord.id).where(PolicyRecord.id.in_(unique_ids)))
+    )
+    missing_ids = [policy_id for policy_id in unique_ids if policy_id not in existing_ids]
+    if missing_ids:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Policy IDs not found: {missing_ids}",
+        )
 
 
 @router.post(
     "",
-    response_model=GlobalPolicyAssignmentRead,
+    response_model=list[GlobalPolicyAssignmentRead],
     status_code=status.HTTP_201_CREATED,
 )
 def create_global_policy_assignment(
     payload: PolicyAssignmentCreate,
     db: Session = Depends(get_db),
-) -> GlobalPolicyAssignmentRecord:
-    """Apply one reusable policy globally."""
+) -> list[dict[str, object]]:
+    """Apply one or more reusable policies globally."""
 
-    if not db.get(PolicyRecord, payload.policy_id):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Policy not found",
+    policy_ids = _unique_policy_ids(payload.policy_ids)
+    _require_policies(policy_ids, db)
+
+    existing_assignments = list(
+        db.scalars(
+            select(GlobalPolicyAssignmentRecord).where(
+                GlobalPolicyAssignmentRecord.policy_id.in_(policy_ids)
+            )
         )
-
-    assignment = GlobalPolicyAssignmentRecord(
-        policy_id=payload.policy_id,
-        enabled=payload.enabled,
     )
-    db.add(assignment)
+    assignments_by_policy_id = {
+        assignment.policy_id: assignment for assignment in existing_assignments
+    }
+    assignments: list[GlobalPolicyAssignmentRecord] = []
+
+    for policy_id in policy_ids:
+        assignment = assignments_by_policy_id.get(policy_id)
+        if assignment is None:
+            assignment = GlobalPolicyAssignmentRecord(
+                policy_id=policy_id,
+                enabled=payload.enabled,
+            )
+            db.add(assignment)
+        else:
+            assignment.enabled = payload.enabled
+        assignments.append(assignment)
 
     try:
         db.commit()
@@ -65,11 +107,14 @@ def create_global_policy_assignment(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="This policy already has a global assignment",
+            detail="One or more policies could not be assigned globally",
         ) from error
 
-    db.refresh(assignment)
-    return assignment
+    for assignment in assignments:
+        db.refresh(assignment)
+    return [
+        serialize_global_policy_assignment(assignment) for assignment in assignments
+    ]
 
 
 @router.put(
@@ -80,7 +125,7 @@ def update_global_policy_assignment(
     assignment_id: int,
     payload: PolicyAssignmentUpdate,
     db: Session = Depends(get_db),
-) -> GlobalPolicyAssignmentRecord:
+) -> dict[str, object]:
     """Enable or disable one mandatory global assignment."""
 
     assignment = db.get(GlobalPolicyAssignmentRecord, assignment_id)
@@ -93,7 +138,7 @@ def update_global_policy_assignment(
     assignment.enabled = payload.enabled
     db.commit()
     db.refresh(assignment)
-    return assignment
+    return serialize_global_policy_assignment(assignment)
 
 
 @router.delete("/{assignment_id}", status_code=status.HTTP_204_NO_CONTENT)

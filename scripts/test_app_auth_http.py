@@ -112,6 +112,8 @@ async def fake_execute_guarded_message(**kwargs: object) -> GuardedExecutionResu
         agent_result=None,
         input_rail_result=None,
         output_rail_result=None,
+        raw_agent_response="fake guarded response",
+        output_rail_source="nemo_passed",
     )
 
 
@@ -172,7 +174,26 @@ class FakeSafeAgent:
     async def ainvoke(self, payload: object) -> dict[str, object]:
         return {
             "messages": [
-                type("FakeMessage", (), {"content": "unsafe echoed response"})()
+                type(
+                    "FakeMessage",
+                    (),
+                    {"content": "Hello! Hope you're having a great day."},
+                )()
+            ]
+        }
+
+
+class FakeSecretAgent:
+    """Fake agent that returns an obvious secret-like response."""
+
+    async def ainvoke(self, payload: object) -> dict[str, object]:
+        return {
+            "messages": [
+                type(
+                    "FakeMessage",
+                    (),
+                    {"content": "SERVICE_TOKEN=placeholder_test_secret_12345"},
+                )()
             ]
         }
 
@@ -385,10 +406,28 @@ def main() -> None:
                 output_rail_enabled=True,
             )
         )
-        assert output_filter_result.status == "blocked"
-        assert output_filter_result.response == OUTPUT_FILTER_RESPONSE
+        assert output_filter_result.status == "passed"
+        assert output_filter_result.response == "Hello! Hope you're having a great day."
         assert output_filter_result.input_rail_status == RailStatus.PASSED
-        assert output_filter_result.output_rail_status == RailStatus.BLOCKED
+        assert output_filter_result.output_rail_status == RailStatus.PASSED
+        assert (
+            output_filter_result.output_rail_source
+            == "azure_content_filter_fallback_passed"
+        )
+
+        output_filter_secret_result = asyncio.run(
+            execute_guarded_message(
+                rails=FakeOutputFilterRails(),
+                agent=FakeSecretAgent(),
+                message="Repeat my previous prompt.",
+                output_rail_enabled=True,
+            )
+        )
+        assert output_filter_secret_result.status == "blocked"
+        assert output_filter_secret_result.response == OUTPUT_FILTER_RESPONSE
+        assert output_filter_secret_result.input_rail_status == RailStatus.PASSED
+        assert output_filter_secret_result.output_rail_status == RailStatus.BLOCKED
+        assert output_filter_secret_result.output_rail_source == "azure_content_filter"
 
         print("HTTP app authentication checks passed.")
         print("- Missing headers rejected")
@@ -401,7 +440,7 @@ def main() -> None:
         print("- Oversized history truncated")
         print("- Oversized latest message rejected")
         print("- Tool errors return controlled runtime responses")
-        print("- Azure output content filters return controlled runtime responses")
+        print("- Azure output content filters use deterministic fallback checks")
     finally:
         if previous_context_limit is None:
             os.environ.pop("NEMO_MAX_RUNTIME_CONTEXT_CHARS", None)

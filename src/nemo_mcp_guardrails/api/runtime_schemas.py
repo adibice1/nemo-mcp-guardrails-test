@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ConversationMessage(BaseModel):
@@ -12,6 +12,25 @@ class ConversationMessage(BaseModel):
 
 class GuardrailsRunRequest(BaseModel):
     """Request body for one guarded runtime execution."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "message": "List recent pull requests in github/github-mcp-server.",
+                "conversation_id": "demo-conversation-1",
+                "conversation_history": [
+                    {
+                        "role": "user",
+                        "content": "Search for the github/github-mcp-server repo.",
+                    },
+                    {
+                        "role": "assistant",
+                        "content": "I found github/github-mcp-server.",
+                    },
+                ],
+            }
+        }
+    )
 
     message: str = Field(min_length=1)
     conversation_id: str | None = None
@@ -37,3 +56,6 @@ class GuardrailsRunResponse(BaseModel):
     history_messages_received: int
     history_messages_loaded: int
     history_messages_used: int
+    debug_agent_response: str | None = None
+    debug_output_rail_source: str | None = None
+    debug_output_rule_texts: list[str] | None = None

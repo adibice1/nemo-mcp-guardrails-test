@@ -6,6 +6,19 @@ from pydantic import BaseModel, ConfigDict, Field
 class AppCreate(BaseModel):
     """Request body for creating a client app."""
 
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "name": "Test App",
+                "client_id": "test-app",
+                "api_key": "replace-with-strong-api-key",
+                "authorized": True,
+                "main_llm_config_id": None,
+                "guardrail_llm_config_id": None,
+            }
+        }
+    )
+
     name: str
     client_id: str
     api_key: str = Field(min_length=16)
@@ -16,6 +29,17 @@ class AppCreate(BaseModel):
 
 class AppUpdate(BaseModel):
     """Request body for updating a client app."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "name": "Updated Test App",
+                "authorized": True,
+                "main_llm_config_id": None,
+                "guardrail_llm_config_id": None,
+            }
+        }
+    )
 
     name: str | None = None
     client_id: str | None = None
@@ -33,6 +57,7 @@ class AppRead(BaseModel):
     id: int
     name: str
     client_id: str
+    display_label: str
     authorized: bool
     main_llm_config_id: int | None
     guardrail_llm_config_id: int | None
@@ -41,9 +66,18 @@ class AppRead(BaseModel):
 
 
 class PolicyAssignmentCreate(BaseModel):
-    """Request body for assigning one reusable policy."""
+    """Request body for assigning one or more reusable policies."""
 
-    policy_id: int
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "policy_ids": [26],
+                "enabled": True,
+            }
+        }
+    )
+
+    policy_ids: list[int] = Field(min_length=1)
     enabled: bool = True
 
 
@@ -60,7 +94,14 @@ class AppPolicyAssignmentRead(BaseModel):
 
     id: int
     app_id: int
+    app_label: str
     policy_id: int
+    policy_label: str
+    policy_type: str
+    connector: str | None
+    action: str | None
+    resource: str | None
+    category: str | None
     enabled: bool
     created_at: datetime
     updated_at: datetime
@@ -73,6 +114,12 @@ class GlobalPolicyAssignmentRead(BaseModel):
 
     id: int
     policy_id: int
+    policy_label: str
+    policy_type: str
+    connector: str | None
+    action: str | None
+    resource: str | None
+    category: str | None
     enabled: bool
     created_at: datetime
     updated_at: datetime

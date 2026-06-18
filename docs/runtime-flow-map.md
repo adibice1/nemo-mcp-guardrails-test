@@ -42,17 +42,29 @@ POST /apps
 
 POST /apps/{app_id}/policy-assignments
 -> validate app and reusable policy
--> create app-specific assignment
+-> create or update one or more app-specific assignments from policy_ids
 
 POST /global-policy-assignments
--> validate reusable policy
--> create mandatory global assignment
+-> validate reusable policies
+-> create or update one or more mandatory global assignments from policy_ids
 ```
 
 These assignment APIs manage scope. Policy and compiled-rule loaders now
 accept an optional app ID and filter to enabled global assignments plus enabled
 assignments for that app. The current no-app integration runner still loads all
 enabled policies and prints an explicit testing-only warning.
+
+Assignment POST bodies use the same shape for single and bulk operations:
+
+```json
+{
+  "policy_ids": [26, 12, 13],
+  "enabled": true
+}
+```
+
+Assignment responses include readable app and policy labels such as
+`app_label` and `policy_label` beside the numeric IDs.
 
 This is a concise map of how the current project moves from database policies to the terminal output shown by `scripts/test_nemo_mcp.py`.
 

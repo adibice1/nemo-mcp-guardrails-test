@@ -109,6 +109,9 @@ The system successfully:
 - Exposes client-app CRUD under `/apps`, app-specific policy assignment CRUD
   under `/apps/{app_id}/policy-assignments`, and global assignment CRUD under
   `/global-policy-assignments`.
+- Uses `policy_ids` for assignment POST bodies, so the same endpoints handle
+  single and bulk assignments. Assignment responses include readable app and
+  policy labels for Swagger/frontend use.
 - Hashes API keys received by app create/update requests and never returns the
   plaintext key or stored hash in API responses.
 - Authenticates runtime HTTP requests through the reusable

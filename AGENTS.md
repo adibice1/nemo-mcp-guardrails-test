@@ -95,6 +95,7 @@ Blocked actions:
 - `app_users` and `app_connectors` now model user/app management roles and app-specific connector access. Connector credentials are represented only by `credential_reference`.
 - `app_policy_assignments` and `global_policy_assignments` reference the existing reusable definitions in `policies`. The connector-independent credential output policy is globally assigned; GitHub write policies remain unassigned.
 - FastAPI client-app CRUD lives under `/apps`; nested app-policy-assignment CRUD lives under `/apps/{app_id}/policy-assignments`; global assignment CRUD lives under `/global-policy-assignments`.
+- App/global assignment POST bodies use `policy_ids`, so the same endpoints handle single and bulk assignment. Assignment responses include readable app and policy labels beside numeric IDs for Swagger/frontend use.
 - App create/update accepts an API key, stores only its SHA-256 hash, and never returns the plaintext key or hash. `src/nemo_mcp_guardrails/app_auth.py` centralizes hashing and constant-time verification; `authenticate_app()` accepts only matching, authorized client ID/API-key pairs.
 - `scripts/test_app_auth.py` is a self-cleaning Postgres authentication diagnostic covering valid, wrong-key, unknown-client, and unauthorized-app cases.
 - `src/nemo_mcp_guardrails/api/auth.py` provides the reusable FastAPI `require_authenticated_app` dependency. It reads `X-App-ID` and `X-API-Key`, authenticates before runtime work begins, and returns the same generic `401` response for every invalid case.
@@ -173,6 +174,7 @@ Useful verification commands for the current state:
 - `python scripts/test_app_policy_scope.py`
 - `python scripts/test_app_auth.py`
 - `python scripts/test_app_auth_http.py`
+- `python scripts/test_policy_assignment_api.py`
 - `python scripts/test_runtime_llm_selection.py`
 - `python scripts/debug_nemo_output_check.py`
 - `python scripts/run_api.py`
