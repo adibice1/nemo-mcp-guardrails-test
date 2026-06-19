@@ -31,7 +31,7 @@ pushed. The work computer cannot see unpushed local files:
 ```powershell
 git status
 git add .
-git commit -m "Add authenticated app-scoped runtime foundation"
+git commit -m "Prepare backend and frontend handoff for GMS demo"
 git push
 ```
 
@@ -133,6 +133,32 @@ Runtime now checks `app_connectors` before building GitHub MCP tools. An app
 must have an enabled link to the enabled GitHub connector, or `/run` returns
 `403` before Docker/Azure/MCP startup.
 
+App connector links can now be managed through HTTP instead of SQL:
+
+```text
+GET    /apps/{app_id}/connectors
+POST   /apps/{app_id}/connectors
+PUT    /apps/{app_id}/connectors/{connector_ref}
+DELETE /apps/{app_id}/connectors/{connector_ref}
+
+GET    /apps/by-client-id/{client_id}/connectors
+POST   /apps/by-client-id/{client_id}/connectors
+PUT    /apps/by-client-id/{client_id}/connectors/{connector_ref}
+DELETE /apps/by-client-id/{client_id}/connectors/{connector_ref}
+```
+
+`credential_reference="env:VAR_NAME"` is executable for GitHub PAT selection.
+Blank references fall back to `GITHUB_PERSONAL_ACCESS_TOKEN`; `vault:...`
+remains future production work.
+
+Frontend planning docs are ready:
+
+```text
+docs/frontend-api-map.md
+docs/frontend-screen-plan.md
+docs/frontend-demo-flow.md
+```
+
 ## Important Current Files
 
 - `src/nemo_mcp_guardrails/app_auth.py`: API-key hashing and app verification.
@@ -195,28 +221,21 @@ Read `docs/open-work-backlog.md` first. It is the source of truth for
 unfinished plans and prevents half-completed ideas from being lost between
 machines.
 
-Immediate top priority: make `config/prompts.yml` a generic self-check shell
-instead of hardcoding GitHub/credential-specific behavior. Active policy
-behavior should come from Postgres policies and `compiled_policy_rules`.
-
-After that, add end-to-end HTTP coverage for real
-`POST /v1/guardrails/run` execution.
+Immediate top priority: start the Next.js 13 frontend MVP for the GitHub MCP
+demo. The backend demo path is ready enough for frontend work:
 
 Recommended incremental slice:
 
 ```text
-1. Make self-check templates generic and DB-rule driven.
-2. Confirm harmless assistant output passes the output rail.
-3. Create a temporary authorized app.
-4. Assign one GitHub input policy to that app.
-5. Call POST /v1/guardrails/run with an allowed read prompt.
-6. Call POST /v1/guardrails/run with a blocked write prompt.
-7. Include a `conversation_id` and verify stored history is available on the
-   next request.
-8. Run `python tests/test_runtime_llm_selection.py` to verify main/guardrail
-   LLM selection behavior.
-9. Assert response status, rail statuses, called tools, history metadata, and
-   cleanup.
+1. Read docs/frontend-api-map.md.
+2. Read docs/frontend-screen-plan.md.
+3. Read docs/frontend-demo-flow.md.
+4. Scaffold Next.js 13 with TypeScript, Tailwind, shadcn/ui, and lucide-react.
+5. Build the app shell, sidebar, and API client.
+6. Implement /apps with list/create/edit behavior.
+7. Implement /apps/[clientId] with the Connectors tab first.
+8. Wire GitHub connector linking with credential_reference="env:VAR_NAME".
+9. Add app policy assignment and runtime tester tabs after connector flow works.
 ```
 
 Keep `GITHUB_MCP_READ_ONLY=1` for scripted tests. Do not add write-capable

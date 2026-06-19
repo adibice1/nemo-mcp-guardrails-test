@@ -157,8 +157,28 @@ Normalized policy metadata seeded.
 
 Use `docs/open-work-backlog.md` as the source of truth for unfinished work.
 
-The immediate app connector management API slice is complete. Developers can
-now link apps to GitHub through HTTP instead of DBeaver.
+The backend is ready enough to begin the frontend MVP for the GitHub MCP demo.
+The next implementation slice should be the Next.js 13 management UI, guided by:
+
+```text
+docs/frontend-api-map.md
+docs/frontend-screen-plan.md
+docs/frontend-demo-flow.md
+```
+
+Recommended first frontend slice:
+
+```text
+1. Scaffold Next.js 13 with TypeScript, Tailwind, shadcn/ui, and lucide-react.
+2. Build the app shell, sidebar, and API client.
+3. Implement /apps with list/create/edit behavior.
+4. Implement /apps/[clientId] with the Connectors tab first.
+5. Wire GitHub connector linking with credential_reference="env:VAR_NAME".
+6. Add the Runtime Tester tab after the connector tab is working.
+```
+
+The app connector management API slice is complete. Developers can now link
+apps to GitHub through HTTP instead of DBeaver.
 
 Implemented endpoints:
 
@@ -272,6 +292,9 @@ Once normalized policy loading is stable:
 
 - `docs/work-computer-handoff.md`
 - `AGENTS.md`
+- `docs/frontend-api-map.md`
+- `docs/frontend-screen-plan.md`
+- `docs/frontend-demo-flow.md`
 - `docs/runtime-flow-map.md`
 - `docs/project-context.md`
 - `docs/policy-schema-design.md`

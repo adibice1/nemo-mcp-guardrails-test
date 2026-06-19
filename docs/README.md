@@ -65,6 +65,9 @@ Start here for current project context:
 - `work-computer-handoff.md`: exact 2026-06-16 continuation point and next slice
 - `open-work-backlog.md`: active unfinished work tracker
 - `project-context.md`: current architecture and implementation state
+- `frontend-api-map.md`: endpoint map for the Next.js frontend
+- `frontend-screen-plan.md`: proposed screens and component structure
+- `frontend-demo-flow.md`: presentation-ready GitHub MCP demo flow
 - `testing-notes.md`: verified tests and commands
 - `next-steps.md`: recommended next work item
 - `runtime-flow-map.md`: concise file/function runtime flow map

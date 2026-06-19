@@ -24,6 +24,9 @@ The GMS backend prototype now has these core runtime pieces:
   app connector links by app ID or client ID.
 - GitHub connector credentials can now be resolved from
   `app_connectors.credential_reference` when it uses `env:VAR_NAME`.
+- Frontend planning docs now exist for the Next.js 13 build:
+  `frontend-api-map.md`, `frontend-screen-plan.md`, and
+  `frontend-demo-flow.md`.
 - Policy create/update now automatically refreshes `compiled_policy_rules`;
   old compiled rows are marked stale and disabled.
 - HTTP runtime integration coverage now proves an authenticated app can pass an
@@ -225,6 +228,20 @@ Target frontend:
 - Policy assignment management.
 - Global policy management for admins.
 - Later: visual policy builder.
+
+Current prep:
+
+- `docs/frontend-api-map.md` maps backend endpoints to frontend screens.
+- `docs/frontend-screen-plan.md` proposes the first app structure and
+  component breakdown.
+- `docs/frontend-demo-flow.md` defines the GitHub MCP presentation flow.
+
+Recommended first implementation slice:
+
+- scaffold Next.js 13 with TypeScript, Tailwind, shadcn/ui, and lucide-react
+- build app shell and API client
+- implement app list and app detail connector tab
+- reuse the documented demo flow for Figma and frontend validation
 
 ### 11. Audit, Analytics, And Caching
 

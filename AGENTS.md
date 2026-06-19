@@ -137,10 +137,11 @@ slice. It is the single backlog for unfinished plans.
 The assignment-aware, app-authentication, protected HTTP boundary,
 authenticated runtime endpoint, reusable guarded-execution slice,
 conversation-history persistence/truncation, app-selected main/guardrail LLM
-selection, policy CRUD auto-compilation, app connector CRUD, and env-based
-connector credential resolution are green. The next backend cleanup is to add
-production secrets-manager credential resolution or protect management/admin
-CRUD routes:
+selection, policy CRUD auto-compilation, app connector CRUD, env-based
+connector credential resolution, and frontend planning docs are green. The next
+main implementation slice is the Next.js 13 frontend MVP for the GitHub MCP
+demo. Use `docs/frontend-api-map.md`, `docs/frontend-screen-plan.md`, and
+`docs/frontend-demo-flow.md` before scaffolding UI code:
 
 ```text
 users + apps + llm_configs now exist
@@ -169,8 +170,12 @@ guarded_execution.py coordinates input rail, agent/tools, and output rail
 test_nemo_mcp.py displays GuardedExecutionResult without owning coordination
 runtime_factory.py selects app main/guardrail LLM configs, then builds Azure-backed NeMo rails, env-configured GitHub MCP tools, and the LangChain agent
 policy CRUD auto-refreshes compiled_policy_rules
--> add production secrets-manager credential resolution
--> add management/admin authentication and authorization
+frontend-api-map.md maps backend endpoints to UI screens
+frontend-screen-plan.md defines the first Next.js 13 screens/components
+frontend-demo-flow.md defines the presentation GitHub MCP demo path
+-> scaffold Next.js 13 frontend with TypeScript, Tailwind, shadcn/ui, lucide-react
+-> build app shell, /apps list, and /apps/[clientId] connector tab first
+-> defer production secrets-manager and admin auth unless specifically requested
 -> keep policy CRUD auto-compilation covered by test_policy_auto_compile.py
 -> keep normal GitHub MCP tests read-only
 ```
