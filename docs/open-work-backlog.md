@@ -18,6 +18,8 @@ The GMS backend prototype now has these core runtime pieces:
   content-filter failures.
 - Centralized single/bulk policy assignment payloads for app and global
   assignments, with readable app and policy labels in API responses.
+- Developer-friendly client-ID aliases for app lookup and app-specific policy
+  assignment management.
 
 Current presentation/demo scope:
 
@@ -83,7 +85,7 @@ Next slice:
 - Call `POST /v1/guardrails/run` with an allowed read prompt.
 - Call `POST /v1/guardrails/run` with a blocked write prompt.
 - Assert status, rail statuses, called tools, history metadata, and cleanup.
-- Keep `GITHUB_READ_ONLY=1`.
+- Keep `GITHUB_MCP_READ_ONLY=1` for scripted tests.
 
 ## Near-Term Backend Work
 
@@ -121,8 +123,7 @@ Needed:
 Current state:
 
 - `app_connectors` stores which connectors an app can use.
-- Runtime still constructs GitHub MCP tools from `.env` and read-only Docker
-  settings.
+- Runtime still constructs GitHub MCP tools from `.env` settings.
 
 Needed:
 

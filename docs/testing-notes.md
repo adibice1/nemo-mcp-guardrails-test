@@ -43,7 +43,18 @@ deterministic local secret-pattern fallback to the raw assistant response.
 Obvious secret-like output remains blocked; harmless output is allowed and the
 debug source is `azure_content_filter_fallback_passed`.
 
-The runtime wraps MCP tools with `src/nemo_mcp_guardrails/tool_guard.py`. This execution-level safety layer blocks restricted GitHub MCP tool names before the underlying MCP tool can run. Normal tests still keep GitHub MCP in read-only mode with `GITHUB_READ_ONLY=1`, so write tools should not be exposed by the server in the first place.
+The runtime wraps MCP tools with `src/nemo_mcp_guardrails/tool_guard.py`. This execution-level safety layer blocks restricted GitHub MCP tool names before the underlying MCP tool can run. Normal automated tests should keep GitHub MCP in read-only mode.
+
+The backend reads `GITHUB_MCP_READ_ONLY` from `.env` and passes it to the
+GitHub MCP Docker server as `GITHUB_READ_ONLY`:
+
+```env
+GITHUB_MCP_READ_ONLY=1  # safe read-only default
+GITHUB_MCP_READ_ONLY=0  # manual local write testing
+```
+
+Restart `scripts/run_api.py` after changing this value. Local manual write
+testing can use `0`, but committed defaults and scripted tests should keep `1`.
 
 `src/nemo_mcp_guardrails/policy_compiler.py` now generates GitHub write-action policy tests from structured policy objects plus adapter-style metadata. `scripts/test_nemo_mcp.py` consumes curated generated prompts through `compile_policy_test_prompts()`.
 
@@ -52,7 +63,9 @@ Current safety layers:
 - `config/prompts.yml` plus `compiled_policy_rules`: NeMo `self_check_input` blocks unsafe user intent before the agent runs.
 - `config/prompts.yml` plus `compiled_policy_rules`: NeMo `self_check_output` blocks unsafe assistant output after the agent runs.
 - `src/nemo_mcp_guardrails/tool_guard.py`: blocks restricted MCP tool names before execution.
-- GitHub MCP Docker env: `GITHUB_READ_ONLY=1` prevents write tools from being offered during normal tests.
+- GitHub MCP Docker env: `GITHUB_READ_ONLY=1`, derived from
+  `GITHUB_MCP_READ_ONLY=1`, prevents write tools from being offered during
+  normal tests.
 - Deterministic Python pre-check: comparison/safety fallback only unless `ENFORCE_PYTHON_PRECHECK=true`.
 - `src/nemo_mcp_guardrails/policy_compiler.py`: prototype compiler for admin-style policy objects.
 - `src/nemo_mcp_guardrails/database/policy_loader.py`: loads enabled DB policy rows for runtime/debug code.
@@ -592,12 +605,41 @@ FastAPI now exposes:
 ```text
 GET/POST/PUT/DELETE /apps
 GET/POST/PUT/DELETE /apps/{app_id}/policy-assignments
+GET/POST/PUT/DELETE /apps/by-client-id/{client_id}/policy-assignments
+GET /apps/{app_id}/effective-policy-assignments
+GET /apps/by-client-id/{client_id}/effective-policy-assignments
 GET/POST/PUT/DELETE /global-policy-assignments
 ```
 
 App create/update accepts an `api_key`, hashes it before storage, and never
 returns the plaintext key or hash. App responses include `display_label` so
 the frontend can show a readable app name beside the numeric ID.
+
+For developer convenience, apps can also be fetched by `client_id`:
+
+```text
+GET /apps/by-client-id/test-app
+```
+
+App-specific policy assignments can use either numeric ID or client ID:
+
+```text
+POST /apps/4/policy-assignments
+POST /apps/by-client-id/test-app/policy-assignments
+PUT  /apps/by-client-id/test-app/policy-assignments/{assignment_id}
+DELETE /apps/by-client-id/test-app/policy-assignments/{assignment_id}
+```
+
+To inspect everything currently assigned to an app in one response, call:
+
+```text
+GET /apps/4/effective-policy-assignments
+GET /apps/by-client-id/test-app/effective-policy-assignments
+```
+
+The response separates mandatory `global_assignments` from app-specific
+`app_assignments`, includes `assignment_id`, `policy_id`, readable labels, and
+whether each assignment is enabled.
 
 Assignment creation validates that the app and reusable policies exist. The
 POST body uses `policy_ids` for both single and bulk assignment:
@@ -642,8 +684,10 @@ Expected output:
 ```text
 Policy assignment API checks passed.
 - App responses include display_label.
+- App lookup and assignment CRUD aliases work with client_id.
 - App policy assignments support single and bulk policy_ids.
 - Global policy assignments support single and bulk policy_ids.
+- Effective policy assignment summaries include app and global scopes.
 - Existing assignments update in place instead of duplicating rows.
 - Assignment responses include readable labels.
 ```

@@ -39,7 +39,7 @@ User prompt
 -> LangChain agent
 -> src/nemo_mcp_guardrails/tool_guard.py wraps MCP tools
 -> blocked tool names are compiled from enabled Postgres input policies
--> GitHub MCP read-only tools run when allowed
+-> GitHub MCP tools run when allowed; `.env` `GITHUB_MCP_READ_ONLY=1` keeps the safe read-only default
 -> NeMo self_check_output uses the app's guardrail AzureChatOpenAI config
 -> final response
 ```
@@ -58,13 +58,19 @@ Current backend/API state:
 - Assignment POST bodies use `policy_ids`, so the same endpoints handle single
   and bulk assignment. Responses include readable app/policy labels beside
   numeric IDs.
+- Developers can use `/apps/by-client-id/{client_id}` and
+  `/apps/by-client-id/{client_id}/policy-assignments` instead of remembering
+  numeric app IDs in Swagger.
+- Effective policy assignment views are available under
+  `/apps/{app_id}/effective-policy-assignments` and
+  `/apps/by-client-id/{client_id}/effective-policy-assignments`.
 - App API keys are hashed before persistence and omitted from API responses.
 - `require_authenticated_app` verifies `X-App-ID` and `X-API-Key` before
   protected runtime work and returns a generic `401` for invalid requests.
 - `GET /v1/guardrails/auth-check` is the first protected runtime proof
   endpoint. Admin CRUD endpoints remain unprotected.
 - `POST /v1/guardrails/run` authenticates, builds app-scoped policies,
-  prompt rules, blocked tools, NeMo rails, and read-only GitHub MCP tools, then
+  prompt rules, blocked tools, NeMo rails, and GitHub MCP tools, then
   executes the submitted message through the guarded runtime.
 - `/run` now respects separate app LLM selections. `guardrail_llm_config_id`
   builds the NeMo rails model; `main_llm_config_id` builds the LangChain agent
@@ -109,7 +115,11 @@ github merge pull_request block -> merge_pull_request
 github update file block -> create_or_update_file
 ```
 
-Normal full-run GitHub MCP tests should stay in read-only mode with `GITHUB_READ_ONLY=1`. Future write-capable testing should be a separate opt-in harness with a throwaway repository and limited token.
+Normal full-run GitHub MCP tests should stay in read-only mode with
+`GITHUB_MCP_READ_ONLY=1`. Manual local write testing can set
+`GITHUB_MCP_READ_ONLY=0` in `.env` and restart the API. Future write-capable
+scripted testing should be a separate opt-in harness with a throwaway
+repository and limited token.
 
 Current normalized metadata counts after seeding:
 

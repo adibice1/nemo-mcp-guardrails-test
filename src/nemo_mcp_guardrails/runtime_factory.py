@@ -35,6 +35,7 @@ class RuntimeEnvironment:
     azure_api_version: str
     azure_deployment: str
     github_pat: str
+    github_mcp_read_only: str
 
 
 @dataclass(frozen=True)
@@ -95,6 +96,10 @@ def load_runtime_environment() -> RuntimeEnvironment:
         raise RuntimeError("Missing runtime environment values: " + ", ".join(missing))
 
     azure_api_key = values["AZURE_OPENAI_API_KEY"] or ""
+    github_mcp_read_only = os.getenv("GITHUB_MCP_READ_ONLY", "1").strip()
+    if github_mcp_read_only not in {"0", "1"}:
+        raise RuntimeError("GITHUB_MCP_READ_ONLY must be 0 or 1")
+
     os.environ["OPENAI_API_KEY"] = azure_api_key
     os.environ["AZURE_OPENAI_API_KEY"] = azure_api_key
 
@@ -104,6 +109,7 @@ def load_runtime_environment() -> RuntimeEnvironment:
         azure_api_version=values["AZURE_OPENAI_API_VERSION"] or "",
         azure_deployment=values["AZURE_OPENAI_DEPLOYMENT"] or "",
         github_pat=values["GITHUB_PERSONAL_ACCESS_TOKEN"] or "",
+        github_mcp_read_only=github_mcp_read_only,
     )
 
 
@@ -178,11 +184,13 @@ def build_chat_model(
     )
 
 
-async def build_read_only_guarded_github_tools(
+async def build_guarded_github_tools(
     environment: RuntimeEnvironment,
     blocked_tool_names: frozenset[str],
 ) -> McpToolBundle:
-    """Build read-only GitHub MCP tools wrapped with the tool guard."""
+    """Build GitHub MCP tools wrapped with the tool guard."""
+
+    github_read_only = environment.github_mcp_read_only
 
     client = MultiServerMCPClient(
         {
@@ -195,7 +203,7 @@ async def build_read_only_guarded_github_tools(
                     "-e",
                     "GITHUB_PERSONAL_ACCESS_TOKEN",
                     "-e",
-                    "GITHUB_READ_ONLY=1",
+                    f"GITHUB_READ_ONLY={github_read_only}",
                     "-e",
                     "GITHUB_TOOLSETS=repos,issues,pull_requests",
                     "ghcr.io/github/github-mcp-server",
@@ -203,7 +211,7 @@ async def build_read_only_guarded_github_tools(
                 "transport": "stdio",
                 "env": {
                     "GITHUB_PERSONAL_ACCESS_TOKEN": environment.github_pat,
-                    "GITHUB_READ_ONLY": "1",
+                    "GITHUB_READ_ONLY": github_read_only,
                     "GITHUB_TOOLSETS": "repos,issues,pull_requests",
                 },
             }
@@ -239,7 +247,7 @@ async def build_guardrails_runtime_parts(app_id: int) -> GuardrailsRuntimeParts:
     )
     rails = LLMRails(prompt_rule_config.rails_config, llm=guardrail_model)
     blocked_tools = blocked_tool_names_for_app(app_id=app_id)
-    tool_bundle = await build_read_only_guarded_github_tools(
+    tool_bundle = await build_guarded_github_tools(
         environment,
         blocked_tools,
     )

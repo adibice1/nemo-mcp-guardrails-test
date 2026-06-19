@@ -36,6 +36,16 @@ The work computer may use Postgres host port `5432`. The home computer uses
 host port `5433` because Windows PostgreSQL already owns `5432`. Keep each
 computer's local `.env` correct and never commit it.
 
+GitHub MCP read/write mode is controlled from `.env`:
+
+```env
+GITHUB_MCP_READ_ONLY=1  # safe default for scripted tests
+GITHUB_MCP_READ_ONLY=0  # manual local write testing
+```
+
+Restart `scripts/run_api.py` after flipping this value. The committed
+`.env.example` keeps the safe read-only default.
+
 ## Current Milestone
 
 The authenticated, app-scoped runtime foundation is implemented:
@@ -61,6 +71,22 @@ handles both single and bulk assignment:
 
 Assignment responses include readable app and policy labels beside numeric IDs
 for Swagger and the future frontend.
+
+Developer-friendly client-ID aliases are also available:
+
+```text
+GET  /apps/by-client-id/{client_id}
+GET  /apps/by-client-id/{client_id}/policy-assignments
+POST /apps/by-client-id/{client_id}/policy-assignments
+PUT  /apps/by-client-id/{client_id}/policy-assignments/{assignment_id}
+DELETE /apps/by-client-id/{client_id}/policy-assignments/{assignment_id}
+GET  /apps/{app_id}/effective-policy-assignments
+GET  /apps/by-client-id/{client_id}/effective-policy-assignments
+```
+
+These routes resolve `client_id` to the internal app ID and then use the same
+assignment logic. The effective-policy routes are read-only summaries that show
+mandatory global assignments and app-specific assignments for one app together.
 
 `POST /v1/guardrails/run` now builds that runtime context and executes the
 submitted message through the reusable guarded flow. It also supports hybrid
@@ -164,8 +190,8 @@ Recommended incremental slice:
    cleanup.
 ```
 
-Keep `GITHUB_READ_ONLY=1`. Do not add write-capable endpoint testing to the
-normal harness.
+Keep `GITHUB_MCP_READ_ONLY=1` for scripted tests. Do not add write-capable
+endpoint testing to the normal harness.
 
 ## Boundaries Not Yet Implemented
 

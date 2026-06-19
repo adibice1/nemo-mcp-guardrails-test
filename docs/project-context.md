@@ -112,6 +112,11 @@ The system successfully:
 - Uses `policy_ids` for assignment POST bodies, so the same endpoints handle
   single and bulk assignments. Assignment responses include readable app and
   policy labels for Swagger/frontend use.
+- Adds client-ID convenience routes under `/apps/by-client-id/{client_id}` so
+  developers do not need to remember numeric app IDs for app lookup or
+  policy-assignment management.
+- Exposes effective policy assignment views so developers can see global and
+  app-specific policies assigned to one app in one response.
 - Hashes API keys received by app create/update requests and never returns the
   plaintext key or stored hash in API responses.
 - Authenticates runtime HTTP requests through the reusable
@@ -121,7 +126,7 @@ The system successfully:
   verifies it through the self-cleaning `scripts/test_app_auth_http.py`.
 - Exposes `POST /v1/guardrails/run` as an authenticated runtime endpoint that
   builds app-scoped policies, prompt rules, blocked tools, NeMo rails, and
-  read-only GitHub MCP tools, then executes the submitted message. When
+  GitHub MCP tools, then executes the submitted message. When
   `conversation_id` is present, it persists the latest user/assistant turn in
   `conversation_messages`; when stored history exists, it is loaded and passed
   to the agent after trimming older turns by `NEMO_MAX_RUNTIME_CONTEXT_CHARS`.
@@ -143,7 +148,7 @@ User prompt
 -> if blocked: safe refusal and no MCP tool call
 -> if passed: LangChain agent
 -> src/nemo_mcp_guardrails/tool_guard.py wraps MCP tools and blocks restricted tool names before execution
--> GitHub MCP read-only tools
+-> GitHub MCP tools, normally read-only through `GITHUB_MCP_READ_ONLY=1`
 -> NeMo self_check_output using the app guardrail AzureChatOpenAI config
 -> final answer
 ```
@@ -244,10 +249,15 @@ src/nemo_mcp_guardrails/tool_guard.py
 -> blocks DB-derived restricted MCP tool names before execution
 
 GitHub MCP Docker env
--> GITHUB_READ_ONLY=1 prevents write tools from being offered during normal tests
+-> GITHUB_MCP_READ_ONLY=1 maps to GitHub MCP `GITHUB_READ_ONLY=1`
+-> prevents write tools from being offered during normal tests
 ```
 
-Normal full-run GitHub MCP tests should remain read-only. Future write-capable testing should use a separate opt-in harness with a throwaway repository, limited token, and explicit safety flags.
+Normal full-run GitHub MCP tests should remain read-only. Manual local write
+testing can set `GITHUB_MCP_READ_ONLY=0` in `.env`, then restart
+`scripts/run_api.py`. Future write-capable scripted testing should use a
+separate opt-in harness with a throwaway repository, limited token, and
+explicit safety flags.
 
 ## Important Implementation Detail
 

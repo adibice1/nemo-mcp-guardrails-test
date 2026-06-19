@@ -371,6 +371,14 @@ body accepts `policy_ids` so one endpoint handles both single and bulk
 assignment. Existing assignments are updated in place instead of duplicating
 rows.
 
+For developer convenience, the API also exposes a `client_id` alias:
+
+```text
+/apps/by-client-id/{client_id}/policy-assignments
+```
+
+This resolves the app first and stores the same `app_id` relationship.
+
 ### global_policy_assignments
 
 Mandatory rules applied to every app.

@@ -5,14 +5,18 @@ from sqlalchemy.orm import Session
 
 from nemo_mcp_guardrails.app_auth import hash_api_key
 from nemo_mcp_guardrails.api.assignment_serializers import (
+    app_label,
     serialize_app,
     serialize_app_policy_assignment,
+    serialize_effective_app_assignment,
+    serialize_effective_global_assignment,
 )
 from nemo_mcp_guardrails.api.app_schemas import (
     AppCreate,
     AppPolicyAssignmentRead,
     AppRead,
     AppUpdate,
+    EffectivePolicyAssignmentsRead,
     PolicyAssignmentCreate,
     PolicyAssignmentUpdate,
 )
@@ -20,6 +24,7 @@ from nemo_mcp_guardrails.database.connection import get_db
 from nemo_mcp_guardrails.database.models import (
     AppPolicyAssignmentRecord,
     AppRecord,
+    GlobalPolicyAssignmentRecord,
     LlmConfigRecord,
     PolicyRecord,
 )
@@ -32,6 +37,18 @@ def _require_app(app_id: int, db: Session) -> AppRecord:
     """Return one app or raise a not-found response."""
 
     app = db.get(AppRecord, app_id)
+    if not app:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="App not found",
+        )
+    return app
+
+
+def _require_app_by_client_id(client_id: str, db: Session) -> AppRecord:
+    """Return one app by client ID or raise a not-found response."""
+
+    app = db.scalar(select(AppRecord).where(AppRecord.client_id == client_id))
     if not app:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -75,6 +92,164 @@ def _validate_llm_config_ids(values: dict[str, object], db: Session) -> None:
             )
 
 
+def _list_policy_assignments_for_app(
+    app_id: int,
+    db: Session,
+) -> list[dict[str, object]]:
+    """Return serialized policy assignments for one app."""
+
+    assignments = list(
+        db.scalars(
+            select(AppPolicyAssignmentRecord)
+            .where(AppPolicyAssignmentRecord.app_id == app_id)
+            .order_by(AppPolicyAssignmentRecord.id)
+        )
+    )
+    return [serialize_app_policy_assignment(assignment) for assignment in assignments]
+
+
+def _assign_policies_to_app(
+    app_id: int,
+    payload: PolicyAssignmentCreate,
+    db: Session,
+) -> list[dict[str, object]]:
+    """Create or update one or more policy assignments for one app."""
+
+    policy_ids = _unique_policy_ids(payload.policy_ids)
+    _require_policies(policy_ids, db)
+
+    existing_assignments = list(
+        db.scalars(
+            select(AppPolicyAssignmentRecord).where(
+                AppPolicyAssignmentRecord.app_id == app_id,
+                AppPolicyAssignmentRecord.policy_id.in_(policy_ids),
+            )
+        )
+    )
+    assignments_by_policy_id = {
+        assignment.policy_id: assignment for assignment in existing_assignments
+    }
+    assignments: list[AppPolicyAssignmentRecord] = []
+
+    for policy_id in policy_ids:
+        assignment = assignments_by_policy_id.get(policy_id)
+        if assignment is None:
+            assignment = AppPolicyAssignmentRecord(
+                app_id=app_id,
+                policy_id=policy_id,
+                enabled=payload.enabled,
+            )
+            db.add(assignment)
+        else:
+            assignment.enabled = payload.enabled
+        assignments.append(assignment)
+
+    try:
+        db.commit()
+    except IntegrityError as error:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="One or more policies could not be assigned to the app",
+        ) from error
+
+    for assignment in assignments:
+        db.refresh(assignment)
+    return [serialize_app_policy_assignment(assignment) for assignment in assignments]
+
+
+def _require_app_policy_assignment(
+    app_id: int,
+    assignment_id: int,
+    db: Session,
+) -> AppPolicyAssignmentRecord:
+    """Return one app policy assignment or raise a not-found response."""
+
+    assignment = db.scalar(
+        select(AppPolicyAssignmentRecord).where(
+            AppPolicyAssignmentRecord.id == assignment_id,
+            AppPolicyAssignmentRecord.app_id == app_id,
+        )
+    )
+    if not assignment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="App policy assignment not found",
+        )
+    return assignment
+
+
+def _update_app_policy_assignment(
+    app_id: int,
+    assignment_id: int,
+    payload: PolicyAssignmentUpdate,
+    db: Session,
+) -> dict[str, object]:
+    """Enable or disable one app-specific policy assignment."""
+
+    assignment = _require_app_policy_assignment(app_id, assignment_id, db)
+    assignment.enabled = payload.enabled
+    db.commit()
+    db.refresh(assignment)
+    return serialize_app_policy_assignment(assignment)
+
+
+def _delete_app_policy_assignment(
+    app_id: int,
+    assignment_id: int,
+    db: Session,
+) -> None:
+    """Delete one app-specific policy assignment."""
+
+    assignment = _require_app_policy_assignment(app_id, assignment_id, db)
+    db.delete(assignment)
+    db.commit()
+
+
+def _effective_policy_assignments_for_app(
+    app: AppRecord,
+    db: Session,
+) -> dict[str, object]:
+    """Return global and app-specific policy assignments for one app."""
+
+    global_assignments = list(
+        db.scalars(
+            select(GlobalPolicyAssignmentRecord).order_by(
+                GlobalPolicyAssignmentRecord.id
+            )
+        )
+    )
+    app_assignments = list(
+        db.scalars(
+            select(AppPolicyAssignmentRecord)
+            .where(AppPolicyAssignmentRecord.app_id == app.id)
+            .order_by(AppPolicyAssignmentRecord.id)
+        )
+    )
+
+    serialized_global = [
+        serialize_effective_global_assignment(assignment)
+        for assignment in global_assignments
+    ]
+    serialized_app = [
+        serialize_effective_app_assignment(assignment)
+        for assignment in app_assignments
+    ]
+    all_assignments = serialized_global + serialized_app
+    enabled_count = sum(1 for assignment in all_assignments if assignment["enabled"])
+
+    return {
+        "app_id": app.id,
+        "app_label": app_label(app),
+        "global_assignment_count": len(serialized_global),
+        "app_assignment_count": len(serialized_app),
+        "enabled_assignment_count": enabled_count,
+        "disabled_assignment_count": len(all_assignments) - enabled_count,
+        "global_assignments": serialized_global,
+        "app_assignments": serialized_app,
+    }
+
+
 @router.get("", response_model=list[AppRead])
 def list_apps(db: Session = Depends(get_db)) -> list[dict[str, object]]:
     """Return all client apps."""
@@ -105,11 +280,110 @@ def create_app(payload: AppCreate, db: Session = Depends(get_db)) -> dict[str, o
     return serialize_app(app)
 
 
+@router.get("/by-client-id/{client_id}", response_model=AppRead)
+def get_app_by_client_id(
+    client_id: str,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    """Return one client app by client ID."""
+
+    return serialize_app(_require_app_by_client_id(client_id, db))
+
+
+@router.get(
+    "/by-client-id/{client_id}/effective-policy-assignments",
+    response_model=EffectivePolicyAssignmentsRead,
+)
+def get_effective_policy_assignments_by_client_id(
+    client_id: str,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    """Return global and app-specific policy assignments by client ID."""
+
+    app = _require_app_by_client_id(client_id, db)
+    return _effective_policy_assignments_for_app(app, db)
+
+
+@router.get(
+    "/by-client-id/{client_id}/policy-assignments",
+    response_model=list[AppPolicyAssignmentRead],
+)
+def list_app_policy_assignments_by_client_id(
+    client_id: str,
+    db: Session = Depends(get_db),
+) -> list[dict[str, object]]:
+    """Return all policy assignments belonging to one app by client ID."""
+
+    app = _require_app_by_client_id(client_id, db)
+    return _list_policy_assignments_for_app(app.id, db)
+
+
+@router.post(
+    "/by-client-id/{client_id}/policy-assignments",
+    response_model=list[AppPolicyAssignmentRead],
+    status_code=status.HTTP_201_CREATED,
+)
+def create_app_policy_assignment_by_client_id(
+    client_id: str,
+    payload: PolicyAssignmentCreate,
+    db: Session = Depends(get_db),
+) -> list[dict[str, object]]:
+    """Assign one or more reusable policies to one app by client ID."""
+
+    app = _require_app_by_client_id(client_id, db)
+    return _assign_policies_to_app(app.id, payload, db)
+
+
+@router.put(
+    "/by-client-id/{client_id}/policy-assignments/{assignment_id}",
+    response_model=AppPolicyAssignmentRead,
+)
+def update_app_policy_assignment_by_client_id(
+    client_id: str,
+    assignment_id: int,
+    payload: PolicyAssignmentUpdate,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    """Enable or disable one app-specific policy assignment by client ID."""
+
+    app = _require_app_by_client_id(client_id, db)
+    return _update_app_policy_assignment(app.id, assignment_id, payload, db)
+
+
+@router.delete(
+    "/by-client-id/{client_id}/policy-assignments/{assignment_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_app_policy_assignment_by_client_id(
+    client_id: str,
+    assignment_id: int,
+    db: Session = Depends(get_db),
+) -> None:
+    """Delete one app-specific policy assignment by client ID."""
+
+    app = _require_app_by_client_id(client_id, db)
+    _delete_app_policy_assignment(app.id, assignment_id, db)
+
+
 @router.get("/{app_id}", response_model=AppRead)
 def get_app(app_id: int, db: Session = Depends(get_db)) -> dict[str, object]:
     """Return one client app by ID."""
 
     return serialize_app(_require_app(app_id, db))
+
+
+@router.get(
+    "/{app_id}/effective-policy-assignments",
+    response_model=EffectivePolicyAssignmentsRead,
+)
+def get_effective_policy_assignments(
+    app_id: int,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    """Return global and app-specific policy assignments for one app."""
+
+    app = _require_app(app_id, db)
+    return _effective_policy_assignments_for_app(app, db)
 
 
 @router.put("/{app_id}", response_model=AppRead)
@@ -163,14 +437,7 @@ def list_app_policy_assignments(
     """Return all policy assignments belonging to one app."""
 
     _require_app(app_id, db)
-    assignments = list(
-        db.scalars(
-            select(AppPolicyAssignmentRecord)
-            .where(AppPolicyAssignmentRecord.app_id == app_id)
-            .order_by(AppPolicyAssignmentRecord.id)
-        )
-    )
-    return [serialize_app_policy_assignment(assignment) for assignment in assignments]
+    return _list_policy_assignments_for_app(app_id, db)
 
 
 @router.post(
@@ -186,47 +453,7 @@ def create_app_policy_assignment(
     """Assign one or more reusable policies to one client app."""
 
     _require_app(app_id, db)
-    policy_ids = _unique_policy_ids(payload.policy_ids)
-    _require_policies(policy_ids, db)
-
-    existing_assignments = list(
-        db.scalars(
-            select(AppPolicyAssignmentRecord).where(
-                AppPolicyAssignmentRecord.app_id == app_id,
-                AppPolicyAssignmentRecord.policy_id.in_(policy_ids),
-            )
-        )
-    )
-    assignments_by_policy_id = {
-        assignment.policy_id: assignment for assignment in existing_assignments
-    }
-    assignments: list[AppPolicyAssignmentRecord] = []
-
-    for policy_id in policy_ids:
-        assignment = assignments_by_policy_id.get(policy_id)
-        if assignment is None:
-            assignment = AppPolicyAssignmentRecord(
-                app_id=app_id,
-                policy_id=policy_id,
-                enabled=payload.enabled,
-            )
-            db.add(assignment)
-        else:
-            assignment.enabled = payload.enabled
-        assignments.append(assignment)
-
-    try:
-        db.commit()
-    except IntegrityError as error:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="One or more policies could not be assigned to the app",
-        ) from error
-
-    for assignment in assignments:
-        db.refresh(assignment)
-    return [serialize_app_policy_assignment(assignment) for assignment in assignments]
+    return _assign_policies_to_app(app_id, payload, db)
 
 
 @router.put(
@@ -241,22 +468,8 @@ def update_app_policy_assignment(
 ) -> dict[str, object]:
     """Enable or disable one app-specific policy assignment."""
 
-    assignment = db.scalar(
-        select(AppPolicyAssignmentRecord).where(
-            AppPolicyAssignmentRecord.id == assignment_id,
-            AppPolicyAssignmentRecord.app_id == app_id,
-        )
-    )
-    if not assignment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="App policy assignment not found",
-        )
-
-    assignment.enabled = payload.enabled
-    db.commit()
-    db.refresh(assignment)
-    return serialize_app_policy_assignment(assignment)
+    _require_app(app_id, db)
+    return _update_app_policy_assignment(app_id, assignment_id, payload, db)
 
 
 @router.delete(
@@ -270,17 +483,5 @@ def delete_app_policy_assignment(
 ) -> None:
     """Delete one app-specific policy assignment."""
 
-    assignment = db.scalar(
-        select(AppPolicyAssignmentRecord).where(
-            AppPolicyAssignmentRecord.id == assignment_id,
-            AppPolicyAssignmentRecord.app_id == app_id,
-        )
-    )
-    if not assignment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="App policy assignment not found",
-        )
-
-    db.delete(assignment)
-    db.commit()
+    _require_app(app_id, db)
+    _delete_app_policy_assignment(app_id, assignment_id, db)

@@ -123,3 +123,37 @@ def serialize_global_policy_assignment(
     }
     data.update(_policy_details(assignment.policy))
     return data
+
+
+def serialize_effective_global_assignment(
+    assignment: GlobalPolicyAssignmentRecord,
+) -> dict[str, Any]:
+    """Serialize one global assignment for an app effective-policy view."""
+
+    data = {
+        "assignment_id": assignment.id,
+        "scope": "global",
+        "policy_id": assignment.policy_id,
+        "enabled": assignment.enabled,
+        "created_at": assignment.created_at,
+        "updated_at": assignment.updated_at,
+    }
+    data.update(_policy_details(assignment.policy))
+    return data
+
+
+def serialize_effective_app_assignment(
+    assignment: AppPolicyAssignmentRecord,
+) -> dict[str, Any]:
+    """Serialize one app assignment for an app effective-policy view."""
+
+    data = {
+        "assignment_id": assignment.id,
+        "scope": "app",
+        "policy_id": assignment.policy_id,
+        "enabled": assignment.enabled,
+        "created_at": assignment.created_at,
+        "updated_at": assignment.updated_at,
+    }
+    data.update(_policy_details(assignment.policy))
+    return data

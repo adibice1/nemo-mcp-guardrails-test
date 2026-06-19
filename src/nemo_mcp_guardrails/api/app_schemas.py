@@ -123,3 +123,33 @@ class GlobalPolicyAssignmentRead(BaseModel):
     enabled: bool
     created_at: datetime
     updated_at: datetime
+
+
+class EffectivePolicyAssignmentRead(BaseModel):
+    """Response body for one effective app/global policy assignment."""
+
+    assignment_id: int
+    scope: str
+    policy_id: int
+    policy_label: str
+    policy_type: str
+    connector: str | None
+    action: str | None
+    resource: str | None
+    category: str | None
+    enabled: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class EffectivePolicyAssignmentsRead(BaseModel):
+    """Response body for all policies assigned to one app."""
+
+    app_id: int
+    app_label: str
+    global_assignment_count: int
+    app_assignment_count: int
+    enabled_assignment_count: int
+    disabled_assignment_count: int
+    global_assignments: list[EffectivePolicyAssignmentRead]
+    app_assignments: list[EffectivePolicyAssignmentRead]

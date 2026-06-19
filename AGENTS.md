@@ -30,7 +30,7 @@ User prompt
 -> NeMo Guardrails input rail using the app's guardrail AzureChatOpenAI config
 -> LangChain agent
 -> `src/nemo_mcp_guardrails/tool_guard.py` wraps GitHub MCP tools and blocks DB-derived restricted tool names before execution
--> GitHub MCP tools in read-only Docker mode
+-> GitHub MCP tools, normally in read-only Docker mode unless local `.env` explicitly sets `GITHUB_MCP_READ_ONLY=0`
 -> NeMo Guardrails output rail using the app's guardrail AzureChatOpenAI config
 -> final model answer
 
@@ -63,7 +63,7 @@ Blocked actions:
 - `.env.example` stores placeholder values and should be committed.
 - `config/config.yml` should be committed but must not contain real API keys.
 - Azure OpenAI credentials are loaded from `.env`.
-- GitHub MCP runs in Docker with `GITHUB_READ_ONLY=1`.
+- GitHub MCP runs in Docker with `GITHUB_READ_ONLY` derived from `.env` `GITHUB_MCP_READ_ONLY`; the committed default is `1` for read-only mode.
 - Current input blocking is handled by NeMo `self check input` using `config/prompts.yml` plus enabled DB rules from `compiled_policy_rules`.
 - Current output checking is handled by NeMo `self check output` using `config/prompts.yml` plus enabled DB rules from `compiled_policy_rules`.
 - `config/config.yml` enables both `self check input` and `self check output`.
@@ -96,22 +96,24 @@ Blocked actions:
 - `app_policy_assignments` and `global_policy_assignments` reference the existing reusable definitions in `policies`. The connector-independent credential output policy is globally assigned; GitHub write policies remain unassigned.
 - FastAPI client-app CRUD lives under `/apps`; nested app-policy-assignment CRUD lives under `/apps/{app_id}/policy-assignments`; global assignment CRUD lives under `/global-policy-assignments`.
 - App/global assignment POST bodies use `policy_ids`, so the same endpoints handle single and bulk assignment. Assignment responses include readable app and policy labels beside numeric IDs for Swagger/frontend use.
+- Developer-friendly client-ID aliases exist under `/apps/by-client-id/{client_id}` and `/apps/by-client-id/{client_id}/policy-assignments`; they resolve to the same internal app rows and full assignment CRUD logic.
+- Effective policy assignment summaries exist under `/apps/{app_id}/effective-policy-assignments` and `/apps/by-client-id/{client_id}/effective-policy-assignments`; they return global plus app-specific assignments with policy IDs, assignment IDs, labels, and enabled flags.
 - App create/update accepts an API key, stores only its SHA-256 hash, and never returns the plaintext key or hash. `src/nemo_mcp_guardrails/app_auth.py` centralizes hashing and constant-time verification; `authenticate_app()` accepts only matching, authorized client ID/API-key pairs.
 - `scripts/test_app_auth.py` is a self-cleaning Postgres authentication diagnostic covering valid, wrong-key, unknown-client, and unauthorized-app cases.
 - `src/nemo_mcp_guardrails/api/auth.py` provides the reusable FastAPI `require_authenticated_app` dependency. It reads `X-App-ID` and `X-API-Key`, authenticates before runtime work begins, and returns the same generic `401` response for every invalid case.
 - `GET /v1/guardrails/auth-check` is the first protected runtime proof endpoint. It verifies credentials and returns only the authenticated app identity; it does not load policies, NeMo, Docker, or MCP tools.
-- `POST /v1/guardrails/run` is now the authenticated guarded runtime endpoint. It validates app credentials, loads stored `conversation_messages` for the app conversation, bootstraps from client-supplied `conversation_history` when needed, trims older turns by `NEMO_MAX_RUNTIME_CONTEXT_CHARS`, builds app-scoped NeMo rails and read-only guarded GitHub MCP tools, calls `execute_guarded_message()`, stores the latest user/assistant turn when `conversation_id` is present, and returns a JSON execution response with history metadata.
+- `POST /v1/guardrails/run` is now the authenticated guarded runtime endpoint. It validates app credentials, loads stored `conversation_messages` for the app conversation, bootstraps from client-supplied `conversation_history` when needed, trims older turns by `NEMO_MAX_RUNTIME_CONTEXT_CHARS`, builds app-scoped NeMo rails and guarded GitHub MCP tools, calls `execute_guarded_message()`, stores the latest user/assistant turn when `conversation_id` is present, and returns a JSON execution response with history metadata.
 - `src/nemo_mcp_guardrails/runtime_factory.py` respects separate `main_llm_config_id` and `guardrail_llm_config_id` values on the authenticated app. The guardrail config is injected into NeMo rails, and the main config is used by the LangChain agent. Missing config IDs fall back to `.env` Azure OpenAI settings. Only Azure OpenAI-compatible provider rows are executable for now; other providers return a clear unsupported-provider error.
 - `src/nemo_mcp_guardrails/guarded_execution.py` now owns the reusable single-request sequence: input rail, early block, agent/guarded tools with optional trimmed history, controlled `tool_error` responses for connector `ToolException` failures, output rail, controlled blocked responses for Azure output `content_filter` failures, and structured result. `scripts/test_nemo_mcp.py` still chooses test prompts and prints the familiar workflow sections.
 - `scripts/test_app_auth_http.py` is a self-cleaning HTTP authentication diagnostic covering missing headers, wrong keys, unknown clients, unauthorized apps, and valid credentials.
 - The management/admin CRUD endpoints are not authenticated yet. Do not describe the current HTTP dependency as protecting `/apps`, `/policies`, or assignment CRUD.
-- Normal full-run GitHub MCP tests should keep `GITHUB_READ_ONLY=1`. Future write-capable testing should be a separate opt-in harness with a throwaway repo and limited token.
+- Normal full-run GitHub MCP tests should keep `GITHUB_MCP_READ_ONLY=1`. Manual local write testing can set `GITHUB_MCP_READ_ONLY=0` in `.env` and restart the API. Future write-capable scripted testing should be a separate opt-in harness with a throwaway repo and limited token.
 - Do not add a custom `config/policies.yml` yet unless explicitly choosing to prototype the future admin/backend policy store. It is not a standard NeMo Guardrails file.
 
 ## When Editing This Project
 
 - Do not add real API keys or PATs to committed files.
-- Preserve read-only GitHub MCP mode.
+- Preserve the safe committed default for GitHub MCP mode; do not hardcode write mode into committed code.
 - Keep blocked write-action tests separate from allowed read tests.
 - Prefer small incremental tests.
 - Add short docstrings to new Python functions/classes.
@@ -152,7 +154,7 @@ POST /v1/guardrails/run executes app-scoped guarded requests
 runtime_schemas.py defines the future-compatible message request and execution response
 guarded_execution.py coordinates input rail, agent/tools, and output rail
 test_nemo_mcp.py displays GuardedExecutionResult without owning coordination
-runtime_factory.py selects app main/guardrail LLM configs, then builds Azure-backed NeMo rails, read-only GitHub MCP tools, and the LangChain agent
+runtime_factory.py selects app main/guardrail LLM configs, then builds Azure-backed NeMo rails, env-configured GitHub MCP tools, and the LangChain agent
 -> make prompts.yml generic and DB-policy driven
 -> add HTTP integration coverage for allowed and blocked runtime cases
 -> automate policy compilation/invalidation

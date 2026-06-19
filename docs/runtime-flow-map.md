@@ -44,6 +44,18 @@ POST /apps/{app_id}/policy-assignments
 -> validate app and reusable policy
 -> create or update one or more app-specific assignments from policy_ids
 
+POST /apps/by-client-id/{client_id}/policy-assignments
+-> resolve client_id to app_id
+-> use the same app-specific assignment flow
+
+PUT/DELETE /apps/by-client-id/{client_id}/policy-assignments/{assignment_id}
+-> resolve client_id to app_id
+-> use the same app-specific update/delete flow
+
+GET /apps/{app_id}/effective-policy-assignments
+GET /apps/by-client-id/{client_id}/effective-policy-assignments
+-> return mandatory global assignments and app-specific assignments together
+
 POST /global-policy-assignments
 -> validate reusable policies
 -> create or update one or more mandatory global assignments from policy_ids
@@ -65,6 +77,14 @@ Assignment POST bodies use the same shape for single and bulk operations:
 
 Assignment responses include readable app and policy labels such as
 `app_label` and `policy_label` beside the numeric IDs.
+
+Developers can use either the numeric app ID or the app `client_id` in Swagger.
+The `client_id` routes are only convenience aliases; assignments are still
+stored against the app's internal `app_id`.
+
+The effective-policy view is read-only. It exists so developers can quickly
+answer "which policies currently apply to this app?" without manually checking
+both global and app assignment tables.
 
 This is a concise map of how the current project moves from database policies to the terminal output shown by `scripts/test_nemo_mcp.py`.
 

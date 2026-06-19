@@ -21,14 +21,15 @@ from nemo_mcp_guardrails.database.models import (
 TEMP_API_KEY = "temporary-assignment-api-key"
 
 
-def create_temporary_records() -> tuple[int, list[int]]:
+def create_temporary_records() -> tuple[int, str, list[int]]:
     """Create one temporary app and two reusable policies."""
 
     suffix = uuid4().hex
+    client_id = f"assignment-api-{suffix}"
     with SessionLocal() as db:
         app_record = AppRecord(
             name=f"Temporary Assignment App {suffix}",
-            client_id=f"assignment-api-{suffix}",
+            client_id=client_id,
             api_key_hash=hash_api_key(TEMP_API_KEY),
             authorized=True,
         )
@@ -55,7 +56,7 @@ def create_temporary_records() -> tuple[int, list[int]]:
         for policy in policies:
             db.refresh(policy)
 
-        return app_record.id, [policy.id for policy in policies]
+        return app_record.id, client_id, [policy.id for policy in policies]
 
 
 def delete_temporary_records(app_id: int, policy_ids: list[int]) -> None:
@@ -107,7 +108,7 @@ def count_global_assignments(policy_ids: list[int]) -> int:
 def main() -> None:
     """Verify assignment APIs support single/bulk upserts and labels."""
 
-    app_id, policy_ids = create_temporary_records()
+    app_id, client_id, policy_ids = create_temporary_records()
 
     try:
         with TestClient(app) as client:
@@ -116,6 +117,10 @@ def main() -> None:
             app_body = app_response.json()
             assert "display_label" in app_body
             assert app_body["display_label"].startswith("Temporary Assignment App")
+
+            app_by_client_id_response = client.get(f"/apps/by-client-id/{client_id}")
+            assert app_by_client_id_response.status_code == 200
+            assert app_by_client_id_response.json()["id"] == app_id
 
             app_bulk = client.post(
                 f"/apps/{app_id}/policy-assignments",
@@ -140,6 +145,36 @@ def main() -> None:
             assert app_single_body[0]["enabled"] is False
             assert count_app_assignments(app_id) == 2
 
+            app_client_id_list = client.get(
+                f"/apps/by-client-id/{client_id}/policy-assignments"
+            )
+            assert app_client_id_list.status_code == 200, app_client_id_list.text
+            assert len(app_client_id_list.json()) == 2
+
+            app_client_id_update = client.post(
+                f"/apps/by-client-id/{client_id}/policy-assignments",
+                json={"policy_ids": [policy_ids[0]], "enabled": True},
+            )
+            assert app_client_id_update.status_code == 201
+            assert app_client_id_update.json()[0]["policy_id"] == policy_ids[0]
+            assert app_client_id_update.json()[0]["enabled"] is True
+            assert count_app_assignments(app_id) == 2
+
+            assignment_id = app_client_id_update.json()[0]["id"]
+            app_client_id_put = client.put(
+                f"/apps/by-client-id/{client_id}/policy-assignments/{assignment_id}",
+                json={"enabled": False},
+            )
+            assert app_client_id_put.status_code == 200, app_client_id_put.text
+            assert app_client_id_put.json()["id"] == assignment_id
+            assert app_client_id_put.json()["enabled"] is False
+
+            app_client_id_delete = client.delete(
+                f"/apps/by-client-id/{client_id}/policy-assignments/{assignment_id}"
+            )
+            assert app_client_id_delete.status_code == 204
+            assert count_app_assignments(app_id) == 1
+
             global_bulk = client.post(
                 "/global-policy-assignments",
                 json={"policy_ids": policy_ids, "enabled": True},
@@ -162,10 +197,47 @@ def main() -> None:
             assert global_single_body[0]["enabled"] is False
             assert count_global_assignments(policy_ids) == 2
 
+            effective_by_id = client.get(
+                f"/apps/{app_id}/effective-policy-assignments"
+            )
+            assert effective_by_id.status_code == 200, effective_by_id.text
+            effective_body = effective_by_id.json()
+            assert effective_body["app_id"] == app_id
+            assert effective_body["app_label"].startswith("Temporary Assignment App")
+            assert effective_body["global_assignment_count"] >= 2
+            assert effective_body["app_assignment_count"] == 1
+            assert effective_body["enabled_assignment_count"] >= 1
+            assert effective_body["disabled_assignment_count"] >= 1
+
+            app_policy_ids = {
+                item["policy_id"] for item in effective_body["app_assignments"]
+            }
+            global_policy_ids = {
+                item["policy_id"] for item in effective_body["global_assignments"]
+            }
+            assert policy_ids[1] in app_policy_ids
+            assert set(policy_ids).issubset(global_policy_ids)
+            assert all(
+                "assignment_id" in item and "policy_label" in item
+                for item in effective_body["global_assignments"]
+            )
+            assert all(
+                "assignment_id" in item and item["scope"] == "app"
+                for item in effective_body["app_assignments"]
+            )
+
+            effective_by_client_id = client.get(
+                f"/apps/by-client-id/{client_id}/effective-policy-assignments"
+            )
+            assert effective_by_client_id.status_code == 200
+            assert effective_by_client_id.json()["app_id"] == app_id
+
         print("Policy assignment API checks passed.")
         print("- App responses include display_label.")
+        print("- App lookup and assignment CRUD aliases work with client_id.")
         print("- App policy assignments support single and bulk policy_ids.")
         print("- Global policy assignments support single and bulk policy_ids.")
+        print("- Effective policy assignment summaries include app and global scopes.")
         print("- Existing assignments update in place instead of duplicating rows.")
         print("- Assignment responses include readable labels.")
 
