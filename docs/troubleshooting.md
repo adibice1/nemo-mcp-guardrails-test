@@ -177,28 +177,28 @@ If the next machine needs to verify the current policy-object prototype, run:
 ```powershell
 python src/nemo_mcp_guardrails/policy_compiler.py
 python scripts/seed_normalized_policy_metadata.py
-python scripts/test_tool_guard.py
-python scripts/test_policy_loader.py
+python tests/test_tool_guard.py
+python tests/test_policy_loader.py
 python scripts/debug_nemo_output_check.py
-python -m py_compile src/nemo_mcp_guardrails/app_auth.py src/nemo_mcp_guardrails/guarded_execution.py src/nemo_mcp_guardrails/api/auth.py src/nemo_mcp_guardrails/api/runtime.py src/nemo_mcp_guardrails/api/runtime_schemas.py src/nemo_mcp_guardrails/policy_compiler.py src/nemo_mcp_guardrails/tool_guard.py src/nemo_mcp_guardrails/database/models.py src/nemo_mcp_guardrails/database/policy_loader.py src/nemo_mcp_guardrails/database/test_case_loader.py src/nemo_mcp_guardrails/database/prompt_rule_loader.py src/nemo_mcp_guardrails/prompt_rule_compiler.py scripts/seed_normalized_policy_metadata.py scripts/test_nemo_mcp.py scripts/test_tool_guard.py scripts/test_policy_loader.py scripts/test_app_policy_scope.py scripts/test_app_auth.py scripts/test_app_auth_http.py scripts/debug_nemo_self_check.py scripts/debug_nemo_output_check.py
-python scripts/test_nemo_mcp.py
+python -m py_compile src/nemo_mcp_guardrails/app_auth.py src/nemo_mcp_guardrails/guarded_execution.py src/nemo_mcp_guardrails/runtime_factory.py src/nemo_mcp_guardrails/api/app_schemas.py src/nemo_mcp_guardrails/api/apps.py src/nemo_mcp_guardrails/api/assignment_serializers.py src/nemo_mcp_guardrails/api/auth.py src/nemo_mcp_guardrails/api/runtime.py src/nemo_mcp_guardrails/api/runtime_schemas.py src/nemo_mcp_guardrails/policy_compiler.py src/nemo_mcp_guardrails/policy_rule_service.py src/nemo_mcp_guardrails/tool_guard.py src/nemo_mcp_guardrails/database/models.py src/nemo_mcp_guardrails/database/conversation_store.py src/nemo_mcp_guardrails/database/policy_loader.py src/nemo_mcp_guardrails/database/test_case_loader.py src/nemo_mcp_guardrails/database/prompt_rule_loader.py src/nemo_mcp_guardrails/prompt_rule_compiler.py scripts/seed_normalized_policy_metadata.py tests/test_nemo_mcp.py tests/test_tool_guard.py tests/test_policy_loader.py tests/test_app_policy_scope.py tests/test_app_auth.py tests/test_app_auth_http.py tests/test_policy_auto_compile.py tests/test_guardrails_run_http.py tests/test_runtime_connector_access.py tests/test_app_connector_api.py tests/test_runtime_connector_credentials.py tests/test_runtime_llm_selection.py scripts/debug_nemo_self_check.py scripts/debug_nemo_output_check.py
+python tests/test_nemo_mcp.py
 ```
 
 Expected:
 
 - `src/nemo_mcp_guardrails/policy_compiler.py` prints all default GitHub write input policy objects, a combined generated tool denylist, and generated output rail rules.
-- `scripts/test_tool_guard.py` reports every DB-derived compiler-generated blocked tool was blocked before execution.
-- `scripts/test_policy_loader.py` reports enabled Postgres input/output policies and their compiled artifacts.
+- `tests/test_tool_guard.py` reports every DB-derived compiler-generated blocked tool was blocked before execution.
+- `tests/test_policy_loader.py` reports enabled Postgres input/output policies and their compiled artifacts.
 - `scripts/seed_normalized_policy_metadata.py` reports `connectors: global, github`, `github connector actions: 11`, `github connector resources: 10`, `github connector tool mappings: 33`, and `allowed test expected-tool links: 3`.
 - `scripts/debug_nemo_output_check.py` reports output rail checks passed.
-- `scripts/test_nemo_mcp.py` prints `NeMo prompt policy rules loaded`, `Runtime input policies loaded`, blocks generated DB-policy prompts through NeMo input rails, and prints `NEMO OUTPUT RAIL RESULT` before final responses.
+- `tests/test_nemo_mcp.py` prints `NeMo prompt policy rules loaded`, `Runtime input policies loaded`, blocks generated DB-policy prompts through NeMo input rails, and prints `NEMO OUTPUT RAIL RESULT` before final responses.
 
-If `scripts/test_nemo_mcp.py` passes allowed read prompts but generated policy prompts are not present, check:
+If `tests/test_nemo_mcp.py` passes allowed read prompts but generated policy prompts are not present, check:
 
 - `src/nemo_mcp_guardrails/database/policy_loader.py` can connect to Postgres.
 - Enabled input policy rows exist in the `policies` table.
 - Rows include `policy_type=input`, `enabled=true`, `connector`, `action`, `resource`, and `effect`.
-- `scripts/test_nemo_mcp.py` calls `compile_policy_test_prompts(load_input_policy_objects())`.
+- `tests/test_nemo_mcp.py` calls `compile_policy_test_prompts(load_input_policy_objects())`.
 
 If the database is unavailable or has no valid enabled input rows, `policy_loader.py` falls back to `DEFAULT_INPUT_POLICY_OBJECTS`.
 
@@ -350,11 +350,11 @@ load enabled global assignments plus enabled assignments for that app.
 Inspect both scopes with:
 
 ```powershell
-python scripts/test_policy_loader.py
-python scripts/test_policy_loader.py --app-id 999999
-python scripts/test_app_policy_scope.py
-python scripts/test_app_auth.py
-python scripts/test_app_auth_http.py
+python tests/test_policy_loader.py
+python tests/test_policy_loader.py --app-id 999999
+python tests/test_app_policy_scope.py
+python tests/test_app_auth.py
+python tests/test_app_auth_http.py
 ```
 
 `tool_guard.py` preserves a no-app all-enabled compatibility constant, but it
@@ -366,7 +366,7 @@ guarded execution.
 The full runner also accepts testing-only app scope:
 
 ```powershell
-python scripts/test_nemo_mcp.py --app-id 999999
+python tests/test_nemo_mcp.py --app-id 999999
 ```
 
 This does not enforce app authentication. Although service-level credential
@@ -376,14 +376,14 @@ purposes because it does not call the verifier.
 Credential verification itself can be checked with:
 
 ```powershell
-python scripts/test_app_auth.py
+python tests/test_app_auth.py
 ```
 
 The service verifier rejects wrong keys, unknown client IDs, and unauthorized
 apps with the same result. HTTP enforcement can be checked with:
 
 ```powershell
-python scripts/test_app_auth_http.py
+python tests/test_app_auth_http.py
 ```
 
 `GET /v1/guardrails/auth-check` returns the same generic `401` for missing

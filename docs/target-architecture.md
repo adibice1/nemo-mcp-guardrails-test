@@ -491,7 +491,10 @@ completed: select separate app main-agent and guardrail LLM configs
 completed: make prompts.yml generic and DB-policy driven
 completed: automate policy CRUD compilation and invalidation
 completed: add allowed/blocked HTTP runtime integration coverage
-next:      enforce app connector access during runtime construction
+completed: enforce app connector access during runtime construction
+completed: add app connector management APIs
+completed: resolve env:VAR_NAME connector credentials through credential_reference
+next:      add production secrets-manager credential resolution
 ```
 
 See `docs/open-work-backlog.md` for the active backlog and unfinished

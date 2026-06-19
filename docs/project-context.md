@@ -66,7 +66,8 @@ Backend/database direction:
 ```text
 config/                              NeMo Guardrails config
 docs/                                handoff and architecture docs
-scripts/                             runnable debug/test scripts
+scripts/                             runnable utilities, migrations, and debug scripts
+tests/                               self-cleaning verification scripts
 src/nemo_mcp_guardrails/             application/library code
 src/nemo_mcp_guardrails/database/    future database code location
 src/nemo_mcp_guardrails/helper/      helper package
@@ -88,12 +89,12 @@ The system successfully:
 - Keeps deterministic Python pre-checks only as a comparison/safety fallback.
 - Wraps MCP tools with `src/nemo_mcp_guardrails/tool_guard.py` so restricted tool names can be blocked before execution.
 - Uses `src/nemo_mcp_guardrails/policy_compiler.py` to prototype admin-style policy objects and generated policy artifacts.
-- Feeds curated policy-generated tests into `scripts/test_nemo_mcp.py`.
+- Feeds curated policy-generated tests into `tests/test_nemo_mcp.py`.
 - Stores prototype policy rows in local Postgres through FastAPI CRUD endpoints.
 - Previews compiler output from enabled database policy rows through `POST /policies/compile-preview`.
 - Loads enabled Postgres input policies into runtime code through `src/nemo_mcp_guardrails/database/policy_loader.py`.
-- Uses DB-loaded input policies to compile `tool_guard.py` blocked tools and `scripts/test_nemo_mcp.py` generated blocked tests.
-- Verifies DB policy loading through `scripts/test_policy_loader.py`.
+- Uses DB-loaded input policies to compile `tool_guard.py` blocked tools and `tests/test_nemo_mcp.py` generated blocked tests.
+- Verifies DB policy loading through `tests/test_policy_loader.py`.
 - Stores compiled NeMo rule text in `compiled_policy_rules`.
 - Automatically refreshes `compiled_policy_rules` when policies are created or
   updated through the policy CRUD API.
@@ -127,7 +128,7 @@ The system successfully:
   `require_authenticated_app` FastAPI dependency using `X-App-ID` and
   `X-API-Key`.
 - Exposes `GET /v1/guardrails/auth-check` as a protected proof endpoint and
-  verifies it through the self-cleaning `scripts/test_app_auth_http.py`.
+  verifies it through the self-cleaning `tests/test_app_auth_http.py`.
 - Exposes `POST /v1/guardrails/run` as an authenticated runtime endpoint that
   builds app-scoped policies, prompt rules, blocked tools, NeMo rails, and
   GitHub MCP tools, then executes the submitted message. When
@@ -194,7 +195,7 @@ The compiler currently generates:
 
 - NeMo self-check rule text preview
 - compiler-generated blocked MCP tool names
-- curated blocked test prompts consumed by `scripts/test_nemo_mcp.py`
+- curated blocked test prompts consumed by `tests/test_nemo_mcp.py`
 - output self-check rule previews for credential/secret output policies
 
 `compile_policy_test_prompts()` returns one test per policy object by default, so the full test runner stays manageable.
@@ -228,7 +229,7 @@ InputPolicyObject(
 
 For a new output policy, add an enabled output policy row in Postgres through
 the API. Policy CRUD automatically refreshes `compiled_policy_rules`; then
-verify that the output rule count appears in `scripts/test_nemo_mcp.py`.
+verify that the output rule count appears in `tests/test_nemo_mcp.py`.
 
 Current important design note:
 
@@ -294,7 +295,7 @@ output:
     - self check output
 ```
 
-`scripts/test_nemo_mcp.py` reads `rails_config.rails.output.flows` and runs `rails.check_async(..., rail_types=[RailType.OUTPUT])` after each final response.
+`tests/test_nemo_mcp.py` reads `rails_config.rails.output.flows` and runs `rails.check_async(..., rail_types=[RailType.OUTPUT])` after each final response.
 
 The output self-check prompt only includes the assistant response:
 
@@ -317,7 +318,7 @@ Postgres policies
 -> InputPolicyObject / OutputPolicyObject
 -> compiler
 -> tool_guard.py blocked tool names
--> generated tests in scripts/test_nemo_mcp.py
+-> generated tests in tests/test_nemo_mcp.py
 ```
 
 Latest verified enabled input policy sample:
@@ -383,9 +384,25 @@ reusable app authentication, and the first protected HTTP runtime endpoint now
 exist. User login, admin-route authorization, and LLM-secret handling do not
 exist yet.
 
-## Current Next Step
+## Current Runtime App Scope
 
-Enforce connector access before runtime constructs GitHub MCP tools:
+App connector management APIs now exist, so apps can be linked to GitHub
+without manual database edits:
+
+```text
+GET    /apps/{app_id}/connectors
+POST   /apps/{app_id}/connectors
+PUT    /apps/{app_id}/connectors/{connector_ref}
+DELETE /apps/{app_id}/connectors/{connector_ref}
+
+GET    /apps/by-client-id/{client_id}/connectors
+POST   /apps/by-client-id/{client_id}/connectors
+PUT    /apps/by-client-id/{client_id}/connectors/{connector_ref}
+DELETE /apps/by-client-id/{client_id}/connectors/{connector_ref}
+```
+
+`connector_ref` can be a numeric connector ID or connector name such as
+`github`.
 
 ```text
 POST /v1/guardrails/run
@@ -411,9 +428,9 @@ for that app. Without an app ID, they intentionally preserve the current
 all-enabled testing behavior and print a warning in the main diagnostics.
 
 `tool_guard.py` can compile a blocked-tool set for an optional app ID and apply
-that set to wrapped tools. `scripts/test_app_policy_scope.py` proves real
+that set to wrapped tools. `tests/test_app_policy_scope.py` proves real
 temporary DB assignments scope both NeMo rules and blocked tools, then cleans
-up. `scripts/test_nemo_mcp.py --app-id ...` passes a testing-only app scope
+up. `tests/test_nemo_mcp.py --app-id ...` passes a testing-only app scope
 through the full read-only runner.
 
 `app_auth.py` verifies app credentials at the service layer.
@@ -421,7 +438,11 @@ through the full read-only runner.
 `GET /v1/guardrails/auth-check` proves invalid requests are rejected before
 runtime work. `POST /v1/guardrails/run` now reuses the authenticated scope and
 executes the submitted message through `execute_guarded_message()`.
-`scripts/test_guardrails_run_http.py` proves allowed and blocked HTTP runtime
+`tests/test_guardrails_run_http.py` proves allowed and blocked HTTP runtime
 cases with real temporary DB policy scope and fake rails/agent.
+`tests/test_runtime_connector_access.py` proves enabled GitHub connector
+links are required before MCP tools are built.
+`tests/test_app_connector_api.py` proves app connector CRUD and client-ID
+aliases.
 
 Do not remove the flat `policies.connector/action/resource` columns yet.

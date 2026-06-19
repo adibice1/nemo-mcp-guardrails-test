@@ -7,11 +7,15 @@ from nemo_mcp_guardrails.app_auth import hash_api_key
 from nemo_mcp_guardrails.api.assignment_serializers import (
     app_label,
     serialize_app,
+    serialize_app_connector,
     serialize_app_policy_assignment,
     serialize_effective_app_assignment,
     serialize_effective_global_assignment,
 )
 from nemo_mcp_guardrails.api.app_schemas import (
+    AppConnectorCreate,
+    AppConnectorRead,
+    AppConnectorUpdate,
     AppCreate,
     AppPolicyAssignmentRead,
     AppRead,
@@ -25,8 +29,10 @@ from nemo_mcp_guardrails.api.app_schemas import (
 )
 from nemo_mcp_guardrails.database.connection import get_db
 from nemo_mcp_guardrails.database.models import (
+    AppConnectorRecord,
     AppPolicyAssignmentRecord,
     AppRecord,
+    ConnectorRecord,
     GlobalPolicyAssignmentRecord,
     LlmConfigRecord,
     PolicyRecord,
@@ -58,6 +64,60 @@ def _require_app_by_client_id(client_id: str, db: Session) -> AppRecord:
             detail="App not found",
         )
     return app
+
+
+def _require_connector_by_reference(
+    connector_ref: str,
+    db: Session,
+) -> ConnectorRecord:
+    """Return one connector by numeric ID or connector name."""
+
+    connector = None
+    if connector_ref.isdigit():
+        connector = db.get(ConnectorRecord, int(connector_ref))
+
+    if connector is None:
+        connector = db.scalar(
+            select(ConnectorRecord).where(ConnectorRecord.name == connector_ref)
+        )
+
+    if not connector:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Connector not found",
+        )
+
+    return connector
+
+
+def _require_connector_from_payload(
+    payload: AppConnectorCreate,
+    db: Session,
+) -> ConnectorRecord:
+    """Return the connector referenced by create payload."""
+
+    if payload.connector_id is None and payload.connector_name is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Provide connector_id or connector_name",
+        )
+
+    if payload.connector_id is not None:
+        connector = db.get(ConnectorRecord, payload.connector_id)
+    else:
+        connector = db.scalar(
+            select(ConnectorRecord).where(
+                ConnectorRecord.name == payload.connector_name
+            )
+        )
+
+    if not connector:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Connector not found",
+        )
+
+    return connector
 
 
 def _unique_policy_ids(policy_ids: list[int]) -> list[int]:
@@ -109,6 +169,109 @@ def _list_policy_assignments_for_app(
         )
     )
     return [serialize_app_policy_assignment(assignment) for assignment in assignments]
+
+
+def _list_app_connectors(
+    app_id: int,
+    db: Session,
+) -> list[dict[str, object]]:
+    """Return connector links for one app."""
+
+    links = list(
+        db.scalars(
+            select(AppConnectorRecord)
+            .where(AppConnectorRecord.app_id == app_id)
+            .order_by(AppConnectorRecord.id)
+        )
+    )
+    return [serialize_app_connector(link) for link in links]
+
+
+def _link_connector_to_app(
+    app_id: int,
+    payload: AppConnectorCreate,
+    db: Session,
+) -> dict[str, object]:
+    """Create or update one app connector link."""
+
+    connector = _require_connector_from_payload(payload, db)
+    link = db.scalar(
+        select(AppConnectorRecord).where(
+            AppConnectorRecord.app_id == app_id,
+            AppConnectorRecord.connector_id == connector.id,
+        )
+    )
+
+    if link is None:
+        link = AppConnectorRecord(
+            app_id=app_id,
+            connector_id=connector.id,
+            credential_reference=payload.credential_reference,
+            enabled=payload.enabled,
+        )
+        db.add(link)
+    else:
+        link.credential_reference = payload.credential_reference
+        link.enabled = payload.enabled
+
+    db.commit()
+    db.refresh(link)
+    return serialize_app_connector(link)
+
+
+def _require_app_connector_link(
+    app_id: int,
+    connector_ref: str,
+    db: Session,
+) -> AppConnectorRecord:
+    """Return one app connector link or raise a not-found response."""
+
+    connector = _require_connector_by_reference(connector_ref, db)
+    link = db.scalar(
+        select(AppConnectorRecord).where(
+            AppConnectorRecord.app_id == app_id,
+            AppConnectorRecord.connector_id == connector.id,
+        )
+    )
+
+    if not link:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="App connector link not found",
+        )
+
+    return link
+
+
+def _update_app_connector_link(
+    app_id: int,
+    connector_ref: str,
+    payload: AppConnectorUpdate,
+    db: Session,
+) -> dict[str, object]:
+    """Update one app connector link."""
+
+    link = _require_app_connector_link(app_id, connector_ref, db)
+    values = payload.model_dump(exclude_unset=True)
+
+    for field, value in values.items():
+        setattr(link, field, value)
+
+    db.commit()
+    db.refresh(link)
+    return serialize_app_connector(link)
+
+
+def _delete_app_connector_link(
+    app_id: int,
+    connector_ref: str,
+    db: Session,
+) -> None:
+    """Delete one app connector link."""
+
+    link = _require_app_connector_link(app_id, connector_ref, db)
+    db.delete(link)
+    db.commit()
 
 
 def _assign_policies_to_app(
@@ -386,6 +549,67 @@ def get_effective_policy_assignments_by_client_id(
 
 
 @router.get(
+    "/by-client-id/{client_id}/connectors",
+    response_model=list[AppConnectorRead],
+)
+def list_app_connectors_by_client_id(
+    client_id: str,
+    db: Session = Depends(get_db),
+) -> list[dict[str, object]]:
+    """Return connector links belonging to one app by client ID."""
+
+    app = _require_app_by_client_id(client_id, db)
+    return _list_app_connectors(app.id, db)
+
+
+@router.post(
+    "/by-client-id/{client_id}/connectors",
+    response_model=AppConnectorRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_app_connector_by_client_id(
+    client_id: str,
+    payload: AppConnectorCreate,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    """Create or update one app connector link by client ID."""
+
+    app = _require_app_by_client_id(client_id, db)
+    return _link_connector_to_app(app.id, payload, db)
+
+
+@router.put(
+    "/by-client-id/{client_id}/connectors/{connector_ref}",
+    response_model=AppConnectorRead,
+)
+def update_app_connector_by_client_id(
+    client_id: str,
+    connector_ref: str,
+    payload: AppConnectorUpdate,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    """Update one app connector link by client ID."""
+
+    app = _require_app_by_client_id(client_id, db)
+    return _update_app_connector_link(app.id, connector_ref, payload, db)
+
+
+@router.delete(
+    "/by-client-id/{client_id}/connectors/{connector_ref}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_app_connector_by_client_id(
+    client_id: str,
+    connector_ref: str,
+    db: Session = Depends(get_db),
+) -> None:
+    """Delete one app connector link by client ID."""
+
+    app = _require_app_by_client_id(client_id, db)
+    _delete_app_connector_link(app.id, connector_ref, db)
+
+
+@router.get(
     "/by-client-id/{client_id}/policy-assignments",
     response_model=list[AppPolicyAssignmentRead],
 )
@@ -495,6 +719,67 @@ def get_effective_policy_assignments(
 
     app = _require_app(app_id, db)
     return _effective_policy_assignments_for_app(app, db)
+
+
+@router.get(
+    "/{app_id}/connectors",
+    response_model=list[AppConnectorRead],
+)
+def list_app_connectors(
+    app_id: int,
+    db: Session = Depends(get_db),
+) -> list[dict[str, object]]:
+    """Return connector links belonging to one app."""
+
+    _require_app(app_id, db)
+    return _list_app_connectors(app_id, db)
+
+
+@router.post(
+    "/{app_id}/connectors",
+    response_model=AppConnectorRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_app_connector(
+    app_id: int,
+    payload: AppConnectorCreate,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    """Create or update one app connector link."""
+
+    _require_app(app_id, db)
+    return _link_connector_to_app(app_id, payload, db)
+
+
+@router.put(
+    "/{app_id}/connectors/{connector_ref}",
+    response_model=AppConnectorRead,
+)
+def update_app_connector(
+    app_id: int,
+    connector_ref: str,
+    payload: AppConnectorUpdate,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    """Update one app connector link."""
+
+    _require_app(app_id, db)
+    return _update_app_connector_link(app_id, connector_ref, payload, db)
+
+
+@router.delete(
+    "/{app_id}/connectors/{connector_ref}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_app_connector(
+    app_id: int,
+    connector_ref: str,
+    db: Session = Depends(get_db),
+) -> None:
+    """Delete one app connector link."""
+
+    _require_app(app_id, db)
+    _delete_app_connector_link(app_id, connector_ref, db)
 
 
 @router.put("/{app_id}", response_model=AppRead)

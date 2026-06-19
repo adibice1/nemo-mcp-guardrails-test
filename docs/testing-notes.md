@@ -9,6 +9,12 @@ connector tools, runs output rails, and returns the final response.
 
 In target terminology, GitHub MCP is a connector rather than a client app.
 
+## Test Folder Layout
+
+Runnable verification checks now live under `tests/`. The `scripts/` directory
+is reserved for API startup helpers, migrations, seeders, and debug utilities.
+Use `python tests/test_*.py` paths when running backend checks.
+
 ## Current Status
 
 NeMo input rails are working in the full GitHub MCP test path when `LLMRails`
@@ -56,7 +62,7 @@ GITHUB_MCP_READ_ONLY=0  # manual local write testing
 Restart `scripts/run_api.py` after changing this value. Local manual write
 testing can use `0`, but committed defaults and scripted tests should keep `1`.
 
-`src/nemo_mcp_guardrails/policy_compiler.py` now generates GitHub write-action policy tests from structured policy objects plus adapter-style metadata. `scripts/test_nemo_mcp.py` consumes curated generated prompts through `compile_policy_test_prompts()`.
+`src/nemo_mcp_guardrails/policy_compiler.py` now generates GitHub write-action policy tests from structured policy objects plus adapter-style metadata. `tests/test_nemo_mcp.py` consumes curated generated prompts through `compile_policy_test_prompts()`.
 
 Current safety layers:
 
@@ -75,7 +81,7 @@ Current safety layers:
 Isolated LLM selection check:
 
 ```powershell
-python scripts/test_runtime_llm_selection.py
+python tests/test_runtime_llm_selection.py
 ```
 
 ## Stage 1: Allowed Read-Only Tests
@@ -150,7 +156,7 @@ If the database is unavailable or has no valid enabled input policies, the loade
 - `Blocked: create repository`
 - `Blocked: fork repository`
 
-Status: Passed through NeMo input rails in the latest full `scripts/test_nemo_mcp.py` run.
+Status: Passed through NeMo input rails in the latest full `tests/test_nemo_mcp.py` run.
 
 Important observation:
 
@@ -175,7 +181,7 @@ Note:
 
 ## Tool-Call Guard Test
 
-`scripts/test_tool_guard.py` tests the MCP tool wrapper without Docker, GitHub MCP, Azure OpenAI, or real credentials.
+`tests/test_tool_guard.py` tests the MCP tool wrapper without Docker, GitHub MCP, Azure OpenAI, or real credentials.
 
 It verifies:
 
@@ -185,7 +191,7 @@ It verifies:
 Run:
 
 ```powershell
-python scripts/test_tool_guard.py
+python tests/test_tool_guard.py
 ```
 
 With the latest verified DB rows, expected blocked tools include:
@@ -210,13 +216,13 @@ test app rows.
 
 ## Policy Loader Test
 
-`scripts/test_policy_loader.py` tests Postgres policy loading and compiler output without Azure OpenAI or GitHub MCP.
+`tests/test_policy_loader.py` tests Postgres policy loading and compiler output without Azure OpenAI or GitHub MCP.
 
 Run:
 
 ```powershell
-python scripts/test_policy_loader.py
-python scripts/test_policy_loader.py --app-id 999999
+python tests/test_policy_loader.py
+python tests/test_policy_loader.py --app-id 999999
 ```
 
 Without `--app-id`, the diagnostic prints a warning and loads every enabled
@@ -232,7 +238,7 @@ app ID 999999: 0 input policies/rules + 1 global output policy/rule
 
 ## App Policy Scope Integration Test
 
-`scripts/test_app_policy_scope.py` creates two temporary real Postgres app
+`tests/test_app_policy_scope.py` creates two temporary real Postgres app
 rows, assigns the existing GitHub issue-creation policy only to App A, verifies
 app-scoped NeMo rules and blocked tools, then deletes both apps and assignments
 in `finally`.
@@ -240,7 +246,7 @@ in `finally`.
 Run:
 
 ```powershell
-python scripts/test_app_policy_scope.py
+python tests/test_app_policy_scope.py
 ```
 
 Latest result:
@@ -257,7 +263,7 @@ before/after app-assignment count: 0
 The full read-only runner also accepts a testing-only app scope:
 
 ```powershell
-python scripts/test_nemo_mcp.py --app-id 999999
+python tests/test_nemo_mcp.py --app-id 999999
 ```
 
 This flag does not authenticate the app yet. The latest unassigned-app run
@@ -273,7 +279,7 @@ returns an app only when the client ID exists, its API key matches, and
 Run:
 
 ```powershell
-python scripts/test_app_auth.py
+python tests/test_app_auth.py
 ```
 
 Latest result:
@@ -314,7 +320,7 @@ crashing the API.
 Run:
 
 ```powershell
-python scripts/test_app_auth_http.py
+python tests/test_app_auth_http.py
 ```
 
 Latest result:
@@ -354,13 +360,13 @@ execution.
 
 ## Guardrails Run HTTP Integration Test
 
-`scripts/test_guardrails_run_http.py` verifies the real app-scoped `/run`
+`tests/test_guardrails_run_http.py` verifies the real app-scoped `/run`
 wiring without starting Docker, GitHub MCP, or Azure.
 
 Run:
 
 ```powershell
-python scripts/test_guardrails_run_http.py
+python tests/test_guardrails_run_http.py
 ```
 
 The test:
@@ -397,6 +403,102 @@ uses real DB policy assignments. Full Docker/Azure/GitHub MCP runtime tests
 remain manual or future opt-in because normal scripted tests should not perform
 write-capable connector actions.
 
+## Runtime Connector Access Test
+
+`src/nemo_mcp_guardrails/runtime_factory.py` checks `app_connectors` before it
+builds GitHub MCP tools. An authenticated app must be linked to the enabled
+GitHub connector, otherwise `/v1/guardrails/run` returns `403` before Docker,
+GitHub MCP, or Azure are started.
+
+Run:
+
+```powershell
+python tests/test_runtime_connector_access.py
+```
+
+Expected output:
+
+```text
+Runtime connector access checks passed.
+- App linked to enabled GitHub connector was allowed.
+- App without GitHub connector link was rejected.
+- App with disabled GitHub connector link was rejected.
+- Temporary connector-access apps deleted
+```
+
+For manual Swagger testing, make sure the app has an enabled `app_connectors`
+row pointing to the GitHub connector. This can now be managed through:
+
+```text
+GET    /apps/{app_id}/connectors
+POST   /apps/{app_id}/connectors
+PUT    /apps/{app_id}/connectors/{connector_ref}
+DELETE /apps/{app_id}/connectors/{connector_ref}
+
+GET    /apps/by-client-id/{client_id}/connectors
+POST   /apps/by-client-id/{client_id}/connectors
+PUT    /apps/by-client-id/{client_id}/connectors/{connector_ref}
+DELETE /apps/by-client-id/{client_id}/connectors/{connector_ref}
+```
+
+`connector_ref` accepts the connector name, such as `github`, or the numeric
+connector ID.
+
+Run:
+
+```powershell
+python tests/test_app_connector_api.py
+```
+
+Expected output:
+
+```text
+App connector API checks passed.
+- App connector links can be created by app ID.
+- App connector links can be listed by app ID and client ID.
+- Connector references work by name and numeric ID.
+- Repeated POST updates the existing connector link.
+- Connector links can be updated and deleted by client ID.
+- Missing connector or missing app link returns 404.
+```
+
+## Runtime Connector Credential Test
+
+`src/nemo_mcp_guardrails/runtime_factory.py` now resolves GitHub connector
+credentials from `app_connectors.credential_reference` when the value uses
+`env:VAR_NAME`. If no connector-specific credential reference is set, runtime
+falls back to `GITHUB_PERSONAL_ACCESS_TOKEN`.
+
+Example app connector link:
+
+```json
+{
+  "connector_name": "github",
+  "credential_reference": "env:APP_A_GITHUB_PAT",
+  "enabled": true
+}
+```
+
+Run:
+
+```powershell
+python tests/test_runtime_connector_credentials.py
+```
+
+Expected output:
+
+```text
+Runtime connector credential checks passed.
+- Empty credential reference uses GITHUB_PERSONAL_ACCESS_TOKEN.
+- env:VAR_NAME references resolve app-specific PAT env vars.
+- Empty env: references fail clearly.
+- Unsupported credential reference schemes fail clearly.
+- Missing env vars fail clearly.
+```
+
+Only `env:VAR_NAME` is executable in the current prototype. References such as
+`vault:...` fail clearly until a real secrets-manager resolver is added.
+
 ## Reusable Guarded Execution
 
 `src/nemo_mcp_guardrails/guarded_execution.py` now owns the single-request
@@ -410,7 +512,7 @@ input rail
 -> GuardedExecutionResult
 ```
 
-`scripts/test_nemo_mcp.py` still owns the test list, legacy Python-precheck
+`tests/test_nemo_mcp.py` still owns the test list, legacy Python-precheck
 comparison, and terminal formatting. It now calls `execute_guarded_message()`
 and prints the returned full rail results, called tools, and final response.
 
@@ -471,7 +573,7 @@ Expected output includes:
 The full test runner consumes a curated subset of generated test prompts:
 
 ```powershell
-python scripts/test_nemo_mcp.py
+python tests/test_nemo_mcp.py
 ```
 
 The full runner should print `Runtime input policies loaded` near startup. That section is the easiest proof that Postgres-backed input policies are feeding the generated tests.
@@ -551,7 +653,7 @@ created.
 Focused auto-compile check:
 
 ```powershell
-python scripts/test_policy_auto_compile.py
+python tests/test_policy_auto_compile.py
 ```
 
 Expected output:
@@ -771,7 +873,7 @@ create temporary app
 Focused API check:
 
 ```powershell
-python scripts/test_policy_assignment_api.py
+python tests/test_policy_assignment_api.py
 ```
 
 Expected output:
@@ -793,7 +895,7 @@ Use Swagger at `http://127.0.0.1:8000/docs` to manage real development rows.
 ## Allowed Test Case API
 
 Allowed test cases are stored separately from policies. They are safe prompts
-that `scripts/test_nemo_mcp.py` should expect to pass.
+that `tests/test_nemo_mcp.py` should expect to pass.
 
 Endpoints:
 
@@ -871,10 +973,10 @@ fake GitHub token: blocked by NeMo output rail
 fake environment variable: blocked by NeMo output rail
 ```
 
-The full `scripts/test_nemo_mcp.py` run now includes `NEMO OUTPUT RAIL RESULT` before each final response.
+The full `tests/test_nemo_mcp.py` run now includes `NEMO OUTPUT RAIL RESULT` before each final response.
 
 ## Compact And Verbose Output
 
-`scripts/test_nemo_mcp.py` defaults to compact output. It shows rail status, MCP tool names, and the final response without dumping full LangChain message traces or large GitHub MCP payloads.
+`tests/test_nemo_mcp.py` defaults to compact output. It shows rail status, MCP tool names, and the final response without dumping full LangChain message traces or large GitHub MCP payloads.
 
 Set `VERBOSE_TRACE=true` to print the full LangChain message trace through `print_messages()` when debugging a specific test.

@@ -113,20 +113,20 @@ The effective-policy view is read-only. It exists so developers can quickly
 answer "which policies currently apply to this app?" without manually checking
 both global and app assignment tables.
 
-This is a concise map of how the current project moves from database policies to the terminal output shown by `scripts/test_nemo_mcp.py`.
+This is a concise map of how the current project moves from database policies to the terminal output shown by `tests/test_nemo_mcp.py`.
 
 The full runner accepts optional testing-only scope through
-`scripts/test_nemo_mcp.py --app-id ...`. It passes that app ID into compiled
+`tests/test_nemo_mcp.py --app-id ...`. It passes that app ID into compiled
 prompt-rule loading, runtime input-policy loading, and blocked-tool
 compilation. It does not authenticate the app yet.
 
-`scripts/test_app_policy_scope.py` creates two temporary real DB apps, assigns
+`tests/test_app_policy_scope.py` creates two temporary real DB apps, assigns
 issue creation only to App A, verifies App A/App B scope differences, and
 deletes its temporary rows in `finally`.
 
 `src/nemo_mcp_guardrails/app_auth.py` centralizes API-key hashing and
 constant-time verification. `authenticate_app()` returns only an authorized app
-whose client ID and API key match. `scripts/test_app_auth.py` proves valid and
+whose client ID and API key match. `tests/test_app_auth.py` proves valid and
 rejected cases with self-cleaning temporary rows.
 
 ## Current Protected Runtime Boundary
@@ -142,7 +142,7 @@ GET /v1/guardrails/auth-check
 
 The proof endpoint deliberately stops after authentication. It does not load
 policies, create NeMo rails, start Docker, or expose MCP tools.
-`scripts/test_app_auth_http.py` verifies missing headers, wrong keys, unknown
+`tests/test_app_auth_http.py` verifies missing headers, wrong keys, unknown
 clients, unauthorized apps, and valid credentials, then removes its temporary
 rows.
 
@@ -159,14 +159,17 @@ app conversation. If no stored turns exist, it bootstraps from client-supplied
 `NEMO_MAX_RUNTIME_CONTEXT_CHARS` so the latest message plus recent history fits
 before Azure OpenAI is called.
 
-`scripts/test_guardrails_run_http.py` is the focused HTTP integration proof for
+`tests/test_guardrails_run_http.py` is the focused HTTP integration proof for
 this endpoint. It uses fake rails/agent to avoid Docker and Azure, while still
 using real temporary DB app rows, policy rows, app assignments,
 `compiled_policy_rules`, prompt-rule loading, and blocked-tool loading.
+`tests/test_runtime_connector_access.py` verifies linked apps are allowed and
+unlinked or disabled-link apps are rejected before GitHub MCP tools are built.
 
 ```text
 POST /v1/guardrails/run
 -> authenticate app
+-> verify app has an enabled app_connectors link to the GitHub connector
 -> load stored conversation_messages for app_id + conversation_id
 -> use client-supplied conversation_history only when no stored history exists
 -> keep newest prior turns that fit beside the latest message
@@ -397,7 +400,7 @@ policy_compiler.py:298
 compile_policy_test_prompts()
 ```
 
-Creates the test-runner prompt dictionaries consumed by `scripts/test_nemo_mcp.py`.
+Creates the test-runner prompt dictionaries consumed by `tests/test_nemo_mcp.py`.
 
 ```text
 policy_compiler.py:319
@@ -457,7 +460,7 @@ If Postgres is down or there are no enabled allowed test cases, the loader falls
 ## Full Test Runner Flow
 
 ```text
-scripts/test_nemo_mcp.py:312
+tests/test_nemo_mcp.py:312
 main()
 ```
 
@@ -553,7 +556,7 @@ test name
 ```
 
 ```text
-scripts/test_nemo_mcp.py:239
+tests/test_nemo_mcp.py:239
 precheck_user_prompt()
 ```
 
@@ -698,7 +701,7 @@ Reads the currently stored compiled rules.
 
 ## Current End State In Terminal
 
-When `scripts/test_nemo_mcp.py` runs successfully, the terminal should show:
+When `tests/test_nemo_mcp.py` runs successfully, the terminal should show:
 
 ```text
 NeMo prompt policy rules loaded

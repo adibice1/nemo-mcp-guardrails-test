@@ -58,7 +58,7 @@ Postgres policies
 -> prompt_rule_compiler.py
 -> config/prompts.yml template
 -> NeMo input/output rails
--> scripts/test_nemo_mcp.py terminal output
+-> tests/test_nemo_mcp.py terminal output
 ```
 
 This is now DB-backed, but the main `policies` table is still flat:

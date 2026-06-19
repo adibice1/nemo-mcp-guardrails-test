@@ -11,7 +11,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
 from nemo_mcp_guardrails.database.connection import SessionLocal
-from nemo_mcp_guardrails.database.models import AppRecord, LlmConfigRecord
+from nemo_mcp_guardrails.database.models import (
+    AppConnectorRecord,
+    AppRecord,
+    ConnectorRecord,
+    LlmConfigRecord,
+)
 from nemo_mcp_guardrails.database.policy_loader import load_input_policy_entries
 from nemo_mcp_guardrails.prompt_rule_compiler import (
     PromptRuleConfig,
@@ -26,6 +31,10 @@ from nemo_mcp_guardrails.tool_guard import (
 SUPPORTED_AZURE_PROVIDERS = {"azure", "azure_openai"}
 
 
+class ConnectorAccessError(RuntimeError):
+    """Raised when an app is not allowed to use a connector."""
+
+
 @dataclass(frozen=True)
 class RuntimeEnvironment:
     """Store environment values needed for one guarded runtime request."""
@@ -36,6 +45,14 @@ class RuntimeEnvironment:
     azure_deployment: str
     github_pat: str
     github_mcp_read_only: str
+
+
+@dataclass(frozen=True)
+class RuntimeConnectorConfig:
+    """Detached connector settings selected from the database."""
+
+    name: str
+    credential_reference: str | None
 
 
 @dataclass(frozen=True)
@@ -78,7 +95,38 @@ class GuardrailsRuntimeParts:
     tool_bundle: McpToolBundle
 
 
-def load_runtime_environment() -> RuntimeEnvironment:
+def resolve_connector_credential(
+    credential_reference: str | None,
+    *,
+    default_env_var: str,
+) -> str:
+    """Resolve one connector credential reference into a secret value."""
+
+    reference = (credential_reference or "").strip()
+    if not reference:
+        env_var = default_env_var
+    elif reference.startswith("env:"):
+        env_var = reference.removeprefix("env:").strip()
+        if not env_var:
+            raise RuntimeError(
+                "Connector credential reference env: is missing a variable name"
+            )
+    else:
+        raise RuntimeError(
+            "Unsupported connector credential reference: "
+            f"{credential_reference}. Only env:VAR_NAME is wired in this prototype."
+        )
+
+    value = os.getenv(env_var)
+    if not value:
+        raise RuntimeError(f"Missing connector credential environment value: {env_var}")
+
+    return value
+
+
+def load_runtime_environment(
+    github_credential_reference: str | None = None,
+) -> RuntimeEnvironment:
     """Load required Azure OpenAI and GitHub MCP environment settings."""
 
     load_dotenv()
@@ -88,7 +136,6 @@ def load_runtime_environment() -> RuntimeEnvironment:
         "AZURE_OPENAI_ENDPOINT": os.getenv("AZURE_OPENAI_ENDPOINT"),
         "AZURE_OPENAI_API_VERSION": os.getenv("AZURE_OPENAI_API_VERSION"),
         "AZURE_OPENAI_DEPLOYMENT": os.getenv("AZURE_OPENAI_DEPLOYMENT"),
-        "GITHUB_PERSONAL_ACCESS_TOKEN": os.getenv("GITHUB_PERSONAL_ACCESS_TOKEN"),
     }
     missing = [name for name, value in values.items() if not value]
 
@@ -96,6 +143,10 @@ def load_runtime_environment() -> RuntimeEnvironment:
         raise RuntimeError("Missing runtime environment values: " + ", ".join(missing))
 
     azure_api_key = values["AZURE_OPENAI_API_KEY"] or ""
+    github_pat = resolve_connector_credential(
+        github_credential_reference,
+        default_env_var="GITHUB_PERSONAL_ACCESS_TOKEN",
+    )
     github_mcp_read_only = os.getenv("GITHUB_MCP_READ_ONLY", "1").strip()
     if github_mcp_read_only not in {"0", "1"}:
         raise RuntimeError("GITHUB_MCP_READ_ONLY must be 0 or 1")
@@ -108,9 +159,47 @@ def load_runtime_environment() -> RuntimeEnvironment:
         azure_endpoint=values["AZURE_OPENAI_ENDPOINT"] or "",
         azure_api_version=values["AZURE_OPENAI_API_VERSION"] or "",
         azure_deployment=values["AZURE_OPENAI_DEPLOYMENT"] or "",
-        github_pat=values["GITHUB_PERSONAL_ACCESS_TOKEN"] or "",
+        github_pat=github_pat,
         github_mcp_read_only=github_mcp_read_only,
     )
+
+
+def load_app_connector_config(
+    app_id: int,
+    connector_name: str,
+) -> RuntimeConnectorConfig:
+    """Return enabled connector config for one app or raise."""
+
+    with SessionLocal() as db:
+        connector_link = db.scalar(
+            select(AppConnectorRecord)
+            .join(
+                ConnectorRecord,
+                ConnectorRecord.id == AppConnectorRecord.connector_id,
+            )
+            .where(
+                AppConnectorRecord.app_id == app_id,
+                AppConnectorRecord.enabled.is_(True),
+                ConnectorRecord.name == connector_name,
+                ConnectorRecord.enabled.is_(True),
+            )
+        )
+
+    if connector_link is None:
+        raise ConnectorAccessError(
+            f"App {app_id} is not linked to enabled connector: {connector_name}"
+        )
+
+    return RuntimeConnectorConfig(
+        name=connector_name,
+        credential_reference=connector_link.credential_reference,
+    )
+
+
+def require_app_connector_access(app_id: int, connector_name: str) -> None:
+    """Raise when an app is not linked to an enabled connector."""
+
+    load_app_connector_config(app_id, connector_name)
 
 
 def _to_runtime_llm_config(
@@ -229,7 +318,10 @@ async def build_guarded_github_tools(
 async def build_guardrails_runtime_parts(app_id: int) -> GuardrailsRuntimeParts:
     """Build rails, agent, and guarded tools for one authenticated app."""
 
-    environment = load_runtime_environment()
+    github_connector = load_app_connector_config(app_id, "github")
+    environment = load_runtime_environment(
+        github_credential_reference=github_connector.credential_reference,
+    )
     llm_selection = load_runtime_llm_selection(app_id)
     guardrail_model = build_chat_model(
         environment,

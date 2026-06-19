@@ -21,21 +21,21 @@ Current handoff status:
   per-app blocked-tool sets from enabled global plus app-assigned input
   policies.
 - `compiled_policy_rules` are injected into `config/prompts.yml` by `prompt_rule_compiler.py` before NeMo rails are created.
-- `scripts/test_nemo_mcp.py` prints DB prompt-rule counts, DB-loaded runtime policies, and DB allowed test cases before running generated tests.
-- `scripts/test_policy_loader.py` verifies legacy and `--app-id` scoped
+- `tests/test_nemo_mcp.py` prints DB prompt-rule counts, DB-loaded runtime policies, and DB allowed test cases before running generated tests.
+- `tests/test_policy_loader.py` verifies legacy and `--app-id` scoped
   Postgres policy loading without Azure OpenAI or GitHub MCP.
-- `scripts/test_app_policy_scope.py` proves real temporary app assignments
+- `tests/test_app_policy_scope.py` proves real temporary app assignments
   scope NeMo rules and tool blocking, then cleans up its rows.
-- `scripts/test_nemo_mcp.py --app-id ...` passes a testing-only app scope
+- `tests/test_nemo_mcp.py --app-id ...` passes a testing-only app scope
   through the full read-only runner; it does not enforce HTTP authentication.
 - `src/nemo_mcp_guardrails/app_auth.py` verifies authorized client ID/API-key
   pairs using stored hashes and constant-time comparison.
-- `scripts/test_app_auth.py` proves valid authentication and generic rejection
+- `tests/test_app_auth.py` proves valid authentication and generic rejection
   of wrong-key, unknown-client, and unauthorized-app cases, then cleans up.
 - `src/nemo_mcp_guardrails/api/auth.py` provides reusable `X-App-ID` and
   `X-API-Key` HTTP authentication with a generic `401` for invalid requests.
 - `GET /v1/guardrails/auth-check` is the first protected runtime proof
-  endpoint; `scripts/test_app_auth_http.py` verifies it and cleans up.
+  endpoint; `tests/test_app_auth_http.py` verifies it and cleans up.
 - `POST /v1/guardrails/run` now authenticates, builds app-scoped rules,
   policies, rails, and guarded tools, then executes the submitted message.
   It supports stored conversation history through `conversation_id`, accepts
@@ -47,10 +47,14 @@ Current handoff status:
 - `src/nemo_mcp_guardrails/runtime_factory.py` respects separate app
   `main_llm_config_id` and `guardrail_llm_config_id` selections for the agent
   and NeMo rails.
-- Admin CRUD endpoints remain unprotected. The next cleanup is to make
-  `config/prompts.yml` generic so policy behavior comes from database rules,
-  followed by real HTTP integration coverage for allowed and blocked
-  `/v1/guardrails/run` requests.
+- App connector CRUD exists under `/apps/{app_id}/connectors` and
+  `/apps/by-client-id/{client_id}/connectors`, so apps can be linked to GitHub
+  without manual SQL.
+- `credential_reference="env:VAR_NAME"` is executable for GitHub connector
+  PAT selection; blank references fall back to `GITHUB_PERSONAL_ACCESS_TOKEN`.
+- Admin CRUD endpoints remain unprotected. The next cleanup is production
+  secrets-manager credential resolution, followed by management/admin
+  authentication and role checks.
 - `scripts/seed_normalized_policy_metadata.py` seeds normalized connector/action/resource/tool metadata and backfills allowed-test expected-tool links.
 - Normalized metadata tables now include `connectors`, `connector_actions`, `connector_resources`, `connector_tool_mappings`, and `allowed_test_case_expected_tools`.
 - Input/output diagnostic scripts now distinguish Azure `content_filter`

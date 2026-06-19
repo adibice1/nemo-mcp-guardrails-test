@@ -13,13 +13,16 @@ Before starting new implementation:
 ```powershell
 git pull
 docker compose up -d postgres
-python scripts/test_app_auth_http.py
-python scripts/test_policy_assignment_api.py
-python scripts/test_policy_auto_compile.py
-python scripts/test_guardrails_run_http.py
-python scripts/test_app_policy_scope.py
-python scripts/test_tool_guard.py
-python scripts/test_nemo_mcp.py
+python tests/test_app_auth_http.py
+python tests/test_policy_assignment_api.py
+python tests/test_policy_auto_compile.py
+python tests/test_guardrails_run_http.py
+python tests/test_runtime_connector_access.py
+python tests/test_app_connector_api.py
+python tests/test_runtime_connector_credentials.py
+python tests/test_app_policy_scope.py
+python tests/test_tool_guard.py
+python tests/test_nemo_mcp.py
 ```
 
 Before leaving the home computer, make sure this milestone is committed and
@@ -117,14 +120,18 @@ execute_guarded_message()
 -> GuardedExecutionResult
 ```
 
-`scripts/test_nemo_mcp.py` calls this reusable function and still prints the
+`tests/test_nemo_mcp.py` calls this reusable function and still prints the
 same detailed terminal workflow. The full read-only NeMo + GitHub MCP run
 passed after the extraction.
 
-`scripts/test_guardrails_run_http.py` now proves authenticated
+`tests/test_guardrails_run_http.py` now proves authenticated
 `POST /v1/guardrails/run` uses real temporary DB app assignments,
 `compiled_policy_rules`, app-scoped prompt rules, and app-scoped blocked tools.
 It fakes rails/agent so it does not start Docker, GitHub MCP, or Azure.
+
+Runtime now checks `app_connectors` before building GitHub MCP tools. An app
+must have an enabled link to the enabled GitHub connector, or `/run` returns
+`403` before Docker/Azure/MCP startup.
 
 ## Important Current Files
 
@@ -137,10 +144,15 @@ It fakes rails/agent so it does not start Docker, GitHub MCP, or Azure.
 - `src/nemo_mcp_guardrails/runtime_factory.py`: Azure, NeMo, MCP, and agent construction. It uses the authenticated app's `guardrail_llm_config_id` for NeMo rails and `main_llm_config_id` for the LangChain agent, with `.env` Azure fallback when either ID is missing.
 - `src/nemo_mcp_guardrails/guarded_execution.py`: reusable single-request guardrail workflow.
 - `src/nemo_mcp_guardrails/tool_guard.py`: app-scoped execution-level MCP tool guard.
-- `scripts/test_nemo_mcp.py`: full read-only integration runner and terminal display.
-- `scripts/test_app_auth_http.py`: protected HTTP boundary and runtime-execution reachability test.
-- `scripts/test_guardrails_run_http.py`: app-scoped allowed/blocked `/run` HTTP integration test with fake rails/agent and real DB scope.
-- `scripts/test_app_policy_scope.py`: real temporary app-assignment scope test.
+- `tests/test_nemo_mcp.py`: full read-only integration runner and terminal display.
+- `tests/test_app_auth_http.py`: protected HTTP boundary and runtime-execution reachability test.
+- `tests/test_guardrails_run_http.py`: app-scoped allowed/blocked `/run` HTTP integration test with fake rails/agent and real DB scope.
+- `tests/test_runtime_connector_access.py`: isolated runtime connector access check for linked, unlinked, and disabled-link apps.
+- `tests/test_app_connector_api.py`: app connector CRUD API test for app ID
+  and client ID routes.
+- `tests/test_runtime_connector_credentials.py`: env-based GitHub PAT
+  reference resolution test.
+- `tests/test_app_policy_scope.py`: real temporary app-assignment scope test.
 
 ## Verified Current Results
 
@@ -154,6 +166,7 @@ oversized latest-message rejection: passed
 controlled connector tool-error responses: passed
 controlled Azure output-filter responses: passed
 authenticated /run allowed/blocked app-scope HTTP coverage: passed
+runtime connector access enforcement: passed
 temporary authentication rows cleanup: passed
 temporary app policy-scope rows cleanup: passed
 App A issue_write blocked / App B issue_write allowed: passed
@@ -200,7 +213,7 @@ Recommended incremental slice:
 6. Call POST /v1/guardrails/run with a blocked write prompt.
 7. Include a `conversation_id` and verify stored history is available on the
    next request.
-8. Run `python scripts/test_runtime_llm_selection.py` to verify main/guardrail
+8. Run `python tests/test_runtime_llm_selection.py` to verify main/guardrail
    LLM selection behavior.
 9. Assert response status, rail statuses, called tools, history metadata, and
    cleanup.
@@ -213,11 +226,9 @@ endpoint testing to the normal harness.
 
 - Admin CRUD endpoints are not authenticated.
 - User login and role authorization are not implemented.
-- Assignment-cache invalidation is not needed yet because there is no Redis/app
-  policy bundle cache.
-- Argument-level and workflow-state policies are not implemented.
 - Connector credentials and LLM credentials are not managed through a secrets
   manager yet.
+- Argument-level and workflow-state policies are not implemented.
 
 ## Editing Rules
 

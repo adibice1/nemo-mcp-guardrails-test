@@ -17,7 +17,10 @@ from nemo_mcp_guardrails.database.conversation_store import (
     load_conversation_turns,
 )
 from nemo_mcp_guardrails.guarded_execution import execute_guarded_message
-from nemo_mcp_guardrails.runtime_factory import build_guardrails_runtime_parts
+from nemo_mcp_guardrails.runtime_factory import (
+    ConnectorAccessError,
+    build_guardrails_runtime_parts,
+)
 
 
 DEFAULT_MAX_RUNTIME_CONTEXT_CHARS = 24000
@@ -222,7 +225,14 @@ async def run_guardrails(
     """Execute one authenticated request through the guarded runtime."""
 
     history_context = _build_runtime_history_context(payload, app.id, db)
-    runtime_parts = await build_guardrails_runtime_parts(app.id)
+    try:
+        runtime_parts = await build_guardrails_runtime_parts(app.id)
+    except ConnectorAccessError as error:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(error),
+        ) from error
+
     execution_result = await execute_guarded_message(
         rails=runtime_parts.rails,
         agent=runtime_parts.agent,

@@ -1,6 +1,7 @@
 from typing import Any
 
 from nemo_mcp_guardrails.database.models import (
+    AppConnectorRecord,
     AppPolicyAssignmentRecord,
     AppRecord,
     GlobalPolicyAssignmentRecord,
@@ -77,6 +78,24 @@ def serialize_app(app: AppRecord) -> dict[str, Any]:
         "guardrail_llm_config_id": app.guardrail_llm_config_id,
         "created_at": app.created_at,
         "updated_at": app.updated_at,
+    }
+
+
+def serialize_app_connector(link: AppConnectorRecord) -> dict[str, Any]:
+    """Serialize one app connector link with readable labels."""
+
+    return {
+        "id": link.id,
+        "app_id": link.app_id,
+        "app_label": app_label(link.app),
+        "connector_id": link.connector_id,
+        "connector_name": link.connector.name,
+        "connector_display_name": link.connector.display_name,
+        "credential_reference": link.credential_reference,
+        "enabled": link.enabled,
+        "connector_enabled": link.connector.enabled,
+        "created_at": link.created_at,
+        "updated_at": link.updated_at,
     }
 
 

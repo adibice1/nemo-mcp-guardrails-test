@@ -318,7 +318,7 @@ Admin-style policy row
 -> src/nemo_mcp_guardrails/policy_compiler.py
 -> generated NeMo self-check rule preview
 -> generated DB-derived tool denylist
--> generated test prompts consumed by scripts/test_nemo_mcp.py
+-> generated test prompts consumed by tests/test_nemo_mcp.py
 -> prompt_rule_compiler.py injects stored compiled rules into NeMo prompts
 ```
 
@@ -357,7 +357,7 @@ src/nemo_mcp_guardrails/guarded_execution.py
 -> NeMo output rail
 -> GuardedExecutionResult
 
-scripts/test_nemo_mcp.py
+tests/test_nemo_mcp.py
 -> choose test prompts and print GuardedExecutionResult
 ```
 

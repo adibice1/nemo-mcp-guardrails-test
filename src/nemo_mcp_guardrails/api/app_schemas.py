@@ -65,6 +65,59 @@ class AppRead(BaseModel):
     updated_at: datetime
 
 
+class AppConnectorCreate(BaseModel):
+    """Request body for linking an app to a connector."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "connector_name": "github",
+                "credential_reference": "env:GITHUB_PERSONAL_ACCESS_TOKEN",
+                "enabled": True,
+            }
+        }
+    )
+
+    connector_id: int | None = None
+    connector_name: str | None = None
+    credential_reference: str | None = None
+    enabled: bool = True
+
+
+class AppConnectorUpdate(BaseModel):
+    """Request body for updating one app connector link."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "credential_reference": "env:GITHUB_PERSONAL_ACCESS_TOKEN",
+                "enabled": True,
+            }
+        }
+    )
+
+    credential_reference: str | None = None
+    enabled: bool | None = None
+
+
+class AppConnectorRead(BaseModel):
+    """Response body for one app connector link."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    app_id: int
+    app_label: str
+    connector_id: int
+    connector_name: str
+    connector_display_name: str
+    credential_reference: str | None
+    enabled: bool
+    connector_enabled: bool
+    created_at: datetime
+    updated_at: datetime
+
+
 class PolicyAssignmentCreate(BaseModel):
     """Request body for assigning one or more reusable policies."""
 

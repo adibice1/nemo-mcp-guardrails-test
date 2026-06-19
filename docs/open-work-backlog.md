@@ -20,11 +20,17 @@ The GMS backend prototype now has these core runtime pieces:
   assignments, with readable app and policy labels in API responses.
 - Developer-friendly client-ID aliases for app lookup and app-specific policy
   assignment management.
+- App connector management APIs now list, create/update, update, and delete
+  app connector links by app ID or client ID.
+- GitHub connector credentials can now be resolved from
+  `app_connectors.credential_reference` when it uses `env:VAR_NAME`.
 - Policy create/update now automatically refreshes `compiled_policy_rules`;
   old compiled rows are marked stale and disabled.
 - HTTP runtime integration coverage now proves an authenticated app can pass an
   allowed read request and block an assigned GitHub write policy through
   `POST /v1/guardrails/run` without Docker or Azure.
+- Runtime construction now checks `app_connectors` before GitHub MCP tools are
+  built and rejects apps that are not linked to the enabled GitHub connector.
 
 Current presentation/demo scope:
 
@@ -81,10 +87,10 @@ Future extension:
 
 Current state:
 
-- `scripts/test_app_auth_http.py` verifies authentication, runtime
+- `tests/test_app_auth_http.py` verifies authentication, runtime
   reachability, conversation history, truncation, and controlled error branches
   with fake runtime pieces.
-- `scripts/test_guardrails_run_http.py` creates a temporary authorized app,
+- `tests/test_guardrails_run_http.py` creates a temporary authorized app,
   creates and assigns a GitHub issue-creation block policy, then calls
   `POST /v1/guardrails/run` with allowed and blocked prompts.
 - The test uses real DB policy assignment, prompt-rule loading, and blocked-tool
@@ -113,7 +119,7 @@ Needed:
 
 - Decide whether assignment changes should trigger cached app-policy bundle
   invalidation once Redis or another cache is introduced.
-- Keep `scripts/test_policy_auto_compile.py` in the verification set whenever
+- Keep `tests/test_policy_auto_compile.py` in the verification set whenever
   policy CRUD changes.
 
 ### 4. Finish Runtime LLM Provider Support
@@ -127,22 +133,32 @@ Current state:
 Needed:
 
 - Add provider adapter functions for future providers.
-- Resolve `credential_reference` through a secrets manager instead of `.env`.
+- Resolve `credential_reference` through a secrets manager instead of `.env`
+  for production deployments.
 - Keep guardrail-classification LLM and main-agent LLM independently
   configurable.
 
-### 5. Enforce Connector Access And Credentials
+### 5. Add Connector Management APIs And Credential Resolution
 
 Current state:
 
 - `app_connectors` stores which connectors an app can use.
-- Runtime still constructs GitHub MCP tools from `.env` settings.
+- Runtime checks enabled GitHub connector access before constructing GitHub MCP
+  tools.
+- App connector links can be managed through `/apps/{app_id}/connectors` and
+  `/apps/by-client-id/{client_id}/connectors`.
+- `tests/test_app_connector_api.py` verifies app connector CRUD, connector
+  lookup by name or ID, upsert behavior, and missing-link errors.
+- Runtime resolves GitHub MCP credentials from `credential_reference` when it
+  uses `env:VAR_NAME`, and falls back to `GITHUB_PERSONAL_ACCESS_TOKEN` when
+  no connector-specific reference is set.
+- `tests/test_runtime_connector_credentials.py` verifies default PAT fallback,
+  app-specific `env:VAR_NAME` references, missing env vars, and unsupported
+  reference schemes.
 
 Needed:
 
-- Load connector access for the authenticated app at runtime.
-- Refuse connector/tool execution when the app is not linked to that connector.
-- Resolve connector credentials through `credential_reference`.
+- Add a real secrets-manager resolver for references such as `vault:...`.
 
 ### 6. Protect Management/Admin APIs
 
@@ -222,14 +238,16 @@ Future enhancements:
 ## Current Useful Verification Commands
 
 ```powershell
-.\.venv\Scripts\python.exe scripts\test_runtime_llm_selection.py
-.\.venv\Scripts\python.exe scripts\test_app_auth_http.py
-.\.venv\Scripts\python.exe scripts\test_app_auth.py
-.\.venv\Scripts\python.exe scripts\test_policy_assignment_api.py
-.\.venv\Scripts\python.exe scripts\test_policy_auto_compile.py
-.\.venv\Scripts\python.exe scripts\test_guardrails_run_http.py
-.\.venv\Scripts\python.exe scripts\test_app_policy_scope.py
-.\.venv\Scripts\python.exe scripts\test_tool_guard.py
+.\.venv\Scripts\python.exe tests\\test_runtime_llm_selection.py
+.\.venv\Scripts\python.exe tests\\test_app_auth_http.py
+.\.venv\Scripts\python.exe tests\\test_app_auth.py
+.\.venv\Scripts\python.exe tests\\test_policy_assignment_api.py
+.\.venv\Scripts\python.exe tests\\test_policy_auto_compile.py
+.\.venv\Scripts\python.exe tests\\test_guardrails_run_http.py
+.\.venv\Scripts\python.exe tests\\test_runtime_connector_access.py
+.\.venv\Scripts\python.exe tests\\test_app_connector_api.py
+.\.venv\Scripts\python.exe tests\\test_app_policy_scope.py
+.\.venv\Scripts\python.exe tests\\test_tool_guard.py
 .\.venv\Scripts\python.exe scripts\debug_nemo_output_check.py
-.\.venv\Scripts\python.exe scripts\test_nemo_mcp.py
+.\.venv\Scripts\python.exe tests\\test_nemo_mcp.py
 ```

@@ -18,6 +18,7 @@ def _environment() -> RuntimeEnvironment:
         azure_api_version="2024-02-15-preview",
         azure_deployment="default-deployment",
         github_pat="fake-pat",
+        github_mcp_read_only="1",
     )
 
 

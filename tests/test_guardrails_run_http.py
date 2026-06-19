@@ -13,9 +13,11 @@ import nemo_mcp_guardrails.api.runtime as runtime_api
 from nemo_mcp_guardrails.api.main import app
 from nemo_mcp_guardrails.database.connection import SessionLocal
 from nemo_mcp_guardrails.database.models import (
+    AppConnectorRecord,
     AppPolicyAssignmentRecord,
     AppRecord,
     CompiledPolicyRuleRecord,
+    ConnectorRecord,
     PolicyRecord,
 )
 from nemo_mcp_guardrails.database.policy_loader import load_input_policy_entries
@@ -140,6 +142,25 @@ def cleanup_records(app_id: int | None, policy_id: int | None) -> None:
         db.commit()
 
 
+def link_app_to_github_connector(app_id: int) -> None:
+    """Link one temporary app to the enabled GitHub connector."""
+
+    with SessionLocal() as db:
+        github_connector = db.scalar(
+            select(ConnectorRecord).where(ConnectorRecord.name == "github")
+        )
+        assert github_connector is not None
+
+        db.add(
+            AppConnectorRecord(
+                app_id=app_id,
+                connector_id=github_connector.id,
+                enabled=True,
+            )
+        )
+        db.commit()
+
+
 def main() -> None:
     """Verify authenticated /run uses app-scoped policies over HTTP."""
 
@@ -167,6 +188,7 @@ def main() -> None:
             )
             assert app_response.status_code == 201, app_response.text
             app_id = app_response.json()["id"]
+            link_app_to_github_connector(app_id)
 
             policy_response = client.post(
                 "/policies",
