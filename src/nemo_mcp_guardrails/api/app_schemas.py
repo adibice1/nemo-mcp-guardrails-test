@@ -87,6 +87,44 @@ class PolicyAssignmentUpdate(BaseModel):
     enabled: bool
 
 
+class PolicyAssignmentBulkUpdate(BaseModel):
+    """Request body for enabling or disabling multiple policy assignments."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "policy_ids": [12, 13, 26],
+                "enabled": False,
+            }
+        }
+    )
+
+    policy_ids: list[int] = Field(min_length=1)
+    enabled: bool
+
+
+class PolicyAssignmentBulkDelete(BaseModel):
+    """Request body for deleting multiple policy assignments."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "policy_ids": [12, 13, 26],
+            }
+        }
+    )
+
+    policy_ids: list[int] = Field(min_length=1)
+
+
+class PolicyAssignmentBulkDeleteResponse(BaseModel):
+    """Response body for deleting multiple policy assignments."""
+
+    deleted_policy_ids: list[int]
+    deleted_assignment_ids: list[int]
+    deleted_count: int
+
+
 class AppPolicyAssignmentRead(BaseModel):
     """Response body for one app-specific policy assignment."""
 

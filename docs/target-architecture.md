@@ -488,9 +488,10 @@ completed: extract reusable single-request guarded execution
 completed: execute authenticated POST /v1/guardrails/run through guarded runtime
 completed: add conversation history persistence/truncation to runtime endpoint
 completed: select separate app main-agent and guardrail LLM configs
-next:      make prompts.yml generic and DB-policy driven
-then:      add allowed/blocked HTTP runtime integration coverage
-then:      automate policy compilation and invalidation
+completed: make prompts.yml generic and DB-policy driven
+completed: automate policy CRUD compilation and invalidation
+completed: add allowed/blocked HTTP runtime integration coverage
+next:      enforce app connector access during runtime construction
 ```
 
 See `docs/open-work-backlog.md` for the active backlog and unfinished

@@ -57,6 +57,9 @@ Completed pieces:
   existing terminal workflow display.
 - `scripts/test_app_auth_http.py` verifies the protected HTTP boundary and
   cleans up all temporary app rows.
+- `scripts/test_guardrails_run_http.py` verifies authenticated `/run` loads
+  real app-scoped policy assignments, compiled prompt rules, and blocked tools
+  while using fake rails/agent to avoid Docker and Azure.
 - Runtime input policies come from Postgres through `policy_loader.py`.
 - Policy and compiled-rule loaders now accept an optional app ID. App-scoped
   calls load enabled global assignments plus enabled assignments for that app.
@@ -70,6 +73,8 @@ Completed pieces:
 - Allowed read tests come from `allowed_test_cases`, with fallback defaults.
 - Blocked tests are generated from enabled DB policies.
 - FastAPI exposes policy CRUD, allowed-test CRUD, compile-preview, compile-rules, and compiled-rules endpoints.
+- Policy create/update automatically refreshes `compiled_policy_rules`;
+  `compile-rules` remains a manual full-resync/debug endpoint.
 - Normalized metadata tables now exist in SQLAlchemy models.
 - `scripts/seed_normalized_policy_metadata.py` seeds:
   ```text
@@ -104,13 +109,15 @@ Run these from the repo root:
 .\.venv\Scripts\python.exe scripts\migrate_connector_terminology.py
 .\.venv\Scripts\python.exe scripts\migrate_app_relationships.py
 .\.venv\Scripts\python.exe scripts\migrate_policy_assignments.py
-.\.venv\Scripts\python.exe -m py_compile src\nemo_mcp_guardrails\app_auth.py src\nemo_mcp_guardrails\guarded_execution.py src\nemo_mcp_guardrails\api\auth.py src\nemo_mcp_guardrails\api\runtime.py src\nemo_mcp_guardrails\api\runtime_schemas.py src\nemo_mcp_guardrails\policy_compiler.py src\nemo_mcp_guardrails\tool_guard.py src\nemo_mcp_guardrails\database\models.py src\nemo_mcp_guardrails\database\policy_loader.py src\nemo_mcp_guardrails\database\test_case_loader.py src\nemo_mcp_guardrails\database\prompt_rule_loader.py src\nemo_mcp_guardrails\prompt_rule_compiler.py scripts\seed_normalized_policy_metadata.py scripts\test_nemo_mcp.py scripts\test_tool_guard.py scripts\test_policy_loader.py scripts\test_app_policy_scope.py scripts\test_app_auth.py scripts\test_app_auth_http.py scripts\debug_nemo_self_check.py scripts\debug_nemo_output_check.py
+.\.venv\Scripts\python.exe -m py_compile src\nemo_mcp_guardrails\app_auth.py src\nemo_mcp_guardrails\guarded_execution.py src\nemo_mcp_guardrails\api\auth.py src\nemo_mcp_guardrails\api\runtime.py src\nemo_mcp_guardrails\api\runtime_schemas.py src\nemo_mcp_guardrails\policy_compiler.py src\nemo_mcp_guardrails\policy_rule_service.py src\nemo_mcp_guardrails\tool_guard.py src\nemo_mcp_guardrails\database\models.py src\nemo_mcp_guardrails\database\policy_loader.py src\nemo_mcp_guardrails\database\test_case_loader.py src\nemo_mcp_guardrails\database\prompt_rule_loader.py src\nemo_mcp_guardrails\prompt_rule_compiler.py scripts\seed_normalized_policy_metadata.py scripts\test_nemo_mcp.py scripts\test_tool_guard.py scripts\test_policy_loader.py scripts\test_app_policy_scope.py scripts\test_app_auth.py scripts\test_app_auth_http.py scripts\test_policy_auto_compile.py scripts\test_guardrails_run_http.py scripts\debug_nemo_self_check.py scripts\debug_nemo_output_check.py
 .\.venv\Scripts\python.exe scripts\seed_normalized_policy_metadata.py
 .\.venv\Scripts\python.exe scripts\test_policy_loader.py
 .\.venv\Scripts\python.exe scripts\test_policy_loader.py --app-id 999999
 .\.venv\Scripts\python.exe scripts\test_app_policy_scope.py
 .\.venv\Scripts\python.exe scripts\test_app_auth.py
 .\.venv\Scripts\python.exe scripts\test_app_auth_http.py
+.\.venv\Scripts\python.exe scripts\test_policy_auto_compile.py
+.\.venv\Scripts\python.exe scripts\test_guardrails_run_http.py
 .\.venv\Scripts\python.exe scripts\test_tool_guard.py
 .\.venv\Scripts\python.exe scripts\test_nemo_mcp.py
 .\.venv\Scripts\python.exe scripts\test_nemo_mcp.py --app-id 999999
@@ -145,25 +152,16 @@ Normalized policy metadata seeded.
 
 Use `docs/open-work-backlog.md` as the source of truth for unfinished work.
 
-The immediate top priority is to remove hardcoded GitHub/credential-specific
-behavior from `config/prompts.yml` and leave it as a generic self-check
-classifier shell. Actual policy behavior should come from Postgres policy rows
-and `compiled_policy_rules`.
-
-After that, add HTTP-level integration coverage for the authenticated runtime
-endpoint.
+The immediate top priority is to enforce app connector access during runtime
+construction.
 
 Recommended slice:
 
 ```text
-1. Make self-check input/output prompts generic.
-2. Confirm harmless assistant output no longer false-positive blocks.
-3. Create a temporary authorized app and assign a GitHub input policy to it.
-4. Call POST /v1/guardrails/run with an allowed read prompt.
-5. Call POST /v1/guardrails/run with a blocked write prompt.
-6. Include `conversation_id` and assert history metadata is returned.
-7. Assert final response status, rail statuses, called tools, and cleanup.
-8. Keep GitHub MCP read-only and automate compilation/invalidation afterward.
+1. Check `app_connectors` for the authenticated app before GitHub MCP tools are built.
+2. Return a clear runtime error if the app is not linked to the GitHub connector.
+3. Keep `.env` token usage for now, but leave the hook for future `credential_reference` resolution.
+4. Add a fake-runtime or isolated service test proving linked apps can proceed and unlinked apps are rejected.
 ```
 
 The normalized policy-reference migration is complete:
@@ -174,6 +172,7 @@ policy_loader.py prefers normalized relationships
 compiled_policy_rules tracks policy_version and stale
 policy create/update accepts readable names and resolves normalized IDs
 policy create/update validates combinations against enabled tool mappings
+policy create/update automatically refreshes compiled_policy_rules
 allowed-test create/update accepts readable tool-name lists and maintains joins
 users, llm_configs, and apps foundation tables exist
 connector terminology migration complete
@@ -189,6 +188,7 @@ test_app_auth.py verifies valid and rejected cases with cleanup
 api/auth.py provides reusable HTTP credential enforcement
 GET /v1/guardrails/auth-check proves the protected runtime boundary
 test_app_auth_http.py verifies valid and rejected HTTP cases with cleanup
+test_guardrails_run_http.py verifies allowed/blocked app-scoped /run behavior
 POST /v1/guardrails/run executes authenticated app-scoped guarded requests
 runtime_schemas.py defines the run request and execution response
 guarded_execution.py owns reusable single-request guardrail coordination

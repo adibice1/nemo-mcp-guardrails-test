@@ -8,6 +8,9 @@ from nemo_mcp_guardrails.api.assignment_serializers import (
 )
 from nemo_mcp_guardrails.api.app_schemas import (
     GlobalPolicyAssignmentRead,
+    PolicyAssignmentBulkDelete,
+    PolicyAssignmentBulkDeleteResponse,
+    PolicyAssignmentBulkUpdate,
     PolicyAssignmentCreate,
     PolicyAssignmentUpdate,
 )
@@ -63,6 +66,34 @@ def _require_policies(policy_ids: list[int], db: Session) -> None:
         )
 
 
+def _require_global_assignments_by_policy_ids(
+    policy_ids: list[int],
+    db: Session,
+) -> list[GlobalPolicyAssignmentRecord]:
+    """Return global assignments by policy IDs or raise for missing assignments."""
+
+    unique_ids = _unique_policy_ids(policy_ids)
+    assignments = list(
+        db.scalars(
+            select(GlobalPolicyAssignmentRecord).where(
+                GlobalPolicyAssignmentRecord.policy_id.in_(unique_ids)
+            )
+        )
+    )
+    assignments_by_policy_id = {
+        assignment.policy_id: assignment for assignment in assignments
+    }
+    missing_ids = [
+        policy_id for policy_id in unique_ids if policy_id not in assignments_by_policy_id
+    ]
+    if missing_ids:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Global policy assignments not found for policy IDs: {missing_ids}",
+        )
+    return [assignments_by_policy_id[policy_id] for policy_id in unique_ids]
+
+
 @router.post(
     "",
     response_model=list[GlobalPolicyAssignmentRead],
@@ -115,6 +146,60 @@ def create_global_policy_assignment(
     return [
         serialize_global_policy_assignment(assignment) for assignment in assignments
     ]
+
+
+@router.put(
+    "",
+    response_model=list[GlobalPolicyAssignmentRead],
+)
+def bulk_update_global_policy_assignments(
+    payload: PolicyAssignmentBulkUpdate,
+    db: Session = Depends(get_db),
+) -> list[dict[str, object]]:
+    """Enable or disable multiple mandatory global assignments."""
+
+    assignments = _require_global_assignments_by_policy_ids(
+        payload.policy_ids,
+        db,
+    )
+    for assignment in assignments:
+        assignment.enabled = payload.enabled
+
+    db.commit()
+    for assignment in assignments:
+        db.refresh(assignment)
+
+    return [
+        serialize_global_policy_assignment(assignment) for assignment in assignments
+    ]
+
+
+@router.delete(
+    "",
+    response_model=PolicyAssignmentBulkDeleteResponse,
+)
+def bulk_delete_global_policy_assignments(
+    payload: PolicyAssignmentBulkDelete,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    """Delete multiple mandatory global assignments."""
+
+    assignments = _require_global_assignments_by_policy_ids(
+        payload.policy_ids,
+        db,
+    )
+    deleted_policy_ids = [assignment.policy_id for assignment in assignments]
+    deleted_assignment_ids = [assignment.id for assignment in assignments]
+
+    for assignment in assignments:
+        db.delete(assignment)
+    db.commit()
+
+    return {
+        "deleted_policy_ids": deleted_policy_ids,
+        "deleted_assignment_ids": deleted_assignment_ids,
+        "deleted_count": len(deleted_assignment_ids),
+    }
 
 
 @router.put(

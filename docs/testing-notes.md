@@ -352,6 +352,51 @@ The admin CRUD endpoints remain unprotected. The dependency currently protects
 both runtime endpoints. The run endpoint now calls the reusable guarded
 execution.
 
+## Guardrails Run HTTP Integration Test
+
+`scripts/test_guardrails_run_http.py` verifies the real app-scoped `/run`
+wiring without starting Docker, GitHub MCP, or Azure.
+
+Run:
+
+```powershell
+python scripts/test_guardrails_run_http.py
+```
+
+The test:
+
+```text
+seed normalized connector metadata
+-> create temporary authorized app through POST /apps
+-> create GitHub issue-creation block policy through POST /policies
+-> verify policy CRUD auto-created an active compiled rule
+-> assign policy to the temporary app
+-> monkeypatch runtime construction with fake rails/agent
+-> call POST /v1/guardrails/run with an allowed read prompt
+-> call POST /v1/guardrails/run with a blocked write prompt
+-> assert app-scoped input rules and issue_write blocked tool are visible
+-> assert allowed request reaches the fake agent
+-> assert blocked request stops before fake agent execution
+-> delete temporary app/policy rows
+```
+
+Expected output:
+
+```text
+Guardrails run HTTP integration checks passed.
+- Temporary app authenticated with X-App-ID/X-API-Key.
+- Policy create auto-compiled one active rule.
+- App policy assignment scoped rules and blocked tools to /run.
+- Allowed read request reached the fake agent.
+- Blocked write request stopped before agent execution.
+- Temporary guardrails-run records deleted
+```
+
+This is the current safest automated proof that the authenticated endpoint
+uses real DB policy assignments. Full Docker/Azure/GitHub MCP runtime tests
+remain manual or future opt-in because normal scripted tests should not perform
+write-capable connector actions.
+
 ## Reusable Guarded Execution
 
 `src/nemo_mcp_guardrails/guarded_execution.py` now owns the single-request
@@ -460,8 +505,21 @@ The endpoint is a preview/debug surface. Runtime input/tool enforcement is handl
 
 ## Compiled Policy Rules API
 
-The API can also compile enabled policies into stored NeMo rail rule text.
+The API stores generated NeMo rail rule text in `compiled_policy_rules`.
 These stored rules are generated artifacts, not the policy source of truth.
+
+Policy CRUD now refreshes compiled rules automatically:
+
+```text
+POST /policies
+-> create policy row
+-> compile active rule in the same transaction
+
+PUT /policies/{policy_id}
+-> mark old compiled rows stale and disabled
+-> create a fresh active rule when the policy remains enabled
+-> leave no active compiled rule when the policy is disabled
+```
 
 Endpoints:
 
@@ -470,12 +528,13 @@ POST /policies/compile-rules
 GET  /policies/compiled-rules
 ```
 
-Expected behavior:
+`POST /policies/compile-rules` remains a manual full-resync/debug endpoint:
 
 ```text
 policies table
 -> POST /policies/compile-rules
--> compiled_policy_rules table
+-> stale/disable existing compiled rows
+-> insert active compiled rows for enabled policies
 ```
 
 With the current GitHub policy set, `POST /policies/compile-rules` should
@@ -488,6 +547,23 @@ Runtime NeMo rails now consume enabled rows from `compiled_policy_rules`.
 `prompt_rule_loader.py` loads those rows, and `prompt_rule_compiler.py`
 injects them into the NeMo self-check prompt templates before `LLMRails` is
 created.
+
+Focused auto-compile check:
+
+```powershell
+python scripts/test_policy_auto_compile.py
+```
+
+Expected output:
+
+```text
+Policy auto-compile checks passed.
+- POST /policies creates an active compiled rule.
+- PUT /policies/{id} stales old rules and creates a new active rule.
+- Disabling a policy leaves no active compiled rule.
+- Invalid compiler input returns 400 without partial persistence.
+- Deleting a policy cascades compiled rules.
+```
 
 ## Normalized Metadata Seed Test
 
@@ -663,6 +739,25 @@ conflict. Assignment responses include `app_label`, `policy_label`,
 `policy_type`, `connector`, `action`, `resource`, and `category` so users do
 not need to manually look up every ID in DBeaver.
 
+Bulk update and delete also use policy IDs:
+
+```json
+{
+  "policy_ids": [12, 13, 26],
+  "enabled": false
+}
+```
+
+```json
+{
+  "policy_ids": [12, 13, 26]
+}
+```
+
+Bulk update/delete returns `404` if any requested policy ID is not currently
+assigned in that scope. This prevents silent mistakes when a developer tries to
+disable or delete a policy assignment that does not exist.
+
 Latest focused smoke test passed:
 
 ```text
@@ -687,6 +782,7 @@ Policy assignment API checks passed.
 - App lookup and assignment CRUD aliases work with client_id.
 - App policy assignments support single and bulk policy_ids.
 - Global policy assignments support single and bulk policy_ids.
+- Bulk assignment update/delete returns 404 for missing assignments.
 - Effective policy assignment summaries include app and global scopes.
 - Existing assignments update in place instead of duplicating rows.
 - Assignment responses include readable labels.

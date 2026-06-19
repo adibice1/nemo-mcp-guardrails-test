@@ -15,6 +15,8 @@ git pull
 docker compose up -d postgres
 python scripts/test_app_auth_http.py
 python scripts/test_policy_assignment_api.py
+python scripts/test_policy_auto_compile.py
+python scripts/test_guardrails_run_http.py
 python scripts/test_app_policy_scope.py
 python scripts/test_tool_guard.py
 python scripts/test_nemo_mcp.py
@@ -60,7 +62,9 @@ X-App-ID + X-API-Key
 ```
 
 App/global policy assignment POST bodies now use `policy_ids`, so one endpoint
-handles both single and bulk assignment:
+handles both single and bulk assignment. Bulk update/delete also uses
+`policy_ids` and returns `404` if a requested policy is not assigned in that
+scope:
 
 ```json
 {
@@ -88,6 +92,11 @@ These routes resolve `client_id` to the internal app ID and then use the same
 assignment logic. The effective-policy routes are read-only summaries that show
 mandatory global assignments and app-specific assignments for one app together.
 
+Policy create/update now refreshes `compiled_policy_rules` automatically.
+Old compiled rows are marked stale and disabled, and a fresh active row is
+created when the policy remains enabled. `POST /policies/compile-rules` remains
+available as a manual full resync/debug endpoint.
+
 `POST /v1/guardrails/run` now builds that runtime context and executes the
 submitted message through the reusable guarded flow. It also supports hybrid
 conversation history: stored turns for `(app_id, conversation_id)` are loaded
@@ -112,6 +121,11 @@ execute_guarded_message()
 same detailed terminal workflow. The full read-only NeMo + GitHub MCP run
 passed after the extraction.
 
+`scripts/test_guardrails_run_http.py` now proves authenticated
+`POST /v1/guardrails/run` uses real temporary DB app assignments,
+`compiled_policy_rules`, app-scoped prompt rules, and app-scoped blocked tools.
+It fakes rails/agent so it does not start Docker, GitHub MCP, or Azure.
+
 ## Important Current Files
 
 - `src/nemo_mcp_guardrails/app_auth.py`: API-key hashing and app verification.
@@ -125,6 +139,7 @@ passed after the extraction.
 - `src/nemo_mcp_guardrails/tool_guard.py`: app-scoped execution-level MCP tool guard.
 - `scripts/test_nemo_mcp.py`: full read-only integration runner and terminal display.
 - `scripts/test_app_auth_http.py`: protected HTTP boundary and runtime-execution reachability test.
+- `scripts/test_guardrails_run_http.py`: app-scoped allowed/blocked `/run` HTTP integration test with fake rails/agent and real DB scope.
 - `scripts/test_app_policy_scope.py`: real temporary app-assignment scope test.
 
 ## Verified Current Results
@@ -138,6 +153,7 @@ conversation history storage/reload/truncation: passed
 oversized latest-message rejection: passed
 controlled connector tool-error responses: passed
 controlled Azure output-filter responses: passed
+authenticated /run allowed/blocked app-scope HTTP coverage: passed
 temporary authentication rows cleanup: passed
 temporary app policy-scope rows cleanup: passed
 App A issue_write blocked / App B issue_write allowed: passed
@@ -197,7 +213,8 @@ endpoint testing to the normal harness.
 
 - Admin CRUD endpoints are not authenticated.
 - User login and role authorization are not implemented.
-- Automatic policy compilation/invalidation is not implemented.
+- Assignment-cache invalidation is not needed yet because there is no Redis/app
+  policy bundle cache.
 - Argument-level and workflow-state policies are not implemented.
 - Connector credentials and LLM credentials are not managed through a secrets
   manager yet.

@@ -17,6 +17,9 @@ from nemo_mcp_guardrails.api.app_schemas import (
     AppRead,
     AppUpdate,
     EffectivePolicyAssignmentsRead,
+    PolicyAssignmentBulkDelete,
+    PolicyAssignmentBulkDeleteResponse,
+    PolicyAssignmentBulkUpdate,
     PolicyAssignmentCreate,
     PolicyAssignmentUpdate,
 )
@@ -179,6 +182,36 @@ def _require_app_policy_assignment(
     return assignment
 
 
+def _require_app_policy_assignments_by_policy_ids(
+    app_id: int,
+    policy_ids: list[int],
+    db: Session,
+) -> list[AppPolicyAssignmentRecord]:
+    """Return app assignments by policy IDs or raise for missing assignments."""
+
+    unique_ids = _unique_policy_ids(policy_ids)
+    assignments = list(
+        db.scalars(
+            select(AppPolicyAssignmentRecord).where(
+                AppPolicyAssignmentRecord.app_id == app_id,
+                AppPolicyAssignmentRecord.policy_id.in_(unique_ids),
+            )
+        )
+    )
+    assignments_by_policy_id = {
+        assignment.policy_id: assignment for assignment in assignments
+    }
+    missing_ids = [
+        policy_id for policy_id in unique_ids if policy_id not in assignments_by_policy_id
+    ]
+    if missing_ids:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Policy assignments not found for policy IDs: {missing_ids}",
+        )
+    return [assignments_by_policy_id[policy_id] for policy_id in unique_ids]
+
+
 def _update_app_policy_assignment(
     app_id: int,
     assignment_id: int,
@@ -194,6 +227,28 @@ def _update_app_policy_assignment(
     return serialize_app_policy_assignment(assignment)
 
 
+def _bulk_update_app_policy_assignments(
+    app_id: int,
+    payload: PolicyAssignmentBulkUpdate,
+    db: Session,
+) -> list[dict[str, object]]:
+    """Enable or disable multiple app-specific policy assignments."""
+
+    assignments = _require_app_policy_assignments_by_policy_ids(
+        app_id,
+        payload.policy_ids,
+        db,
+    )
+    for assignment in assignments:
+        assignment.enabled = payload.enabled
+
+    db.commit()
+    for assignment in assignments:
+        db.refresh(assignment)
+
+    return [serialize_app_policy_assignment(assignment) for assignment in assignments]
+
+
 def _delete_app_policy_assignment(
     app_id: int,
     assignment_id: int,
@@ -204,6 +259,32 @@ def _delete_app_policy_assignment(
     assignment = _require_app_policy_assignment(app_id, assignment_id, db)
     db.delete(assignment)
     db.commit()
+
+
+def _bulk_delete_app_policy_assignments(
+    app_id: int,
+    payload: PolicyAssignmentBulkDelete,
+    db: Session,
+) -> dict[str, object]:
+    """Delete multiple app-specific policy assignments."""
+
+    assignments = _require_app_policy_assignments_by_policy_ids(
+        app_id,
+        payload.policy_ids,
+        db,
+    )
+    deleted_policy_ids = [assignment.policy_id for assignment in assignments]
+    deleted_assignment_ids = [assignment.id for assignment in assignments]
+
+    for assignment in assignments:
+        db.delete(assignment)
+    db.commit()
+
+    return {
+        "deleted_policy_ids": deleted_policy_ids,
+        "deleted_assignment_ids": deleted_assignment_ids,
+        "deleted_count": len(deleted_assignment_ids),
+    }
 
 
 def _effective_policy_assignments_for_app(
@@ -335,6 +416,36 @@ def create_app_policy_assignment_by_client_id(
 
 
 @router.put(
+    "/by-client-id/{client_id}/policy-assignments",
+    response_model=list[AppPolicyAssignmentRead],
+)
+def bulk_update_app_policy_assignments_by_client_id(
+    client_id: str,
+    payload: PolicyAssignmentBulkUpdate,
+    db: Session = Depends(get_db),
+) -> list[dict[str, object]]:
+    """Enable or disable multiple app-specific assignments by client ID."""
+
+    app = _require_app_by_client_id(client_id, db)
+    return _bulk_update_app_policy_assignments(app.id, payload, db)
+
+
+@router.delete(
+    "/by-client-id/{client_id}/policy-assignments",
+    response_model=PolicyAssignmentBulkDeleteResponse,
+)
+def bulk_delete_app_policy_assignments_by_client_id(
+    client_id: str,
+    payload: PolicyAssignmentBulkDelete,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    """Delete multiple app-specific assignments by client ID."""
+
+    app = _require_app_by_client_id(client_id, db)
+    return _bulk_delete_app_policy_assignments(app.id, payload, db)
+
+
+@router.put(
     "/by-client-id/{client_id}/policy-assignments/{assignment_id}",
     response_model=AppPolicyAssignmentRead,
 )
@@ -454,6 +565,36 @@ def create_app_policy_assignment(
 
     _require_app(app_id, db)
     return _assign_policies_to_app(app_id, payload, db)
+
+
+@router.put(
+    "/{app_id}/policy-assignments",
+    response_model=list[AppPolicyAssignmentRead],
+)
+def bulk_update_app_policy_assignments(
+    app_id: int,
+    payload: PolicyAssignmentBulkUpdate,
+    db: Session = Depends(get_db),
+) -> list[dict[str, object]]:
+    """Enable or disable multiple app-specific policy assignments."""
+
+    _require_app(app_id, db)
+    return _bulk_update_app_policy_assignments(app_id, payload, db)
+
+
+@router.delete(
+    "/{app_id}/policy-assignments",
+    response_model=PolicyAssignmentBulkDeleteResponse,
+)
+def bulk_delete_app_policy_assignments(
+    app_id: int,
+    payload: PolicyAssignmentBulkDelete,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    """Delete multiple app-specific policy assignments."""
+
+    _require_app(app_id, db)
+    return _bulk_delete_app_policy_assignments(app_id, payload, db)
 
 
 @router.put(

@@ -58,6 +58,8 @@ Current backend/API state:
 - Assignment POST bodies use `policy_ids`, so the same endpoints handle single
   and bulk assignment. Responses include readable app/policy labels beside
   numeric IDs.
+- Assignment bulk update/delete also uses `policy_ids` and returns `404` when
+  a requested policy is not assigned in that scope.
 - Developers can use `/apps/by-client-id/{client_id}` and
   `/apps/by-client-id/{client_id}/policy-assignments` instead of remembering
   numeric app IDs in Swagger.
@@ -84,7 +86,9 @@ Current backend/API state:
   agent/guarded-tool execution with trimmed history, output rail, and
   structured results.
 - `POST /policies/compile-preview` previews compiler output from enabled DB rows.
-- `POST /policies/compile-rules` stores generated NeMo rule text in `compiled_policy_rules`.
+- `POST /policies` and `PUT /policies/{policy_id}` automatically refresh
+  generated NeMo rule text in `compiled_policy_rules`.
+- `POST /policies/compile-rules` remains available as a manual full resync.
 - `src/nemo_mcp_guardrails/database/policy_loader.py` optionally loads enabled global plus app-assigned policy rows.
 - `prompt_rule_loader.py` and `prompt_rule_compiler.py` optionally apply the same app scope when injecting enabled compiled rules into NeMo prompts.
 - `scripts/seed_normalized_policy_metadata.py` seeds normalized app/action/resource/tool metadata.
@@ -691,7 +695,7 @@ To add a new policy in the current prototype:
 ```text
 Input policy:
 create enabled policy row in Postgres
--> POST /policies/compile-rules
+-> policy CRUD automatically refreshes compiled_policy_rules
 -> policy_loader.py / policy_compiler.py / tool_guard.py use it at runtime
 
 New GitHub compiler metadata:
@@ -702,7 +706,7 @@ GITHUB_METADATA_TOOL_MAPPINGS for normalized metadata seeding
 
 Output policy:
 create enabled output policy row in Postgres
--> POST /policies/compile-rules
+-> policy CRUD automatically refreshes compiled_policy_rules
 -> prompt_rule_compiler.py injects it into the NeMo output prompt
 ```
 
@@ -733,6 +737,11 @@ Latest verified full test result:
   unknown clients, and unauthorized apps receive a generic `401`; valid
   credentials reach the protected endpoints; the run endpoint reaches guarded
   execution; and temporary rows are cleaned up.
+- `scripts/test_guardrails_run_http.py` confirmed authenticated
+  `POST /v1/guardrails/run` loads real app-scoped DB policy assignments,
+  compiled prompt rules, and blocked tools. It proves an allowed read prompt
+  reaches the fake agent and an assigned GitHub issue-creation block stops
+  before agent execution without starting Docker, GitHub MCP, or Azure.
 - `scripts/debug_nemo_output_check.py` confirmed the safe summary passes NeMo
   and fake token/environment-variable output is blocked by the NeMo output
   rail.
@@ -777,7 +786,9 @@ python scripts/test_policy_loader.py
 python scripts/test_app_policy_scope.py
 python scripts/test_app_auth.py
 python scripts/test_app_auth_http.py
+python scripts/test_policy_auto_compile.py
+python scripts/test_guardrails_run_http.py
 python scripts/debug_nemo_output_check.py
-python -m py_compile src/nemo_mcp_guardrails/app_auth.py src/nemo_mcp_guardrails/guarded_execution.py src/nemo_mcp_guardrails/runtime_factory.py src/nemo_mcp_guardrails/api/auth.py src/nemo_mcp_guardrails/api/runtime.py src/nemo_mcp_guardrails/api/runtime_schemas.py src/nemo_mcp_guardrails/policy_compiler.py src/nemo_mcp_guardrails/tool_guard.py src/nemo_mcp_guardrails/database/models.py src/nemo_mcp_guardrails/database/conversation_store.py src/nemo_mcp_guardrails/database/policy_loader.py src/nemo_mcp_guardrails/database/test_case_loader.py src/nemo_mcp_guardrails/database/prompt_rule_loader.py src/nemo_mcp_guardrails/prompt_rule_compiler.py scripts/seed_normalized_policy_metadata.py scripts/test_nemo_mcp.py scripts/test_tool_guard.py scripts/test_policy_loader.py scripts/test_app_policy_scope.py scripts/test_app_auth.py scripts/test_app_auth_http.py scripts/test_runtime_llm_selection.py scripts/debug_nemo_self_check.py scripts/debug_nemo_output_check.py
+python -m py_compile src/nemo_mcp_guardrails/app_auth.py src/nemo_mcp_guardrails/guarded_execution.py src/nemo_mcp_guardrails/runtime_factory.py src/nemo_mcp_guardrails/api/auth.py src/nemo_mcp_guardrails/api/runtime.py src/nemo_mcp_guardrails/api/runtime_schemas.py src/nemo_mcp_guardrails/policy_compiler.py src/nemo_mcp_guardrails/policy_rule_service.py src/nemo_mcp_guardrails/tool_guard.py src/nemo_mcp_guardrails/database/models.py src/nemo_mcp_guardrails/database/conversation_store.py src/nemo_mcp_guardrails/database/policy_loader.py src/nemo_mcp_guardrails/database/test_case_loader.py src/nemo_mcp_guardrails/database/prompt_rule_loader.py src/nemo_mcp_guardrails/prompt_rule_compiler.py scripts/seed_normalized_policy_metadata.py scripts/test_nemo_mcp.py scripts/test_tool_guard.py scripts/test_policy_loader.py scripts/test_app_policy_scope.py scripts/test_app_auth.py scripts/test_app_auth_http.py scripts/test_policy_auto_compile.py scripts/test_guardrails_run_http.py scripts/test_runtime_llm_selection.py scripts/debug_nemo_self_check.py scripts/debug_nemo_output_check.py
 python scripts/test_nemo_mcp.py
 ```

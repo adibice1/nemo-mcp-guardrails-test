@@ -175,6 +175,44 @@ def main() -> None:
             assert app_client_id_delete.status_code == 204
             assert count_app_assignments(app_id) == 1
 
+            app_bulk_restore = client.post(
+                f"/apps/by-client-id/{client_id}/policy-assignments",
+                json={"policy_ids": policy_ids, "enabled": True},
+            )
+            assert app_bulk_restore.status_code == 201, app_bulk_restore.text
+            assert count_app_assignments(app_id) == 2
+
+            app_bulk_update = client.put(
+                f"/apps/by-client-id/{client_id}/policy-assignments",
+                json={"policy_ids": policy_ids, "enabled": False},
+            )
+            assert app_bulk_update.status_code == 200, app_bulk_update.text
+            assert len(app_bulk_update.json()) == 2
+            assert all(item["enabled"] is False for item in app_bulk_update.json())
+
+            app_missing_bulk_update = client.put(
+                f"/apps/by-client-id/{client_id}/policy-assignments",
+                json={"policy_ids": [999999999], "enabled": True},
+            )
+            assert app_missing_bulk_update.status_code == 404
+
+            app_bulk_delete = client.request(
+                "DELETE",
+                f"/apps/by-client-id/{client_id}/policy-assignments",
+                json={"policy_ids": [policy_ids[0]]},
+            )
+            assert app_bulk_delete.status_code == 200, app_bulk_delete.text
+            assert app_bulk_delete.json()["deleted_policy_ids"] == [policy_ids[0]]
+            assert app_bulk_delete.json()["deleted_count"] == 1
+            assert count_app_assignments(app_id) == 1
+
+            app_missing_bulk_delete = client.request(
+                "DELETE",
+                f"/apps/by-client-id/{client_id}/policy-assignments",
+                json={"policy_ids": [policy_ids[0]]},
+            )
+            assert app_missing_bulk_delete.status_code == 404
+
             global_bulk = client.post(
                 "/global-policy-assignments",
                 json={"policy_ids": policy_ids, "enabled": True},
@@ -197,6 +235,37 @@ def main() -> None:
             assert global_single_body[0]["enabled"] is False
             assert count_global_assignments(policy_ids) == 2
 
+            global_bulk_update = client.put(
+                "/global-policy-assignments",
+                json={"policy_ids": policy_ids, "enabled": False},
+            )
+            assert global_bulk_update.status_code == 200, global_bulk_update.text
+            assert len(global_bulk_update.json()) == 2
+            assert all(item["enabled"] is False for item in global_bulk_update.json())
+
+            global_missing_bulk_update = client.put(
+                "/global-policy-assignments",
+                json={"policy_ids": [999999999], "enabled": True},
+            )
+            assert global_missing_bulk_update.status_code == 404
+
+            global_bulk_delete = client.request(
+                "DELETE",
+                "/global-policy-assignments",
+                json={"policy_ids": [policy_ids[0]]},
+            )
+            assert global_bulk_delete.status_code == 200, global_bulk_delete.text
+            assert global_bulk_delete.json()["deleted_policy_ids"] == [policy_ids[0]]
+            assert global_bulk_delete.json()["deleted_count"] == 1
+            assert count_global_assignments(policy_ids) == 1
+
+            global_missing_bulk_delete = client.request(
+                "DELETE",
+                "/global-policy-assignments",
+                json={"policy_ids": [policy_ids[0]]},
+            )
+            assert global_missing_bulk_delete.status_code == 404
+
             effective_by_id = client.get(
                 f"/apps/{app_id}/effective-policy-assignments"
             )
@@ -204,9 +273,8 @@ def main() -> None:
             effective_body = effective_by_id.json()
             assert effective_body["app_id"] == app_id
             assert effective_body["app_label"].startswith("Temporary Assignment App")
-            assert effective_body["global_assignment_count"] >= 2
+            assert effective_body["global_assignment_count"] >= 1
             assert effective_body["app_assignment_count"] == 1
-            assert effective_body["enabled_assignment_count"] >= 1
             assert effective_body["disabled_assignment_count"] >= 1
 
             app_policy_ids = {
@@ -216,7 +284,7 @@ def main() -> None:
                 item["policy_id"] for item in effective_body["global_assignments"]
             }
             assert policy_ids[1] in app_policy_ids
-            assert set(policy_ids).issubset(global_policy_ids)
+            assert policy_ids[1] in global_policy_ids
             assert all(
                 "assignment_id" in item and "policy_label" in item
                 for item in effective_body["global_assignments"]
@@ -237,6 +305,7 @@ def main() -> None:
         print("- App lookup and assignment CRUD aliases work with client_id.")
         print("- App policy assignments support single and bulk policy_ids.")
         print("- Global policy assignments support single and bulk policy_ids.")
+        print("- Bulk assignment update/delete returns 404 for missing assignments.")
         print("- Effective policy assignment summaries include app and global scopes.")
         print("- Existing assignments update in place instead of duplicating rows.")
         print("- Assignment responses include readable labels.")

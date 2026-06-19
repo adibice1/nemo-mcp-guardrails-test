@@ -95,6 +95,8 @@ The system successfully:
 - Uses DB-loaded input policies to compile `tool_guard.py` blocked tools and `scripts/test_nemo_mcp.py` generated blocked tests.
 - Verifies DB policy loading through `scripts/test_policy_loader.py`.
 - Stores compiled NeMo rule text in `compiled_policy_rules`.
+- Automatically refreshes `compiled_policy_rules` when policies are created or
+  updated through the policy CRUD API.
 - Injects enabled compiled rules into `config/prompts.yml` at runtime through `prompt_rule_compiler.py`.
 - Seeds normalized app/action/resource/tool metadata through `scripts/seed_normalized_policy_metadata.py`.
 - Backfills `allowed_test_case_expected_tools` from current allowed test rows.
@@ -112,6 +114,8 @@ The system successfully:
 - Uses `policy_ids` for assignment POST bodies, so the same endpoints handle
   single and bulk assignments. Assignment responses include readable app and
   policy labels for Swagger/frontend use.
+- Uses `policy_ids` for assignment bulk update/delete too, returning `404`
+  when a requested policy is not assigned in that app/global scope.
 - Adds client-ID convenience routes under `/apps/by-client-id/{client_id}` so
   developers do not need to remember numeric app IDs for app lookup or
   policy-assignment management.
@@ -208,7 +212,7 @@ For a new GitHub input/tool policy:
 3. Add resource synonyms in `GITHUB_RESOURCE_SYNONYMS` if the resource is new.
 4. Add an `InputPolicyObject` to `DEFAULT_INPUT_POLICY_OBJECTS`.
 5. Add or enable the policy row in Postgres.
-6. Run `POST /policies/compile-rules`.
+6. Policy CRUD automatically refreshes `compiled_policy_rules`.
 7. Run the compiler, tool guard, and full MCP tests.
 
 Example:
@@ -222,9 +226,9 @@ InputPolicyObject(
 )
 ```
 
-For a new output policy, add an enabled output policy row in Postgres, run
-`POST /policies/compile-rules`, and verify that the output rule count appears
-in `scripts/test_nemo_mcp.py`.
+For a new output policy, add an enabled output policy row in Postgres through
+the API. Policy CRUD automatically refreshes `compiled_policy_rules`; then
+verify that the output rule count appears in `scripts/test_nemo_mcp.py`.
 
 Current important design note:
 
@@ -327,6 +331,8 @@ github update file block -> create_or_update_file
 
 Output policies are compiled into `compiled_policy_rules`; enabled output rules
 are now injected into the runtime NeMo output prompt by `prompt_rule_compiler.py`.
+`POST /policies/compile-rules` remains available as a manual full-resync/debug
+endpoint, but normal policy create/update flows no longer require it.
 
 ## Current Normalized Metadata State
 
@@ -379,18 +385,19 @@ exist yet.
 
 ## Current Next Step
 
-Add stronger HTTP integration coverage for the authenticated full-proxy endpoint:
+Enforce connector access before runtime constructs GitHub MCP tools:
 
 ```text
 POST /v1/guardrails/run
 -> require_authenticated_app
 -> authenticated app ID
+-> check app_connectors for enabled GitHub connector access
+-> reject runtime construction if app is not linked to GitHub
 -> app_policy_assignments + global_policy_assignments
 -> active global policies + active app policies
 -> app-scoped NeMo prompt rules
 -> app-scoped tool guard
 -> execute input rail + guarded agent/tools + output rail
--> next: assert allowed and blocked HTTP runtime cases end to end
 ```
 
 The `users`, `apps`, `app_users`, `connectors`, and `app_connectors`
@@ -414,5 +421,7 @@ through the full read-only runner.
 `GET /v1/guardrails/auth-check` proves invalid requests are rejected before
 runtime work. `POST /v1/guardrails/run` now reuses the authenticated scope and
 executes the submitted message through `execute_guarded_message()`.
+`scripts/test_guardrails_run_http.py` proves allowed and blocked HTTP runtime
+cases with real temporary DB policy scope and fake rails/agent.
 
 Do not remove the flat `policies.connector/action/resource` columns yet.

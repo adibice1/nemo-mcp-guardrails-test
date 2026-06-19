@@ -52,6 +52,11 @@ PUT/DELETE /apps/by-client-id/{client_id}/policy-assignments/{assignment_id}
 -> resolve client_id to app_id
 -> use the same app-specific update/delete flow
 
+PUT/DELETE /apps/by-client-id/{client_id}/policy-assignments
+-> resolve client_id to app_id
+-> bulk update/delete assignment rows by policy_ids
+-> return 404 if any requested policy_id is not assigned to the app
+
 GET /apps/{app_id}/effective-policy-assignments
 GET /apps/by-client-id/{client_id}/effective-policy-assignments
 -> return mandatory global assignments and app-specific assignments together
@@ -59,6 +64,28 @@ GET /apps/by-client-id/{client_id}/effective-policy-assignments
 POST /global-policy-assignments
 -> validate reusable policies
 -> create or update one or more mandatory global assignments from policy_ids
+
+PUT/DELETE /global-policy-assignments
+-> bulk update/delete global assignment rows by policy_ids
+-> return 404 if any requested policy_id is not globally assigned
+
+POST /policies
+-> validate readable connector/action/resource/category fields
+-> store policy row
+-> compile its NeMo rail rule in the same transaction
+-> rollback and return 400 if the compiler cannot build a rule
+
+PUT /policies/{policy_id}
+-> update policy row
+-> increment policy_version
+-> mark previous compiled rules stale and disabled
+-> compile a fresh active rule when the policy remains enabled
+-> leave no active compiled rule when the policy is disabled
+
+POST /policies/compile-rules
+-> manual full resync/debug endpoint
+-> marks existing compiled rules stale and disabled
+-> creates fresh active compiled rules for all enabled policies
 ```
 
 These assignment APIs manage scope. Policy and compiled-rule loaders now
@@ -131,6 +158,11 @@ app conversation. If no stored turns exist, it bootstraps from client-supplied
 `conversation_history`. Older turns are trimmed by
 `NEMO_MAX_RUNTIME_CONTEXT_CHARS` so the latest message plus recent history fits
 before Azure OpenAI is called.
+
+`scripts/test_guardrails_run_http.py` is the focused HTTP integration proof for
+this endpoint. It uses fake rails/agent to avoid Docker and Azure, while still
+using real temporary DB app rows, policy rows, app assignments,
+`compiled_policy_rules`, prompt-rule loading, and blocked-tool loading.
 
 ```text
 POST /v1/guardrails/run
@@ -303,7 +335,9 @@ src/nemo_mcp_guardrails/database/prompt_rule_loader.py:21
 load_prompt_policy_rules()
 ```
 
-Loads enabled rule rows from the `compiled_policy_rules` table. These rows are generated artifacts created by `POST /policies/compile-rules`.
+Loads enabled rule rows from the `compiled_policy_rules` table. These rows are
+generated artifacts refreshed automatically by policy create/update and can
+also be regenerated through `POST /policies/compile-rules`.
 
 ```text
 -> src/nemo_mcp_guardrails/prompt_rule_compiler.py:23
@@ -609,11 +643,31 @@ output_rules
 This does not store anything.
 
 ```text
-policies.py:158
+src/nemo_mcp_guardrails/policy_rule_service.py
+```
+
+Owns reusable policy-rule compilation:
+
+```text
+policy row
+-> to_input_policy_object() or to_output_policy_object()
+-> compile_policy_rule_record()
+-> refresh_compiled_policy_rule()
+-> compiled_policy_rules
+```
+
+`POST /policies` and `PUT /policies/{policy_id}` call this service inside the
+same database transaction as the policy write. Old compiled rows are marked
+`stale=true` and `enabled=false`; a fresh row is inserted only when the policy
+is enabled.
+
+```text
+policies.py
 compile_and_store_policy_rules()
 ```
 
-Reads enabled DB policies, compiles them, deletes old stored compiled rules, and inserts fresh rows into `compiled_policy_rules`.
+The manual resync endpoint still exists. It marks existing stored compiled
+rules stale/disabled and inserts fresh rows for every enabled policy.
 
 ```text
 policies.py:145
@@ -640,7 +694,7 @@ Reads the currently stored compiled rules.
 | Normalized connector/action/resource metadata | Postgres `connectors`, `connector_actions`, `connector_resources`, `connector_tool_mappings` | Seeded by `scripts/seed_normalized_policy_metadata.py`. |
 | Actual NeMo input prompt template | `config/prompts.yml` + DB rules | `prompt_rule_compiler.py` injects `compiled_policy_rules` into the template. |
 | Actual NeMo output prompt template | `config/prompts.yml` + DB rules | `prompt_rule_compiler.py` injects `compiled_policy_rules` into the template. |
-| Stored compiled rule text | Postgres `compiled_policy_rules` table | Created by `POST /policies/compile-rules`, consumed by `prompt_rule_loader.py`. |
+| Stored compiled rule text | Postgres `compiled_policy_rules` table | Auto-refreshed by policy CRUD and manually resyncable through `POST /policies/compile-rules`; consumed by `prompt_rule_loader.py`. |
 
 ## Current End State In Terminal
 

@@ -86,6 +86,8 @@ Blocked actions:
 - The home computer runs the project Docker Postgres service on host port `5433` because a Windows PostgreSQL service already uses host port `5432`. Home-computer `.env`, `DATABASE_URL`, and DBeaver settings must use `5433`; Postgres still listens on port `5432` inside the container.
 - FastAPI policy CRUD endpoints live under `/policies`.
 - `POST /policies/compile-preview` reads enabled DB policy rows, converts them into `InputPolicyObject` / `OutputPolicyObject`, and returns generated input rules, blocked tools, generated test prompts, and output rules.
+- `POST /policies` and `PUT /policies/{policy_id}` automatically refresh `compiled_policy_rules`; old compiled rows are marked stale and disabled, and a fresh active row is created when the policy remains enabled.
+- `POST /policies/compile-rules` remains available as a manual full resync/debug endpoint.
 - FastAPI allowed-test CRUD endpoints live under `/allowed-test-cases`. These rows are safe prompts that `scripts/test_nemo_mcp.py` should expect to pass; they are not allow/block policies.
 - `src/nemo_mcp_guardrails/database/policy_loader.py` provides app-aware `load_input_policy_objects(app_id=...)` and `load_output_policy_objects(app_id=...)`. With an app ID, loaders return enabled global assignments plus enabled assignments for that app. Without an app ID, they preserve the current all-enabled testing behavior.
 - `src/nemo_mcp_guardrails/database/prompt_rule_loader.py` and `build_rails_config_with_prompt_rules(..., app_id=...)` apply the same optional assignment scope to compiled NeMo rules.
@@ -96,6 +98,7 @@ Blocked actions:
 - `app_policy_assignments` and `global_policy_assignments` reference the existing reusable definitions in `policies`. The connector-independent credential output policy is globally assigned; GitHub write policies remain unassigned.
 - FastAPI client-app CRUD lives under `/apps`; nested app-policy-assignment CRUD lives under `/apps/{app_id}/policy-assignments`; global assignment CRUD lives under `/global-policy-assignments`.
 - App/global assignment POST bodies use `policy_ids`, so the same endpoints handle single and bulk assignment. Assignment responses include readable app and policy labels beside numeric IDs for Swagger/frontend use.
+- App/global assignment bulk update/delete also uses `policy_ids`; the API returns `404` if a requested policy is not assigned in that app/global scope.
 - Developer-friendly client-ID aliases exist under `/apps/by-client-id/{client_id}` and `/apps/by-client-id/{client_id}/policy-assignments`; they resolve to the same internal app rows and full assignment CRUD logic.
 - Effective policy assignment summaries exist under `/apps/{app_id}/effective-policy-assignments` and `/apps/by-client-id/{client_id}/effective-policy-assignments`; they return global plus app-specific assignments with policy IDs, assignment IDs, labels, and enabled flags.
 - App create/update accepts an API key, stores only its SHA-256 hash, and never returns the plaintext key or hash. `src/nemo_mcp_guardrails/app_auth.py` centralizes hashing and constant-time verification; `authenticate_app()` accepts only matching, authorized client ID/API-key pairs.
@@ -106,6 +109,7 @@ Blocked actions:
 - `src/nemo_mcp_guardrails/runtime_factory.py` respects separate `main_llm_config_id` and `guardrail_llm_config_id` values on the authenticated app. The guardrail config is injected into NeMo rails, and the main config is used by the LangChain agent. Missing config IDs fall back to `.env` Azure OpenAI settings. Only Azure OpenAI-compatible provider rows are executable for now; other providers return a clear unsupported-provider error.
 - `src/nemo_mcp_guardrails/guarded_execution.py` now owns the reusable single-request sequence: input rail, early block, agent/guarded tools with optional trimmed history, controlled `tool_error` responses for connector `ToolException` failures, output rail, controlled blocked responses for Azure output `content_filter` failures, and structured result. `scripts/test_nemo_mcp.py` still chooses test prompts and prints the familiar workflow sections.
 - `scripts/test_app_auth_http.py` is a self-cleaning HTTP authentication diagnostic covering missing headers, wrong keys, unknown clients, unauthorized apps, and valid credentials.
+- `scripts/test_guardrails_run_http.py` is a self-cleaning HTTP runtime diagnostic proving authenticated `/run` loads real app-scoped policy assignments, compiled prompt rules, and blocked tools while using fake rails/agent to avoid Docker and Azure.
 - The management/admin CRUD endpoints are not authenticated yet. Do not describe the current HTTP dependency as protecting `/apps`, `/policies`, or assignment CRUD.
 - Normal full-run GitHub MCP tests should keep `GITHUB_MCP_READ_ONLY=1`. Manual local write testing can set `GITHUB_MCP_READ_ONLY=0` in `.env` and restart the API. Future write-capable scripted testing should be a separate opt-in harness with a throwaway repo and limited token.
 - Do not add a custom `config/policies.yml` yet unless explicitly choosing to prototype the future admin/backend policy store. It is not a standard NeMo Guardrails file.
@@ -127,12 +131,9 @@ slice. It is the single backlog for unfinished plans.
 
 The assignment-aware, app-authentication, protected HTTP boundary,
 authenticated runtime endpoint, reusable guarded-execution slice,
-conversation-history persistence/truncation, and app-selected main/guardrail
-LLM selection are green. The immediate cleanup is to make
-`config/prompts.yml` a generic self-check shell so actual policy behavior comes
-from Postgres policy rows and `compiled_policy_rules`, not hardcoded
-GitHub/credential examples. After that, add end-to-end HTTP coverage for real
-allowed and blocked app-scoped requests:
+conversation-history persistence/truncation, app-selected main/guardrail LLM
+selection, and policy CRUD auto-compilation are green. The immediate backend
+cleanup is to enforce app connector access during runtime construction:
 
 ```text
 users + apps + llm_configs now exist
@@ -150,14 +151,15 @@ test_app_auth.py covers valid and rejected cases with cleanup
 api/auth.py rejects invalid X-App-ID/X-API-Key requests before runtime work
 GET /v1/guardrails/auth-check proves the protected boundary
 test_app_auth_http.py covers valid and rejected HTTP cases with cleanup
+test_guardrails_run_http.py covers allowed and blocked /run behavior with real DB scope
 POST /v1/guardrails/run executes app-scoped guarded requests
 runtime_schemas.py defines the future-compatible message request and execution response
 guarded_execution.py coordinates input rail, agent/tools, and output rail
 test_nemo_mcp.py displays GuardedExecutionResult without owning coordination
 runtime_factory.py selects app main/guardrail LLM configs, then builds Azure-backed NeMo rails, env-configured GitHub MCP tools, and the LangChain agent
--> make prompts.yml generic and DB-policy driven
--> add HTTP integration coverage for allowed and blocked runtime cases
--> automate policy compilation/invalidation
+policy CRUD auto-refreshes compiled_policy_rules
+-> enforce app_connectors before constructing GitHub MCP tools
+-> keep policy CRUD auto-compilation covered by test_policy_auto_compile.py
 -> keep normal GitHub MCP tests read-only
 ```
 
@@ -177,8 +179,10 @@ Useful verification commands for the current state:
 - `python scripts/test_app_auth.py`
 - `python scripts/test_app_auth_http.py`
 - `python scripts/test_policy_assignment_api.py`
+- `python scripts/test_policy_auto_compile.py`
+- `python scripts/test_guardrails_run_http.py`
 - `python scripts/test_runtime_llm_selection.py`
 - `python scripts/debug_nemo_output_check.py`
 - `python scripts/run_api.py`
-- `python -m py_compile src/nemo_mcp_guardrails/app_auth.py src/nemo_mcp_guardrails/guarded_execution.py src/nemo_mcp_guardrails/runtime_factory.py src/nemo_mcp_guardrails/api/auth.py src/nemo_mcp_guardrails/api/runtime.py src/nemo_mcp_guardrails/api/runtime_schemas.py src/nemo_mcp_guardrails/policy_compiler.py src/nemo_mcp_guardrails/tool_guard.py src/nemo_mcp_guardrails/database/models.py src/nemo_mcp_guardrails/database/conversation_store.py src/nemo_mcp_guardrails/database/policy_loader.py src/nemo_mcp_guardrails/database/test_case_loader.py src/nemo_mcp_guardrails/database/prompt_rule_loader.py src/nemo_mcp_guardrails/prompt_rule_compiler.py scripts/seed_normalized_policy_metadata.py scripts/test_nemo_mcp.py scripts/test_tool_guard.py scripts/test_policy_loader.py scripts/test_app_policy_scope.py scripts/test_app_auth.py scripts/test_app_auth_http.py scripts/test_runtime_llm_selection.py scripts/debug_nemo_self_check.py scripts/debug_nemo_output_check.py`
+- `python -m py_compile src/nemo_mcp_guardrails/app_auth.py src/nemo_mcp_guardrails/guarded_execution.py src/nemo_mcp_guardrails/runtime_factory.py src/nemo_mcp_guardrails/api/auth.py src/nemo_mcp_guardrails/api/runtime.py src/nemo_mcp_guardrails/api/runtime_schemas.py src/nemo_mcp_guardrails/policy_compiler.py src/nemo_mcp_guardrails/policy_rule_service.py src/nemo_mcp_guardrails/tool_guard.py src/nemo_mcp_guardrails/database/models.py src/nemo_mcp_guardrails/database/conversation_store.py src/nemo_mcp_guardrails/database/policy_loader.py src/nemo_mcp_guardrails/database/test_case_loader.py src/nemo_mcp_guardrails/database/prompt_rule_loader.py src/nemo_mcp_guardrails/prompt_rule_compiler.py scripts/seed_normalized_policy_metadata.py scripts/test_nemo_mcp.py scripts/test_tool_guard.py scripts/test_policy_loader.py scripts/test_app_policy_scope.py scripts/test_app_auth.py scripts/test_app_auth_http.py scripts/test_policy_auto_compile.py scripts/test_guardrails_run_http.py scripts/test_runtime_llm_selection.py scripts/debug_nemo_self_check.py scripts/debug_nemo_output_check.py`
 - `python scripts/test_nemo_mcp.py`

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import delete, select, update
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from nemo_mcp_guardrails.api.policy_schemas import (
@@ -21,10 +21,14 @@ from nemo_mcp_guardrails.database.models import (
     PolicyRecord,
 )
 from nemo_mcp_guardrails.policy_compiler import (
-    InputPolicyObject,
-    OutputPolicyObject,
     compile_output_rail_rules,
     compile_policy,
+)
+from nemo_mcp_guardrails.policy_rule_service import (
+    refresh_all_compiled_policy_rules,
+    refresh_compiled_policy_rule,
+    to_input_policy_object,
+    to_output_policy_object,
 )
 
 
@@ -147,88 +151,6 @@ def _resolve_policy_references(policy: PolicyRecord, db: Session) -> None:
             )
 
 
-def _require_policy_fields(policy: PolicyRecord, fields: tuple[str, ...]) -> None:
-    """Raise a validation error when a stored policy is missing compiler fields."""
-
-    missing_fields = [field for field in fields if not getattr(policy, field)]
-    if missing_fields:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                f"Policy {policy.id} is missing required fields: "
-                + ", ".join(missing_fields)
-            ),
-        )
-
-
-def _to_input_policy_object(policy: PolicyRecord) -> InputPolicyObject:
-    """Convert a stored input policy row into the compiler dataclass."""
-
-    connector = (
-        policy.normalized_connector.name
-        if policy.normalized_connector
-        else policy.connector
-    )
-    action = policy.normalized_action.name if policy.normalized_action else policy.action
-    resource = (
-        policy.normalized_resource.name
-        if policy.normalized_resource
-        else policy.resource
-    )
-
-    if not (connector and action and resource and policy.effect):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Policy {policy.id} is missing required input policy fields",
-        )
-
-    return InputPolicyObject(
-        connector=connector,
-        action=action,
-        resource=resource,
-        effect=policy.effect,
-    )
-
-
-def _to_output_policy_object(policy: PolicyRecord) -> OutputPolicyObject:
-    """Convert a stored output policy row into the compiler dataclass."""
-
-    _require_policy_fields(policy, ("category", "description", "effect"))
-    return OutputPolicyObject(
-        category=policy.category or "",
-        description=policy.description or "",
-        effect=policy.effect,
-    )
-
-
-def _compile_policy_rule_record(policy: PolicyRecord) -> CompiledPolicyRuleRecord:
-    """Compile one stored policy row into a persisted rail rule record."""
-
-    if policy.policy_type == "input":
-        compiled_policy = compile_policy(_to_input_policy_object(policy))
-        return CompiledPolicyRuleRecord(
-            policy_id=policy.id,
-            rail_type="input",
-            rule_text=compiled_policy.input_rail_rule,
-            policy_version=policy.policy_version,
-            stale=False,
-            enabled=True,
-        )
-
-    if policy.policy_type == "output":
-        output_rules = compile_output_rail_rules((_to_output_policy_object(policy),))
-        return CompiledPolicyRuleRecord(
-            policy_id=policy.id,
-            rail_type="output",
-            rule_text=output_rules[0],
-            policy_version=policy.policy_version,
-            stale=False,
-            enabled=True,
-        )
-
-    raise ValueError(f"Unsupported policy type: {policy.policy_type}")
-
-
 @router.get("", response_model=list[PolicyRead])
 def list_policies(db: Session = Depends(get_db)) -> list[PolicyRecord]:
     """Return all stored policies."""
@@ -256,7 +178,7 @@ def compile_policy_preview(db: Session = Depends(get_db)) -> CompilePreviewRespo
     try:
         for policy in policies:
             if policy.policy_type == "input":
-                compiled_policy = compile_policy(_to_input_policy_object(policy))
+                compiled_policy = compile_policy(to_input_policy_object(policy))
                 input_rules.append(compiled_policy.input_rail_rule)
                 blocked_tools.update(compiled_policy.blocked_tools)
                 test_prompts.extend(
@@ -264,7 +186,7 @@ def compile_policy_preview(db: Session = Depends(get_db)) -> CompilePreviewRespo
                     for test_case in compiled_policy.test_cases
                 )
             elif policy.policy_type == "output":
-                output_policies.append(_to_output_policy_object(policy))
+                output_policies.append(to_output_policy_object(policy))
             else:
                 raise ValueError(f"Unsupported policy type: {policy.policy_type}")
 
@@ -302,24 +224,14 @@ def compile_and_store_policy_rules(
 ) -> CompileAndStoreRulesResponse:
     """Compile enabled policies into stored NeMo rail rule text."""
 
-    policies = list(
-        db.scalars(
-            select(PolicyRecord)
-            .where(PolicyRecord.enabled.is_(True))
-            .order_by(PolicyRecord.id)
-        )
-    )
-
     try:
-        compiled_rules = [_compile_policy_rule_record(policy) for policy in policies]
+        compiled_rules = refresh_all_compiled_policy_rules(db)
     except ValueError as error:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(error),
         ) from error
 
-    db.execute(delete(CompiledPolicyRuleRecord))
-    db.add_all(compiled_rules)
     db.commit()
 
     for compiled_rule in compiled_rules:
@@ -352,6 +264,17 @@ def create_policy(
     policy = PolicyRecord(**payload.model_dump())
     _resolve_policy_references(policy, db)
     db.add(policy)
+
+    try:
+        db.flush()
+        refresh_compiled_policy_rule(db, policy)
+    except ValueError as error:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+
     db.commit()
     db.refresh(policy)
     return policy
@@ -379,11 +302,16 @@ def update_policy(
 
     _resolve_policy_references(policy, db)
     policy.policy_version += 1
-    db.execute(
-        update(CompiledPolicyRuleRecord)
-        .where(CompiledPolicyRuleRecord.policy_id == policy.id)
-        .values(stale=True)
-    )
+
+    try:
+        refresh_compiled_policy_rule(db, policy)
+    except ValueError as error:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+
     db.commit()
     db.refresh(policy)
     return policy

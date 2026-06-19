@@ -20,6 +20,11 @@ The GMS backend prototype now has these core runtime pieces:
   assignments, with readable app and policy labels in API responses.
 - Developer-friendly client-ID aliases for app lookup and app-specific policy
   assignment management.
+- Policy create/update now automatically refreshes `compiled_policy_rules`;
+  old compiled rows are marked stale and disabled.
+- HTTP runtime integration coverage now proves an authenticated app can pass an
+  allowed read request and block an assigned GitHub write policy through
+  `POST /v1/guardrails/run` without Docker or Azure.
 
 Current presentation/demo scope:
 
@@ -72,36 +77,44 @@ Future extension:
 - Store prompt templates or prompt-template versions in Postgres if admins need
   configurable classifier wrappers later.
 
-### 2. Add Real Allowed/Blocked HTTP Runtime Integration Coverage
-
-Current `scripts/test_app_auth_http.py` verifies authentication, runtime
-reachability, conversation history, truncation, and controlled error branches
-with fake runtime pieces.
-
-Next slice:
-
-- Create a temporary authorized app.
-- Assign one GitHub input policy to it.
-- Call `POST /v1/guardrails/run` with an allowed read prompt.
-- Call `POST /v1/guardrails/run` with a blocked write prompt.
-- Assert status, rail statuses, called tools, history metadata, and cleanup.
-- Keep `GITHUB_MCP_READ_ONLY=1` for scripted tests.
-
-## Near-Term Backend Work
-
-### 3. Automate Policy Compilation And Invalidation
+### 2. Keep Real Allowed/Blocked HTTP Runtime Integration Coverage Green
 
 Current state:
 
-- `POST /policies/compile-rules` can write `compiled_policy_rules`.
-- Compiled rules can become stale when a policy or assignment changes.
+- `scripts/test_app_auth_http.py` verifies authentication, runtime
+  reachability, conversation history, truncation, and controlled error branches
+  with fake runtime pieces.
+- `scripts/test_guardrails_run_http.py` creates a temporary authorized app,
+  creates and assigns a GitHub issue-creation block policy, then calls
+  `POST /v1/guardrails/run` with allowed and blocked prompts.
+- The test uses real DB policy assignment, prompt-rule loading, and blocked-tool
+  loading, but fake rails/agent so Docker, GitHub MCP, Azure, and write tools
+  are not touched.
 
 Needed:
 
-- Automatically mark compiled rules stale when policy definitions change.
-- Compile or refresh rules after create/update/delete operations.
-- Decide whether this happens synchronously in the API or later through a
-  worker/background queue.
+- Keep `GITHUB_MCP_READ_ONLY=1` for scripted tests.
+- Add real-Docker/Azure coverage only as an explicit opt-in harness later.
+
+## Near-Term Backend Work
+
+### 3. Broaden Automatic Compilation Coverage
+
+Current state:
+
+- `POST /policies` creates the compiled rule inside the same transaction.
+- `PUT /policies/{policy_id}` stales/disables old compiled rows and creates a
+  fresh active rule when the policy remains enabled.
+- Disabling a policy leaves no active non-stale compiled rule.
+- Invalid compiler input returns `400` without partially persisting the policy.
+- `POST /policies/compile-rules` remains available as a manual full resync.
+
+Needed:
+
+- Decide whether assignment changes should trigger cached app-policy bundle
+  invalidation once Redis or another cache is introduced.
+- Keep `scripts/test_policy_auto_compile.py` in the verification set whenever
+  policy CRUD changes.
 
 ### 4. Finish Runtime LLM Provider Support
 
@@ -213,6 +226,8 @@ Future enhancements:
 .\.venv\Scripts\python.exe scripts\test_app_auth_http.py
 .\.venv\Scripts\python.exe scripts\test_app_auth.py
 .\.venv\Scripts\python.exe scripts\test_policy_assignment_api.py
+.\.venv\Scripts\python.exe scripts\test_policy_auto_compile.py
+.\.venv\Scripts\python.exe scripts\test_guardrails_run_http.py
 .\.venv\Scripts\python.exe scripts\test_app_policy_scope.py
 .\.venv\Scripts\python.exe scripts\test_tool_guard.py
 .\.venv\Scripts\python.exe scripts\debug_nemo_output_check.py
