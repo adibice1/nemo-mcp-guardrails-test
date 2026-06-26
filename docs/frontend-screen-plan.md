@@ -441,13 +441,16 @@ components/
 
 ## Frontend Implementation Order
 
-1. App shell and API client.
-2. Apps list and create/edit forms.
-3. App detail with connector tab.
-4. App policy assignment tab.
-5. Runtime tester.
-6. Policy library create/edit.
-7. Dashboard polish.
+1. Figma-matched static shell and pages. Done in `frontend/` for `/login`,
+   `/signup`, `/policies`, and `/settings`.
+2. API client and typed fetch wrappers.
+3. Wire policy creation/listing to `/policies` and assignment endpoints.
+4. Apps list and create/edit forms.
+5. App detail with connector tab.
+6. App policy assignment tab.
+7. Runtime tester.
+8. Policy library create/edit.
+9. Dashboard polish.
 
 This order gets the core demo path working quickly:
 

@@ -27,6 +27,9 @@ The GMS backend prototype now has these core runtime pieces:
 - Frontend planning docs now exist for the Next.js 13 build:
   `frontend-api-map.md`, `frontend-screen-plan.md`, and
   `frontend-demo-flow.md`.
+- The first Next.js 13 frontend scaffold now exists under `frontend/`. It
+  currently implements the uploaded Figma screens with mock data:
+  `/login`, `/signup`, `/policies`, and `/settings`.
 - Policy create/update now automatically refreshes `compiled_policy_rules`;
   old compiled rows are marked stale and disabled.
 - HTTP runtime integration coverage now proves an authenticated app can pass an
@@ -235,13 +238,17 @@ Current prep:
 - `docs/frontend-screen-plan.md` proposes the first app structure and
   component breakdown.
 - `docs/frontend-demo-flow.md` defines the GitHub MCP presentation flow.
+- `docs/figma-design-intake.md` records the uploaded Figma screens and
+  interaction notes.
+- `frontend/` contains the first static/mock implementation of the Figma
+  pages.
 
-Recommended first implementation slice:
+Next implementation slice:
 
-- scaffold Next.js 13 with TypeScript, Tailwind, shadcn/ui, and lucide-react
-- build app shell and API client
-- implement app list and app detail connector tab
-- reuse the documented demo flow for Figma and frontend validation
+- Wire `/policies` to the FastAPI policy/app assignment endpoints.
+- Replace mock app/policy data with typed API calls from
+  `docs/frontend-api-map.md`.
+- Add loading/error/empty states before expanding to runtime tester screens.
 
 ### 11. Audit, Analytics, And Caching
 

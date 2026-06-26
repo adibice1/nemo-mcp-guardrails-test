@@ -221,8 +221,33 @@ Read `docs/open-work-backlog.md` first. It is the source of truth for
 unfinished plans and prevents half-completed ideas from being lost between
 machines.
 
-Immediate top priority: start the Next.js 13 frontend MVP for the GitHub MCP
-demo. The backend demo path is ready enough for frontend work:
+Immediate top priority: continue the Next.js 13 frontend MVP for the GitHub MCP
+demo. The first frontend scaffold now exists in `frontend/` and recreates the
+uploaded Figma pages with mock data:
+
+```text
+/login
+/signup
+/policies
+/settings
+```
+
+Run it with:
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+Open:
+
+```text
+http://127.0.0.1:3000/policies
+```
+
+`npm run build` passed on the work computer. If Codex sandboxing blocks Next's
+worker process with `spawn EPERM`, rerun the build outside the sandbox.
 
 Recommended incremental slice:
 
@@ -230,10 +255,10 @@ Recommended incremental slice:
 1. Read docs/frontend-api-map.md.
 2. Read docs/frontend-screen-plan.md.
 3. Read docs/frontend-demo-flow.md.
-4. Scaffold Next.js 13 with TypeScript, Tailwind, shadcn/ui, and lucide-react.
-5. Build the app shell, sidebar, and API client.
-6. Implement /apps with list/create/edit behavior.
-7. Implement /apps/[clientId] with the Connectors tab first.
+4. Wire `/policies` to the FastAPI app/policy endpoints.
+5. Replace mock policy data with typed API calls and loading/error states.
+6. Implement `/apps` with list/create/edit behavior.
+7. Implement `/apps/[clientId]` with the Connectors tab first.
 8. Wire GitHub connector linking with credential_reference="env:VAR_NAME".
 9. Add app policy assignment and runtime tester tabs after connector flow works.
 ```

@@ -138,10 +138,11 @@ The assignment-aware, app-authentication, protected HTTP boundary,
 authenticated runtime endpoint, reusable guarded-execution slice,
 conversation-history persistence/truncation, app-selected main/guardrail LLM
 selection, policy CRUD auto-compilation, app connector CRUD, env-based
-connector credential resolution, and frontend planning docs are green. The next
-main implementation slice is the Next.js 13 frontend MVP for the GitHub MCP
-demo. Use `docs/frontend-api-map.md`, `docs/frontend-screen-plan.md`, and
-`docs/frontend-demo-flow.md` before scaffolding UI code:
+connector credential resolution, frontend planning docs, and the first
+Next.js 13 mock frontend scaffold are green. The next main implementation
+slice is wiring the frontend to the FastAPI backend for the GitHub MCP demo.
+Use `docs/frontend-api-map.md`, `docs/frontend-screen-plan.md`, and
+`docs/frontend-demo-flow.md` before changing UI code:
 
 ```text
 users + apps + llm_configs now exist
@@ -173,8 +174,9 @@ policy CRUD auto-refreshes compiled_policy_rules
 frontend-api-map.md maps backend endpoints to UI screens
 frontend-screen-plan.md defines the first Next.js 13 screens/components
 frontend-demo-flow.md defines the presentation GitHub MCP demo path
--> scaffold Next.js 13 frontend with TypeScript, Tailwind, shadcn/ui, lucide-react
--> build app shell, /apps list, and /apps/[clientId] connector tab first
+frontend/ contains the first mock Next.js 13 pages: /login, /signup, /policies, /settings
+-> wire /policies to the FastAPI policy/app endpoints
+-> build /apps list and /apps/[clientId] connector tab next
 -> defer production secrets-manager and admin auth unless specifically requested
 -> keep policy CRUD auto-compilation covered by test_policy_auto_compile.py
 -> keep normal GitHub MCP tests read-only
