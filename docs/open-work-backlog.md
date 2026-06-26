@@ -28,8 +28,13 @@ The GMS backend prototype now has these core runtime pieces:
   `frontend-api-map.md`, `frontend-screen-plan.md`, and
   `frontend-demo-flow.md`.
 - The first Next.js 13 frontend scaffold now exists under `frontend/`. It
-  currently implements the uploaded Figma screens with mock data:
+  implements the uploaded Figma screens:
   `/login`, `/signup`, `/policies`, and `/settings`.
+- The `/policies` page now has a read-only typed API adapter. When
+  `frontend/.env.local` sets
+  `NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000`, it loads real apps, global
+  policy assignments, and app effective policy assignments from FastAPI. When
+  the env var is absent, it stays in mock mode for static/Vercel design demos.
 - Policy create/update now automatically refreshes `compiled_policy_rules`;
   old compiled rows are marked stale and disabled.
 - HTTP runtime integration coverage now proves an authenticated app can pass an
@@ -240,15 +245,18 @@ Current prep:
 - `docs/frontend-demo-flow.md` defines the GitHub MCP presentation flow.
 - `docs/figma-design-intake.md` records the uploaded Figma screens and
   interaction notes.
-- `frontend/` contains the first static/mock implementation of the Figma
-  pages.
+- `frontend/` contains the first Figma-matched implementation and a read-only
+  API-backed `/policies` adapter.
 
 Next implementation slice:
 
-- Wire `/policies` to the FastAPI policy/app assignment endpoints.
-- Replace mock app/policy data with typed API calls from
-  `docs/frontend-api-map.md`.
-- Add loading/error/empty states before expanding to runtime tester screens.
+- Wire `/policies` create/edit/delete to FastAPI. Creating a policy should call
+  `POST /policies`, then assign it through either global assignments or
+  app-specific assignments depending on the selected view/admin checkbox.
+- Replace local create/edit/delete behavior with backend mutation calls and
+  refresh the read model after mutation.
+- Add `/apps` list/create/edit after the policy page mutation path works.
+- Add `/apps/[clientId]` connector management before the runtime tester screen.
 
 ### 11. Audit, Analytics, And Caching
 

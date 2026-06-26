@@ -159,6 +159,34 @@ docs/frontend-screen-plan.md
 docs/frontend-demo-flow.md
 ```
 
+The first frontend backend-integration slice is also in place. The
+`/policies` page now has a typed client-side API adapter:
+
+```text
+frontend/lib/api-client.ts
+frontend/app/policies/page.tsx
+frontend/.env.example
+```
+
+By default, the deployed/mock frontend still uses local mock policy data. To
+switch local development to real FastAPI data, create `frontend/.env.local`:
+
+```env
+NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
+```
+
+Then restart the frontend with `npm run dev:clean`. With the API base URL set,
+`/policies` reads:
+
+```text
+GET /apps
+GET /global-policy-assignments
+GET /apps/by-client-id/{client_id}/effective-policy-assignments
+```
+
+Create/edit/delete buttons are still local UI behavior and are not wired to the
+backend yet.
+
 ## Important Current Files
 
 - `src/nemo_mcp_guardrails/app_auth.py`: API-key hashing and app verification.
@@ -223,7 +251,7 @@ machines.
 
 Immediate top priority: continue the Next.js 13 frontend MVP for the GitHub MCP
 demo. The first frontend scaffold now exists in `frontend/` and recreates the
-uploaded Figma pages with mock data:
+uploaded Figma pages:
 
 ```text
 /login
@@ -237,7 +265,7 @@ Run it with:
 ```powershell
 cd frontend
 npm install
-npm run dev
+npm run dev:clean
 ```
 
 Open:
@@ -249,14 +277,26 @@ http://127.0.0.1:3000/policies
 `npm run build` passed on the work computer. If Codex sandboxing blocks Next's
 worker process with `spawn EPERM`, rerun the build outside the sandbox.
 
+To use backend data locally, also run the API:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\run_api.py
+```
+
+Then add `frontend/.env.local`:
+
+```env
+NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
+```
+
 Recommended incremental slice:
 
 ```text
 1. Read docs/frontend-api-map.md.
 2. Read docs/frontend-screen-plan.md.
 3. Read docs/frontend-demo-flow.md.
-4. Wire `/policies` to the FastAPI app/policy endpoints.
-5. Replace mock policy data with typed API calls and loading/error states.
+4. Wire `/policies` create to `POST /policies` plus app/global assignment endpoints.
+5. Wire edit/delete buttons to policy and assignment update/delete endpoints.
 6. Implement `/apps` with list/create/edit behavior.
 7. Implement `/apps/[clientId]` with the Connectors tab first.
 8. Wire GitHub connector linking with credential_reference="env:VAR_NAME".

@@ -318,6 +318,16 @@ Data:
 - `GET /policies`
 - `GET /policies/compiled-rules`
 
+Current implementation note:
+
+- The Figma-matched `/policies` screen currently uses
+  `GET /apps`, `GET /global-policy-assignments`, and
+  `GET /apps/by-client-id/{client_id}/effective-policy-assignments` when
+  `NEXT_PUBLIC_API_BASE_URL` is configured.
+- Without `NEXT_PUBLIC_API_BASE_URL`, it intentionally falls back to mock data
+  for static design demos.
+- Create/edit/delete controls are not backend-wired yet.
+
 Table columns:
 
 - ID
@@ -443,13 +453,15 @@ components/
 
 1. Figma-matched static shell and pages. Done in `frontend/` for `/login`,
    `/signup`, `/policies`, and `/settings`.
-2. API client and typed fetch wrappers.
-3. Wire policy creation/listing to `/policies` and assignment endpoints.
+2. API client and typed fetch wrappers. First read-only `/policies` adapter is
+   done in `frontend/lib/api-client.ts`.
+3. Wire policy creation, edit, and delete to `/policies` and assignment
+   endpoints.
 4. Apps list and create/edit forms.
 5. App detail with connector tab.
 6. App policy assignment tab.
 7. Runtime tester.
-8. Policy library create/edit.
+8. Policy library create/edit polish.
 9. Dashboard polish.
 
 This order gets the core demo path working quickly:

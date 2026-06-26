@@ -14,6 +14,35 @@ X-App-ID: <client_id>
 X-API-Key: <plaintext app api key>
 ```
 
+## Current Frontend Integration State
+
+The first frontend backend slice is read-only and lives in:
+
+```text
+frontend/lib/api-client.ts
+frontend/app/policies/page.tsx
+```
+
+Local backend mode is enabled by creating `frontend/.env.local`:
+
+```env
+NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
+```
+
+If this env var is absent, the frontend remains in mock mode. This keeps the
+Vercel/design preview working without a backend.
+
+The current `/policies` page reads:
+
+```text
+GET /apps
+GET /global-policy-assignments
+GET /apps/by-client-id/{client_id}/effective-policy-assignments
+```
+
+The current `/policies` page does not yet write to the backend. Create, edit,
+and delete are the next integration slice.
+
 ## Health
 
 | Screen | Method | Endpoint | Purpose |

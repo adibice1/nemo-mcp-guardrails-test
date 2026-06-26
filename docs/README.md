@@ -59,6 +59,11 @@ Current handoff status:
 - Normalized metadata tables now include `connectors`, `connector_actions`, `connector_resources`, `connector_tool_mappings`, and `allowed_test_case_expected_tools`.
 - Input/output diagnostic scripts now distinguish Azure `content_filter`
   blocks from completed NeMo classifications.
+- The Next.js 13 frontend scaffold exists in `frontend/`. Its `/policies` page
+  has a read-only FastAPI adapter that uses real app/global/effective policy
+  assignment data when `frontend/.env.local` sets
+  `NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000`; otherwise it uses mock data
+  for static demos.
 
 Start here for current project context:
 

@@ -33,6 +33,8 @@ Confirmed target behavior:
 - GMS acts as a full proxy for input rail, agent/tool execution, and output rail
 - policy changes automatically compile or invalidate generated rules
 - frontend target is Next.js 13
+- frontend scaffold exists in `frontend/`; `/policies` has a read-only FastAPI
+  adapter when `NEXT_PUBLIC_API_BASE_URL` is set
 
 The authoritative target design is in `docs/target-architecture.md`.
 
@@ -142,6 +144,12 @@ The system successfully:
   future metadata but are not executable yet.
 - Uses `src/nemo_mcp_guardrails/guarded_execution.py` for reusable
   single-request input-rail, agent/guarded-tool, and output-rail coordination.
+- Provides a Next.js 13 frontend scaffold under `frontend/` for `/login`,
+  `/signup`, `/policies`, and `/settings`.
+- Keeps the frontend in mock mode when `NEXT_PUBLIC_API_BASE_URL` is absent,
+  and switches `/policies` to read real apps/global assignments/effective app
+  assignments from FastAPI when `frontend/.env.local` sets
+  `NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000`.
 
 ## Current Runtime Flow
 

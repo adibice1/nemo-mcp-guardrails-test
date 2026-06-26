@@ -166,15 +166,27 @@ docs/frontend-screen-plan.md
 docs/frontend-demo-flow.md
 ```
 
-Recommended first frontend slice:
+Recommended frontend slice from the current state:
 
 ```text
-1. Scaffold Next.js 13 with TypeScript, Tailwind, shadcn/ui, and lucide-react.
-2. Build the app shell, sidebar, and API client.
-3. Implement /apps with list/create/edit behavior.
-4. Implement /apps/[clientId] with the Connectors tab first.
-5. Wire GitHub connector linking with credential_reference="env:VAR_NAME".
-6. Add the Runtime Tester tab after the connector tab is working.
+1. Keep the existing Next.js 13 scaffold in `frontend/`.
+2. Use `frontend/.env.local` with NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000 for local backend mode.
+3. Wire /policies create/edit/delete to `POST/PUT/DELETE /policies` and app/global assignment endpoints.
+4. Implement /apps with list/create/edit behavior.
+5. Implement /apps/[clientId] with the Connectors tab first.
+6. Wire GitHub connector linking with credential_reference="env:VAR_NAME".
+7. Add the Runtime Tester tab after the connector tab is working.
+```
+
+Current frontend status:
+
+```text
+frontend/ implements /login, /signup, /policies, and /settings
+/policies uses mock data by default
+/policies reads GET /apps, GET /global-policy-assignments, and
+GET /apps/by-client-id/{client_id}/effective-policy-assignments when
+NEXT_PUBLIC_API_BASE_URL is configured
+create/edit/delete controls are not backend-wired yet
 ```
 
 The app connector management API slice is complete. Developers can now link

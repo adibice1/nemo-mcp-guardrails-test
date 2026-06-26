@@ -4,7 +4,7 @@ Next.js 13 frontend prototype for the Guardrails Management System.
 
 ## Current Scope
 
-This first UI slice recreates the uploaded Figma screens with local mock data:
+This first UI slice recreates the uploaded Figma screens:
 
 - `/login`
 - `/signup`
@@ -35,8 +35,29 @@ Current frontend behavior:
 - Settings placeholder toggles are interactive, and Save Changes enables only
   after a setting is changed.
 
-The current implementation is intentionally not wired to the FastAPI backend
-yet. Backend wiring should use `docs/frontend-api-map.md`.
+The `/policies` page has a read-only FastAPI adapter. It stays in mock mode
+when no API base URL is configured, which keeps the static/Vercel design demo
+usable without a backend.
+
+To use local backend data, create `frontend/.env.local`:
+
+```env
+NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
+```
+
+Then restart with `npm run dev:clean` while the FastAPI backend is running.
+
+Current backend reads:
+
+```text
+GET /apps
+GET /global-policy-assignments
+GET /apps/by-client-id/{client_id}/effective-policy-assignments
+```
+
+Create/edit/delete controls are still local UI behavior. The next frontend
+slice should wire those controls to the backend policy and assignment endpoints
+from `docs/frontend-api-map.md`.
 
 ## Component Layout
 

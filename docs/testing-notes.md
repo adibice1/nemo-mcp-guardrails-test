@@ -980,3 +980,56 @@ The full `tests/test_nemo_mcp.py` run now includes `NEMO OUTPUT RAIL RESULT` bef
 `tests/test_nemo_mcp.py` defaults to compact output. It shows rail status, MCP tool names, and the final response without dumping full LangChain message traces or large GitHub MCP payloads.
 
 Set `VERBOSE_TRACE=true` to print the full LangChain message trace through `print_messages()` when debugging a specific test.
+
+## Frontend Verification
+
+The Next.js frontend lives in `frontend/`.
+
+Build check:
+
+```powershell
+cd frontend
+npm run build
+```
+
+Local mock/design mode:
+
+```powershell
+cd frontend
+npm run dev:clean
+```
+
+Open:
+
+```text
+http://127.0.0.1:3000/policies
+```
+
+Backend-backed local mode:
+
+1. Start FastAPI from the repo root:
+
+   ```powershell
+   .\.venv\Scripts\python.exe scripts\run_api.py
+   ```
+
+2. Create `frontend/.env.local`:
+
+   ```env
+   NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
+   ```
+
+3. Restart the frontend:
+
+   ```powershell
+   cd frontend
+   npm run dev:clean
+   ```
+
+The current backend-backed `/policies` page reads apps, global policy
+assignments, and effective app policy assignments. Create/edit/delete controls
+are not backend-wired yet.
+
+Avoid running `npm run build` while the dev server is already running. Both
+commands write `.next`; if the page renders as raw HTML or CSS appears missing,
+restart with `npm run dev:clean`.

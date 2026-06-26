@@ -85,6 +85,13 @@ Current backend/API state:
 - `guarded_execution.py` coordinates reusable single-request input rail,
   agent/guarded-tool execution with trimmed history, output rail, and
   structured results.
+- The Next.js 13 frontend scaffold exists under `frontend/` with `/login`,
+  `/signup`, `/policies`, and `/settings`. The `/policies` page now has a
+  read-only FastAPI adapter that loads `GET /apps`,
+  `GET /global-policy-assignments`, and
+  `GET /apps/by-client-id/{client_id}/effective-policy-assignments` when
+  `NEXT_PUBLIC_API_BASE_URL` is configured. Without that env var, it stays in
+  mock mode for design/Vercel preview.
 - `POST /policies/compile-preview` previews compiler output from enabled DB rows.
 - `POST /policies` and `PUT /policies/{policy_id}` automatically refresh
   generated NeMo rule text in `compiled_policy_rules`.
