@@ -29,11 +29,17 @@ Current frontend behavior:
 - Custom resource is optional; policy name is required.
 - Modal dropdowns are custom scrollable menus so larger connector/action/resource
   lists fit later.
+- The frontend connector selector is intentionally limited to GitHub and
+  SharePoint for the current demo scope. Policy rows display a GitHub brand icon
+  or a Microsoft/SharePoint-colored connector mark instead of a generic folder.
 - Policy rows default to newest-created first and can sort by `Created` or
   `Global`.
 - Policy pagination uses 8 rows per page.
 - Settings placeholder toggles are interactive, and Save Changes enables only
   after a setting is changed.
+- Dark mode previews immediately from Settings and persists to `gms:theme` in
+  browser `localStorage` when Save Changes is clicked. The root layout restores
+  the saved theme before the app renders.
 
 The `/policies` page has a FastAPI adapter for policy reads, duplicate-aware
 creation, assignment-safe editing, and assignment-only deletion. It stays in mock mode

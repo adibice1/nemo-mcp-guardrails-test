@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
 type SettingsState = {
@@ -35,6 +35,12 @@ export function SettingsForm() {
   const [dirty, setDirty] = useState(false);
   const [saved, setSaved] = useState(false);
 
+  useEffect(() => {
+    const darkMode = window.localStorage.getItem("gms:theme") === "dark";
+    setSettings((current) => ({ ...current, darkMode }));
+    document.documentElement.classList.toggle("dark", darkMode);
+  }, []);
+
   function toggleSetting(key: keyof SettingsState) {
     setSettings((current) => ({
       ...current,
@@ -54,8 +60,18 @@ export function SettingsForm() {
   }
 
   function handleSave() {
+    window.localStorage.setItem(
+      "gms:theme",
+      settings.darkMode ? "dark" : "light"
+    );
     setDirty(false);
     setSaved(true);
+  }
+
+  function toggleDarkMode() {
+    const enabled = !settings.darkMode;
+    document.documentElement.classList.toggle("dark", enabled);
+    toggleSetting("darkMode");
   }
 
   return (
@@ -65,7 +81,7 @@ export function SettingsForm() {
           "absolute right-0 top-0 h-12 rounded-2xl px-7 text-sm font-extrabold uppercase tracking-wide transition",
           dirty
             ? "bg-gms-blue text-white shadow-button"
-            : "bg-[#dedede] text-[#b2b2b2]"
+            : "bg-[#dedede] text-[#777b85] dark:bg-[#30343e] dark:text-[#777f91]"
         )}
         disabled={!dirty}
         type="button"
@@ -84,7 +100,7 @@ export function SettingsForm() {
             </span>
             <div>
               <button
-                className="h-12 rounded-xl border border-[#dddddd] bg-white px-5 text-sm font-extrabold uppercase tracking-widest text-gms-blue shadow-[0_4px_0_rgba(0,0,0,0.08)]"
+                className="h-12 rounded-xl border border-[#dddddd] bg-white px-5 text-sm font-extrabold uppercase tracking-widest text-gms-blue shadow-[0_4px_0_rgba(0,0,0,0.08)] dark:border-gms-line dark:bg-[#252932]"
                 type="button"
               >
                 Choose File
@@ -125,7 +141,7 @@ export function SettingsForm() {
           <SettingsToggle
             enabled={settings.darkMode}
             label="Dark Mode"
-            onToggle={() => toggleSetting("darkMode")}
+            onToggle={toggleDarkMode}
           />
           <SettingsToggle
             enabled={settings.placeholderOne}
@@ -182,7 +198,7 @@ function SettingsInput({
     <label className="grid grid-cols-[160px_1fr] items-center gap-10">
       <span className="text-right text-sm font-extrabold">{label}</span>
       <input
-        className="h-12 max-w-[390px] rounded-2xl border border-[#dddddd] bg-[#f7f7f7] px-3 text-xl text-[#545454] outline-none"
+        className="h-12 max-w-[390px] rounded-2xl border border-[#dddddd] bg-[#f7f7f7] px-3 text-xl text-[#545454] outline-none dark:border-gms-line dark:bg-[#252932] dark:text-gms-text"
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />
@@ -205,7 +221,7 @@ function SettingsToggle({
       <button
         className={cn(
           "relative h-8 w-[58px] rounded-full transition",
-          enabled ? "bg-gms-blue" : "bg-[#dedede]"
+          enabled ? "bg-gms-blue" : "bg-[#dedede] dark:bg-[#3b404b]"
         )}
         type="button"
         onClick={onToggle}
@@ -215,7 +231,7 @@ function SettingsToggle({
             "absolute top-[-2px] h-9 w-9 rounded-xl border-2 bg-white transition",
             enabled
               ? "left-7 border-gms-blue"
-              : "left-0 border-[#dddddd]"
+              : "left-0 border-[#dddddd] dark:border-[#626a7a] dark:bg-[#e6e8ee]"
           )}
         />
       </button>

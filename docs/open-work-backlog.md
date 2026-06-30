@@ -30,6 +30,9 @@ The GMS backend prototype now has these core runtime pieces:
 - The first Next.js 13 frontend scaffold now exists under `frontend/`. It
   implements the uploaded Figma screens:
   `/login`, `/signup`, `/policies`, and `/settings`.
+- Settings now provides a class-based app-wide dark theme. It previews
+  immediately, saves the selected theme in browser `localStorage`, and restores
+  it before rendering on later visits.
 - The `/policies` page now has a typed read/write API adapter. When
   `frontend/.env.local` sets
   `NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000`, it loads real apps, global
@@ -67,6 +70,9 @@ Current presentation/demo scope:
 
 - GitHub MCP is the only connector that needs to be demonstrably supported for
   the upcoming presentation.
+- The frontend currently exposes only GitHub and SharePoint in its connector
+  selector. GitHub is executable; SharePoint remains a UI/metadata placeholder
+  until backend mappings and runtime support are implemented.
 - SharePoint, Outlook, and other connectors remain target-architecture
   extensions and should not block the near-term backend/frontend milestone.
 

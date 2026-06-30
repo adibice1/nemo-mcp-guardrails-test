@@ -117,10 +117,10 @@ export function CreatePolicyModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent px-6">
-      <section className="relative w-full max-w-[840px] rounded-[14px] bg-white px-5 pb-5 pt-16 shadow-modal">
+      <section className="relative w-full max-w-[840px] rounded-[14px] bg-white px-5 pb-5 pt-16 shadow-modal dark:bg-[#20242c]">
         <button
           aria-label={`Close ${mode} policy modal`}
-          className="absolute left-4 top-6 flex h-12 w-12 items-center justify-center rounded-xl bg-white text-gms-text shadow-[0_3px_12px_rgba(40,48,78,0.12)]"
+          className="absolute left-4 top-6 flex h-12 w-12 items-center justify-center rounded-xl bg-white text-gms-text shadow-[0_3px_12px_rgba(40,48,78,0.12)] dark:bg-[#2a2f39]"
           type="button"
           onClick={handleClose}
         >
@@ -182,7 +182,7 @@ export function CreatePolicyModal({
                 "h-[96px] w-full resize-none rounded border border-gms-blue px-3 py-3 text-sm outline-none",
                 customResourceLocked
                   ? "bg-[#bdbdbd] text-white placeholder:text-white"
-                  : "bg-white text-gms-text placeholder:text-[#a9bdff]"
+                  : "bg-white text-gms-text placeholder:text-[#a9bdff] dark:bg-[#252932]"
               )}
               disabled={customResourceLocked}
               placeholder="Type your Resource"
@@ -196,7 +196,7 @@ export function CreatePolicyModal({
           <div className="mt-6 grid grid-cols-1 gap-8 md:grid-cols-[240px_1fr]">
             <FormField label="Name Policy:" required>
               <input
-                className="h-14 w-full rounded border border-gms-blue px-3 text-sm text-gms-text outline-none placeholder:text-[#a9bdff] disabled:bg-[#f2f2f2]"
+                className="h-14 w-full rounded border border-gms-blue bg-white px-3 text-sm text-gms-text outline-none placeholder:text-[#a9bdff] disabled:bg-[#f2f2f2] dark:bg-[#252932] dark:disabled:bg-[#363b45]"
                 disabled={nameLocked}
                 placeholder="Type your Policy Name"
                 value={policyName}
@@ -283,7 +283,7 @@ function SelectField({
             "flex h-7 w-full items-center justify-between rounded border border-gms-blue px-3 text-left text-sm outline-none",
             disabled
               ? "bg-[#bdbdbd] text-white"
-              : "bg-white text-gms-text",
+              : "bg-white text-gms-text dark:bg-[#252932]",
             !value && !disabled && "text-[#a9bdff]"
           )}
           disabled={disabled}
@@ -295,7 +295,7 @@ function SelectField({
         </button>
 
         {open && !disabled && (
-          <div className="absolute left-0 top-8 z-30 max-h-44 w-full overflow-y-auto rounded border border-gms-blue bg-white py-1 shadow-[0_8px_20px_rgba(40,48,78,0.14)]">
+          <div className="absolute left-0 top-8 z-30 max-h-44 w-full overflow-y-auto rounded border border-gms-blue bg-white py-1 shadow-[0_8px_20px_rgba(40,48,78,0.14)] dark:bg-[#252932]">
             <button
               className="block w-full px-4 py-2 text-left text-sm text-[#a9bdff] hover:bg-gms-blue hover:text-white"
               type="button"
@@ -310,7 +310,7 @@ function SelectField({
                   "block w-full px-4 py-2 text-left text-sm hover:bg-gms-blue hover:text-white",
                   value === option
                     ? "bg-gms-blue text-white"
-                    : "bg-white text-gms-text"
+                    : "bg-white text-gms-text dark:bg-[#252932]"
                 )}
                 type="button"
                 onClick={() => handleSelect(option)}

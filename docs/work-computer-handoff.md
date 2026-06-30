@@ -168,6 +168,10 @@ frontend/app/policies/page.tsx
 frontend/.env.example
 ```
 
+The Settings dark-mode toggle now applies an app-wide Tailwind `dark` class.
+Saving writes `gms:theme` to browser `localStorage`; `app/layout.tsx` restores
+the class before rendering to reduce theme flashing.
+
 By default, the deployed/mock frontend still uses local mock policy data. To
 switch local development to real FastAPI data, create `frontend/.env.local`:
 

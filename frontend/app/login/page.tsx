@@ -3,8 +3,8 @@ import { AuthIllustration } from "@/components/shared/auth-illustration";
 
 export default function LoginPage() {
   return (
-    <main className="grid min-h-screen bg-[#f8faff] lg:grid-cols-[1fr_1.1fr]">
-      <section className="hidden items-center justify-center bg-[#eefaff] lg:flex">
+    <main className="grid min-h-screen bg-[#f8faff] dark:bg-[#17191f] lg:grid-cols-[1fr_1.1fr]">
+      <section className="hidden items-center justify-center bg-[#eefaff] dark:bg-[#20242c] lg:flex">
         <AuthIllustration />
       </section>
 
@@ -25,13 +25,13 @@ export default function LoginPage() {
           <form className="space-y-4">
             <label className="block text-xs font-bold text-gms-text">
               Enter Your Email
-              <input className="mt-3 h-12 w-full rounded-md border border-[#d2d2d8] bg-white px-3 outline-none" />
+              <input className="mt-3 h-12 w-full rounded-md border border-[#d2d2d8] bg-white px-3 outline-none dark:border-gms-line dark:bg-[#252932]" />
             </label>
 
             <label className="block text-xs font-bold text-gms-text">
               Enter Your Password
               <input
-                className="mt-3 h-12 w-full rounded-md border border-[#d2d2d8] bg-white px-3 outline-none"
+                className="mt-3 h-12 w-full rounded-md border border-[#d2d2d8] bg-white px-3 outline-none dark:border-gms-line dark:bg-[#252932]"
                 type="password"
               />
             </label>

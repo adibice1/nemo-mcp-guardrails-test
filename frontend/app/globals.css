@@ -4,6 +4,20 @@
 
 :root {
   color-scheme: light;
+  --gms-bg: 238 243 255;
+  --gms-blue-soft: 235 241 255;
+  --gms-text: 54 55 70;
+  --gms-muted: 139 143 161;
+  --gms-line: 232 237 247;
+}
+
+:root.dark {
+  color-scheme: dark;
+  --gms-bg: 17 19 24;
+  --gms-blue-soft: 41 48 67;
+  --gms-text: 235 238 246;
+  --gms-muted: 166 173 191;
+  --gms-line: 54 60 74;
 }
 
 * {
@@ -17,8 +31,9 @@ body {
 }
 
 body {
-  background: #eef3ff;
-  color: #363746;
+  background: rgb(var(--gms-bg));
+  color: rgb(var(--gms-text));
+  transition: background-color 160ms ease, color 160ms ease;
 }
 
 button,

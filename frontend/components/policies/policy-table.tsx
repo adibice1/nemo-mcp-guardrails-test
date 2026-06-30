@@ -1,6 +1,8 @@
 "use client";
 
-import { Edit2, Folder, MoreVertical, Trash2 } from "lucide-react";
+import { Edit2, Folder, Globe2, MoreVertical, Trash2 } from "lucide-react";
+import { FaMicrosoft } from "react-icons/fa6";
+import { SiGithub } from "react-icons/si";
 import { type PolicyRow } from "@/lib/mock-data";
 import { cn, formatPolicyDate } from "@/lib/utils";
 
@@ -72,7 +74,7 @@ export function PolicyTable({
             />
           ))
         ) : (
-          <div className="rounded-md border border-dashed border-gms-line py-12 text-center text-sm text-gms-muted">
+          <div className="rounded-md border border-dashed border-gms-line bg-white py-12 text-center text-sm text-gms-muted dark:bg-[#20242c]">
             No policies found for this view.
           </div>
         )}
@@ -164,12 +166,12 @@ function PolicyRowItem({
   onEdit: (policy: PolicyRow) => void;
 }) {
   return (
-    <div className="group grid min-h-[56px] grid-cols-[46px_66px_180px_1fr_180px_150px_90px_94px_34px] items-center rounded-md border border-gms-line bg-white px-1 text-sm text-gms-text shadow-[0_1px_2px_rgba(55,70,110,0.04)] transition hover:border-gms-blue hover:bg-gms-blue hover:text-white">
+    <div className="group grid min-h-[56px] grid-cols-[46px_66px_180px_1fr_180px_150px_90px_94px_34px] items-center rounded-md border border-gms-line bg-white px-1 text-sm text-gms-text shadow-[0_1px_2px_rgba(55,70,110,0.04)] transition hover:border-gms-blue hover:bg-gms-blue hover:text-white dark:bg-[#20242c]">
       <span className="text-center text-xl font-extrabold text-[#a7bcf8] group-hover:text-white">
         {index}
       </span>
       <span className="flex justify-center">
-        <Folder className="h-8 w-8 fill-[#e3eefc] text-[#4791ff] group-hover:fill-white group-hover:text-white" />
+        <ConnectorIcon connector={policy.connector} global={policy.global} />
       </span>
       <span className="font-medium text-gms-blue group-hover:text-white">
         {policy.connector}
@@ -214,5 +216,40 @@ function PolicyRowItem({
         <MoreVertical className="h-6 w-6" />
       </button>
     </div>
+  );
+}
+
+function ConnectorIcon({
+  connector,
+  global
+}: {
+  connector: string;
+  global: boolean;
+}) {
+  if (global) {
+    return (
+      <Globe2 className="h-8 w-8 text-gms-blue transition-colors group-hover:text-white" />
+    );
+  }
+
+  const connectorKey = connector.trim().toLowerCase();
+
+  if (connectorKey === "github") {
+    return (
+      <SiGithub className="h-8 w-8 text-[#24292f] transition-colors group-hover:text-white dark:text-white" />
+    );
+  }
+
+  if (connectorKey === "sharepoint") {
+    return (
+      <FaMicrosoft
+        aria-label="SharePoint"
+        className="h-8 w-8 text-[#038387] transition-colors group-hover:text-white"
+      />
+    );
+  }
+
+  return (
+    <Folder className="h-8 w-8 fill-[#e3eefc] text-[#4791ff] group-hover:fill-white group-hover:text-white" />
   );
 }

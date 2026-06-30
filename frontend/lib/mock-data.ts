@@ -97,12 +97,7 @@ export const initialPolicies: PolicyRow[] = [
 
 export const connectorOptions = [
   "GitHub",
-  "SharePoint",
-  "Outlook",
-  "Teams",
-  "OneDrive",
-  "Jira",
-  "Confluence"
+  "SharePoint"
 ];
 
 export const actionOptions = [

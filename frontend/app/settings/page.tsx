@@ -5,7 +5,7 @@ export default function SettingsPage() {
   return (
     <main className="min-h-screen bg-gms-bg px-6 py-8 lg:px-20">
       <AppTopNav active="settings" />
-      <section className="mx-auto mt-4 min-h-[calc(100vh-112px)] max-w-[1480px] rounded-[24px] bg-white px-14 py-9 shadow-shell lg:px-16">
+      <section className="mx-auto mt-4 min-h-[calc(100vh-112px)] max-w-[1480px] rounded-[24px] bg-white px-14 py-9 shadow-shell transition-colors dark:bg-[#1b1e25] lg:px-16">
         <SettingsForm />
       </section>
     </main>

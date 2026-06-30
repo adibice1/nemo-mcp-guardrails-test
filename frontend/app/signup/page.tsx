@@ -3,14 +3,14 @@ import { AuthIllustration } from "@/components/shared/auth-illustration";
 
 export default function SignupPage() {
   return (
-    <main className="grid min-h-screen bg-white lg:grid-cols-[1fr_1.1fr]">
-      <section className="hidden items-center justify-center bg-[#eefaff] lg:flex">
+    <main className="grid min-h-screen bg-white dark:bg-[#17191f] lg:grid-cols-[1fr_1.1fr]">
+      <section className="hidden items-center justify-center bg-[#eefaff] dark:bg-[#20242c] lg:flex">
         <AuthIllustration />
       </section>
 
       <section className="flex items-center justify-center px-6">
         <div className="w-full max-w-[650px]">
-          <h1 className="text-[42px] font-black leading-tight text-black">
+          <h1 className="text-[42px] font-black leading-tight text-black dark:text-gms-text">
             Register an account for the
             <br />
             <span className="text-[#138cf5]">
@@ -32,7 +32,7 @@ export default function SignupPage() {
               type="password"
             />
 
-            <label className="flex items-center gap-3 text-xl text-black">
+            <label className="flex items-center gap-3 text-xl text-black dark:text-gms-text">
               <input className="h-5 w-5" type="checkbox" />
               <span>
                 I agree to all the{" "}
@@ -70,11 +70,11 @@ function FloatingInput({
 }) {
   return (
     <label className="relative block">
-      <span className="absolute -top-2 left-4 bg-white px-1 text-sm text-black">
+      <span className="absolute -top-2 left-4 bg-white px-1 text-sm text-black dark:bg-[#17191f] dark:text-gms-text">
         {label}
       </span>
       <input
-        className="h-14 w-full rounded border border-[#4e4e4e] bg-white px-4 text-lg text-gms-text outline-none placeholder:text-[#8a8a8a]"
+        className="h-14 w-full rounded border border-[#4e4e4e] bg-white px-4 text-lg text-gms-text outline-none placeholder:text-[#8a8a8a] dark:border-gms-line dark:bg-[#252932]"
         placeholder={placeholder}
         type={type}
       />

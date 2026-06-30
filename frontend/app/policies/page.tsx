@@ -469,7 +469,7 @@ export default function PoliciesPage() {
     <main className="min-h-screen bg-gms-bg px-6 py-8 lg:px-20">
       <AppTopNav active="policies" />
 
-      <section className="mx-auto mt-4 min-h-[calc(100vh-112px)] max-w-[1480px] rounded-[24px] bg-white px-8 py-12 shadow-shell lg:px-20">
+      <section className="mx-auto mt-4 min-h-[calc(100vh-112px)] max-w-[1480px] rounded-[24px] bg-white px-8 py-12 shadow-shell transition-colors dark:bg-[#1b1e25] lg:px-20">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h1 className="text-4xl font-extrabold tracking-normal text-gms-text lg:text-[42px]">
@@ -481,7 +481,7 @@ export default function PoliciesPage() {
                 Apps
               </label>
               <select
-                className="mt-2 h-9 w-full appearance-none border-b border-gms-line bg-transparent pr-8 text-sm text-gms-text outline-none"
+                className="mt-2 h-9 w-full appearance-none border-b border-gms-line bg-transparent pr-8 text-sm text-gms-text outline-none dark:[color-scheme:dark]"
                 value={selectedApp}
                 onChange={(event) => handleSelectedAppChange(event.target.value)}
               >
@@ -499,7 +499,7 @@ export default function PoliciesPage() {
           <div className="flex flex-col items-stretch gap-9 lg:items-end">
             <label className="relative block w-full lg:w-[405px]">
               <input
-                className="h-11 w-full rounded-xl border border-gms-line bg-white px-4 pr-11 text-sm text-gms-text shadow-field outline-none placeholder:text-gms-muted"
+                className="h-11 w-full rounded-xl border border-gms-line bg-white px-4 pr-11 text-sm text-gms-text shadow-field outline-none placeholder:text-gms-muted dark:bg-[#252932]"
                 placeholder="Search"
                 value={search}
                 onChange={(event) => {
@@ -570,7 +570,7 @@ export default function PoliciesPage() {
 
       {notice && (
         <div
-          className={`fixed right-6 top-6 z-[70] flex max-w-md items-start gap-4 rounded-md border bg-white px-5 py-4 text-sm shadow-modal ${
+          className={`fixed right-6 top-6 z-[70] flex max-w-md items-start gap-4 rounded-md border bg-white px-5 py-4 text-sm shadow-modal dark:bg-[#252932] ${
             notice.tone === "warning"
               ? "border-[#f1c66a] text-[#74510b]"
               : "border-[#8bc9a7] text-[#245d3b]"

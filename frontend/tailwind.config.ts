@@ -1,6 +1,7 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
+  darkMode: "class",
   content: [
     "./app/**/*.{ts,tsx}",
     "./components/**/*.{ts,tsx}",
@@ -9,13 +10,13 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        "gms-bg": "#eef3ff",
+        "gms-bg": "rgb(var(--gms-bg) / <alpha-value>)",
         "gms-blue": "#4775ff",
         "gms-blue-dark": "#2f63f7",
-        "gms-blue-soft": "#ebf1ff",
-        "gms-text": "#363746",
-        "gms-muted": "#8b8fa1",
-        "gms-line": "#e8edf7",
+        "gms-blue-soft": "rgb(var(--gms-blue-soft) / <alpha-value>)",
+        "gms-text": "rgb(var(--gms-text) / <alpha-value>)",
+        "gms-muted": "rgb(var(--gms-muted) / <alpha-value>)",
+        "gms-line": "rgb(var(--gms-line) / <alpha-value>)",
         "gms-danger": "#ff263d"
       },
       boxShadow: {
