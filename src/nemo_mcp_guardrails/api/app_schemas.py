@@ -1,5 +1,7 @@
 from datetime import datetime
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -178,6 +180,17 @@ class PolicyAssignmentBulkDeleteResponse(BaseModel):
     deleted_count: int
 
 
+class PolicyAssignmentResolutionRead(BaseModel):
+    """Response describing whether a policy was created, reused, or active."""
+
+    resolution: Literal["created", "reused", "already_assigned"]
+    scope: Literal["app", "global"]
+    policy_id: int
+    assignment_id: int
+    display_name: str | None
+    policy_label: str
+
+
 class AppPolicyAssignmentRead(BaseModel):
     """Response body for one app-specific policy assignment."""
 
@@ -187,6 +200,7 @@ class AppPolicyAssignmentRead(BaseModel):
     app_id: int
     app_label: str
     policy_id: int
+    display_name: str | None
     policy_label: str
     policy_type: str
     connector: str | None
@@ -205,6 +219,7 @@ class GlobalPolicyAssignmentRead(BaseModel):
 
     id: int
     policy_id: int
+    display_name: str | None
     policy_label: str
     policy_type: str
     connector: str | None
@@ -222,6 +237,7 @@ class EffectivePolicyAssignmentRead(BaseModel):
     assignment_id: int
     scope: str
     policy_id: int
+    display_name: str | None
     policy_label: str
     policy_type: str
     connector: str | None

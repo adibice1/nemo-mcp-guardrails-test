@@ -184,8 +184,49 @@ GET /global-policy-assignments
 GET /apps/by-client-id/{client_id}/effective-policy-assignments
 ```
 
-Create/edit/delete buttons are still local UI behavior and are not wired to the
-backend yet.
+Create is now backend-wired and duplicate-aware. In backend mode it performs:
+
+```text
+POST /global-policy-assignments/resolve
+or POST /apps/by-client-id/{client_id}/policy-assignments/resolve
+-> create a new definition or reuse an equivalent definition
+-> return created, reused, or already_assigned
+-> reload DB-backed policy assignments
+```
+
+The modal closes only after resolution succeeds and shows a visible result
+notice. Delete removes only the app/global assignment; it does not delete the
+reusable policy definition. Edit is now assignment-safe through:
+
+```text
+PUT /apps/by-client-id/{client_id}/policy-assignments/{assignment_id}/resolve
+or PUT /global-policy-assignments/{assignment_id}/resolve
+-> reuse an existing equivalent policy or create a new definition
+-> switch only the selected assignment
+-> leave every other app assignment unchanged
+```
+
+Assignments now have optional `display_name` values. Run
+`python scripts/migrate_policy_assignment_display_names.py` after pulling this
+schema change. Legacy duplicate definitions can be previewed with
+`python scripts/deduplicate_policies.py` and applied with `--apply`.
+
+Direct `POST /policies` and `PUT /policies/{policy_id}` now return `409` when
+the requested enforcement behavior is equivalent to another enabled policy.
+Equivalence ignores description/name and compares normalized policy structure,
+effect, priority, conditions, and enabled state.
+
+FastAPI now enables local frontend CORS through `NEMO_CORS_ORIGINS`. The
+committed default allows ports used by the local frontend:
+
+```env
+NEMO_CORS_ORIGINS=http://127.0.0.1:3000,http://localhost:3000
+```
+
+The modal stores optional custom resource text in
+`conditions.custom_resource`, but the current compiler does not enforce that
+condition yet. Current action/resource policies still apply to the whole
+resource class.
 
 ## Important Current Files
 
@@ -295,8 +336,8 @@ Recommended incremental slice:
 1. Read docs/frontend-api-map.md.
 2. Read docs/frontend-screen-plan.md.
 3. Read docs/frontend-demo-flow.md.
-4. Wire `/policies` create to `POST /policies` plus app/global assignment endpoints.
-5. Wire edit/delete buttons to policy and assignment update/delete endpoints.
+4. Add admin-only reusable-definition deletion safeguards.
+5. Add compiler support for explicit custom-resource/argument conditions.
 6. Implement `/apps` with list/create/edit behavior.
 7. Implement `/apps/[clientId]` with the Connectors tab first.
 8. Wire GitHub connector linking with credential_reference="env:VAR_NAME".

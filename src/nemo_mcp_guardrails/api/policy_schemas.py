@@ -38,6 +38,13 @@ class PolicyUpdate(BaseModel):
     enabled: bool | None = None
 
 
+class PolicyAssignmentResolutionCreate(BaseModel):
+    """Request body for resolving and assigning one policy definition."""
+
+    policy: PolicyCreate
+    display_name: str | None = Field(default=None, max_length=300)
+
+
 class PolicyRead(BaseModel):
     """Response body for a stored policy."""
 

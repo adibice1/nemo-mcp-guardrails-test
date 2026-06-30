@@ -15,6 +15,8 @@ type PolicyTableProps = {
   pageSize: number;
   sort: PolicySort;
   totalCount: number;
+  onDelete: (policy: PolicyRow) => void;
+  onEdit: (policy: PolicyRow) => void;
   onPageChange: (page: number) => void;
   onSort: (key: PolicySort["key"]) => void;
 };
@@ -25,6 +27,8 @@ export function PolicyTable({
   pageSize,
   sort,
   totalCount,
+  onDelete,
+  onEdit,
   onPageChange,
   onSort
 }: PolicyTableProps) {
@@ -63,6 +67,8 @@ export function PolicyTable({
               key={policy.id}
               index={(page - 1) * pageSize + index + 1}
               policy={policy}
+              onDelete={onDelete}
+              onEdit={onEdit}
             />
           ))
         ) : (
@@ -148,10 +154,14 @@ function SortableHeader({
 
 function PolicyRowItem({
   index,
-  policy
+  policy,
+  onDelete,
+  onEdit
 }: {
   index: number;
   policy: PolicyRow;
+  onDelete: (policy: PolicyRow) => void;
+  onEdit: (policy: PolicyRow) => void;
 }) {
   return (
     <div className="group grid min-h-[56px] grid-cols-[46px_66px_180px_1fr_180px_150px_90px_94px_34px] items-center rounded-md border border-gms-line bg-white px-1 text-sm text-gms-text shadow-[0_1px_2px_rgba(55,70,110,0.04)] transition hover:border-gms-blue hover:bg-gms-blue hover:text-white">
@@ -175,9 +185,10 @@ function PolicyRowItem({
       </span>
       <span>
         <button
-          className="flex h-8 w-8 items-center justify-center rounded-full bg-gms-blue-soft text-gms-blue group-hover:bg-white/12 group-hover:text-white"
+          className="flex h-8 w-8 items-center justify-center rounded-full bg-gms-blue-soft text-gms-blue group-hover:bg-[#c8d7ff] group-hover:text-[#2f63e8]"
           type="button"
           aria-label={`Edit ${policy.name}`}
+          onClick={() => onEdit(policy)}
         >
           <Edit2 className="h-4 w-4" />
         </button>
@@ -186,10 +197,11 @@ function PolicyRowItem({
         <button
           className={cn(
             "flex h-8 w-8 items-center justify-center rounded-full bg-[#fff0f1] text-gms-danger",
-            "group-hover:bg-white/12 group-hover:text-white"
+            "group-hover:bg-[#ffd2d9] group-hover:text-[#e33b52]"
           )}
           type="button"
           aria-label={`Delete ${policy.name}`}
+          onClick={() => onDelete(policy)}
         >
           <Trash2 className="h-4 w-4" />
         </button>

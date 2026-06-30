@@ -450,6 +450,10 @@ class AppPolicyAssignmentRecord(Base):
         ForeignKey("policies.id", ondelete="CASCADE"),
         index=True,
     )
+    display_name: Mapped[str | None] = mapped_column(
+        String(300),
+        nullable=True,
+    )
     enabled: Mapped[bool] = mapped_column(
         Boolean,
         default=True,
@@ -484,6 +488,10 @@ class GlobalPolicyAssignmentRecord(Base):
     policy_id: Mapped[int] = mapped_column(
         ForeignKey("policies.id", ondelete="CASCADE"),
         index=True,
+    )
+    display_name: Mapped[str | None] = mapped_column(
+        String(300),
+        nullable=True,
     )
     enabled: Mapped[bool] = mapped_column(
         Boolean,

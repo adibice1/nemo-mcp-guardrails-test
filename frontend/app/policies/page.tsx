@@ -1,34 +1,55 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, Plus, Search } from "lucide-react";
-import { CreatePolicyModal } from "@/components/policies/create-policy-modal";
+import { ChevronDown, Plus, Search, X } from "lucide-react";
+import {
+  CreatePolicyModal,
+  type PolicyDraft
+} from "@/components/policies/create-policy-modal";
 import { PolicyTable, type PolicySort } from "@/components/policies/policy-table";
 import { AppTopNav } from "@/components/shared/app-top-nav";
 import {
+  deleteAppPolicyAssignment,
+  deleteGlobalPolicyAssignment,
+  editAppPolicyAssignment,
+  editGlobalPolicyAssignment,
   getEffectivePolicyAssignments,
   hasApiBaseUrl,
   listApps,
   listGlobalPolicyAssignments,
+  listPolicies,
+  resolvePolicyForApp,
+  resolvePolicyGlobally,
   type ClientApp,
   type EffectivePolicyAssignment,
-  type GlobalPolicyAssignment
+  type GlobalPolicyAssignment,
+  type PolicyRecord
 } from "@/lib/api-client";
 import { appOptions, initialPolicies, type PolicyRow } from "@/lib/mock-data";
 
 const SELECTED_APP_STORAGE_KEY = "gms:selected-app";
 const PAGE_SIZE = 8;
 type ApiStatus = "mock" | "loading" | "ready" | "error";
+type Notice = {
+  tone: "success" | "warning";
+  message: string;
+};
 
 export default function PoliciesPage() {
   const [selectedApp, setSelectedApp] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingPolicy, setEditingPolicy] = useState<PolicyRow | null>(null);
   const [policies, setPolicies] = useState<PolicyRow[]>(initialPolicies);
   const [apps, setApps] = useState<ClientApp[]>([]);
+  const [globalAssignments, setGlobalAssignments] = useState<
+    GlobalPolicyAssignment[]
+  >([]);
+  const [policyDefinitions, setPolicyDefinitions] = useState<PolicyRecord[]>([]);
   const [apiStatus, setApiStatus] = useState<ApiStatus>(
     hasApiBaseUrl() ? "loading" : "mock"
   );
   const [apiError, setApiError] = useState("");
+  const [notice, setNotice] = useState<Notice | null>(null);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState<PolicySort>({
@@ -52,12 +73,20 @@ export default function PoliciesPage() {
       try {
         setApiStatus("loading");
         setApiError("");
-        const [nextApps, globalAssignments] = await Promise.all([
+        const [nextApps, nextGlobalAssignments, nextPolicyDefinitions] =
+          await Promise.all([
           listApps(),
-          listGlobalPolicyAssignments()
+          listGlobalPolicyAssignments(),
+          listPolicies()
         ]);
         setApps(nextApps);
-        setPolicies(globalAssignments.map(mapGlobalAssignmentToPolicyRow));
+        setGlobalAssignments(nextGlobalAssignments);
+        setPolicyDefinitions(nextPolicyDefinitions);
+        setPolicies(
+          nextGlobalAssignments.map((assignment) =>
+            mapGlobalAssignmentToPolicyRow(assignment, nextPolicyDefinitions)
+          )
+        );
         setApiStatus("ready");
       } catch (error) {
         setApiStatus("error");
@@ -72,7 +101,16 @@ export default function PoliciesPage() {
   }, []);
 
   useEffect(() => {
-    if (!hasApiBaseUrl() || !selectedApp) {
+    if (!hasApiBaseUrl()) {
+      return;
+    }
+
+    if (!selectedApp) {
+      setPolicies(
+        globalAssignments.map((assignment) =>
+          mapGlobalAssignmentToPolicyRow(assignment, policyDefinitions)
+        )
+      );
       return;
     }
 
@@ -90,10 +128,17 @@ export default function PoliciesPage() {
         const effective = await getEffectivePolicyAssignments(app.client_id);
         setPolicies([
           ...effective.global_assignments.map((assignment) =>
-            mapEffectiveAssignmentToPolicyRow(assignment)
+            mapEffectiveAssignmentToPolicyRow(
+              assignment,
+              policyDefinitions
+            )
           ),
           ...effective.app_assignments.map((assignment) =>
-            mapEffectiveAssignmentToPolicyRow(assignment, app.display_label)
+            mapEffectiveAssignmentToPolicyRow(
+              assignment,
+              policyDefinitions,
+              app.display_label
+            )
           )
         ]);
         setApiStatus("ready");
@@ -106,7 +151,257 @@ export default function PoliciesPage() {
     }
 
     void loadAppPolicies(selectedAppRecord);
-  }, [apps, selectedApp]);
+  }, [apps, globalAssignments, policyDefinitions, selectedApp]);
+
+  async function reloadPolicyData() {
+    const [nextApps, nextGlobalAssignments, nextPolicyDefinitions] =
+      await Promise.all([
+        listApps(),
+        listGlobalPolicyAssignments(),
+        listPolicies()
+      ]);
+
+    setApps(nextApps);
+    setGlobalAssignments(nextGlobalAssignments);
+    setPolicyDefinitions(nextPolicyDefinitions);
+
+    const app = nextApps.find((item) => item.display_label === selectedApp);
+    if (selectedApp && app) {
+      const effective = await getEffectivePolicyAssignments(app.client_id);
+      setPolicies([
+        ...effective.global_assignments.map((assignment) =>
+          mapEffectiveAssignmentToPolicyRow(assignment, nextPolicyDefinitions)
+        ),
+        ...effective.app_assignments.map((assignment) =>
+          mapEffectiveAssignmentToPolicyRow(
+            assignment,
+            nextPolicyDefinitions,
+            app.display_label
+          )
+        )
+      ]);
+    } else {
+      setPolicies(
+        nextGlobalAssignments.map((assignment) =>
+          mapGlobalAssignmentToPolicyRow(assignment, nextPolicyDefinitions)
+        )
+      );
+    }
+  }
+
+  async function handleCreatePolicy(draft: PolicyDraft): Promise<boolean> {
+    if (!hasApiBaseUrl()) {
+      setPolicies((current) => [
+        {
+          id: Date.now(),
+          connector: draft.connector,
+          name: draft.name,
+          created: new Date().toISOString(),
+          global: draft.global,
+          app: draft.global ? null : selectedApp
+        },
+        ...current
+      ]);
+      setModalOpen(false);
+      return true;
+    }
+
+    const app = apps.find((item) => item.display_label === selectedApp);
+    if (!draft.global && !app) {
+      setApiStatus("error");
+      setApiError("Select an app before creating an app-specific policy.");
+      return false;
+    }
+
+    try {
+      setApiStatus("loading");
+      setApiError("");
+      setNotice(null);
+      const payload = {
+        policy_type: "input",
+        connector: toApiKey(draft.connector),
+        action: toApiKey(draft.action),
+        resource: toApiKey(draft.resource),
+        description: draft.name,
+        effect: "block",
+        priority: 100,
+        conditions: draft.customResource
+          ? { custom_resource: draft.customResource }
+          : {},
+        enabled: true
+      } as const;
+      const resolution = draft.global
+        ? await resolvePolicyGlobally(payload, draft.name)
+        : await resolvePolicyForApp(app!.client_id, payload, draft.name);
+
+      setNotice(resolutionNotice(resolution.resolution, resolution.policy_label));
+    } catch (error) {
+      setApiStatus("error");
+      setApiError(
+        error instanceof Error ? error.message : "Could not create policy."
+      );
+      return false;
+    }
+
+    try {
+      await reloadPolicyData();
+      setApiStatus("ready");
+    } catch (error) {
+      setApiStatus("error");
+      setApiError(
+        error instanceof Error
+          ? error.message
+          : "Policy was created, but the list could not be refreshed."
+      );
+    }
+
+    setModalOpen(false);
+    return true;
+  }
+
+  function handleEditPolicy(policy: PolicyRow) {
+    if (policy.scope === "global" && selectedApp) {
+      setNotice({
+        tone: "warning",
+        message: "Switch to Global policies to edit a global assignment."
+      });
+      return;
+    }
+    setEditingPolicy(policy);
+    setModalOpen(true);
+  }
+
+  async function handleUpdatePolicy(draft: PolicyDraft): Promise<boolean> {
+    if (!editingPolicy) {
+      return false;
+    }
+
+    if (!hasApiBaseUrl()) {
+      setPolicies((current) =>
+        current.map((policy) =>
+          policy.id === editingPolicy.id
+            ? {
+                ...policy,
+                connector: draft.connector,
+                name: draft.name,
+                global: editingPolicy.global
+              }
+            : policy
+        )
+      );
+      setEditingPolicy(null);
+      setModalOpen(false);
+      return true;
+    }
+
+    if (
+      editingPolicy.assignmentId === undefined ||
+      editingPolicy.scope === undefined
+    ) {
+      setApiStatus("error");
+      setApiError("This policy row is missing assignment information.");
+      return false;
+    }
+
+    const payload = buildPolicyPayload(draft);
+    try {
+      setApiStatus("loading");
+      setApiError("");
+      setNotice(null);
+      const resolution =
+        editingPolicy.scope === "global"
+          ? await editGlobalPolicyAssignment(
+              editingPolicy.assignmentId,
+              payload,
+              draft.name
+            )
+          : await editAppPolicyAssignment(
+              getSelectedApp(apps, selectedApp).client_id,
+              editingPolicy.assignmentId,
+              payload,
+              draft.name
+            );
+
+      await reloadPolicyData();
+      setApiStatus("ready");
+      setNotice({
+        tone: "success",
+        message:
+          resolution.resolution === "created"
+            ? `${draft.name} was saved as a new reusable policy.`
+            : `${draft.name} now uses the matching reusable policy.`
+      });
+      setEditingPolicy(null);
+      setModalOpen(false);
+      return true;
+    } catch (error) {
+      setApiStatus("error");
+      setApiError(
+        error instanceof Error ? error.message : "Could not update policy."
+      );
+      return false;
+    }
+  }
+
+  async function handleDeletePolicy(policy: PolicyRow) {
+    if (!hasApiBaseUrl()) {
+      setPolicies((current) => current.filter((item) => item.id !== policy.id));
+      setNotice({
+        tone: "success",
+        message: `${policy.name} was removed from the mock policy view.`
+      });
+      return;
+    }
+
+    if (policy.assignmentId === undefined || policy.scope === undefined) {
+      setApiStatus("error");
+      setApiError("This policy row is missing assignment information.");
+      return;
+    }
+
+    if (policy.scope === "global" && selectedApp) {
+      setNotice({
+        tone: "warning",
+        message: "Switch to Global policies to remove a global assignment."
+      });
+      return;
+    }
+
+    const scopeLabel = policy.scope === "global" ? "every app" : selectedApp;
+    const confirmed = window.confirm(
+      `Remove "${policy.name}" from ${scopeLabel}? ` +
+        "The reusable policy definition will remain in the database."
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setApiStatus("loading");
+      setApiError("");
+      setNotice(null);
+      if (policy.scope === "global") {
+        await deleteGlobalPolicyAssignment(policy.assignmentId);
+      } else {
+        const app = apps.find((item) => item.display_label === selectedApp);
+        if (!app) {
+          throw new Error("Selected app was not found.");
+        }
+        await deleteAppPolicyAssignment(app.client_id, policy.assignmentId);
+      }
+      await reloadPolicyData();
+      setApiStatus("ready");
+      setNotice({
+        tone: "success",
+        message: `${policy.name} was unassigned. Its reusable definition remains available.`
+      });
+    } catch (error) {
+      setApiStatus("error");
+      setApiError(
+        error instanceof Error ? error.message : "Could not unassign policy."
+      );
+    }
+  }
 
   function handleSelectedAppChange(value: string) {
     setSelectedApp(value);
@@ -218,7 +513,10 @@ export default function PoliciesPage() {
             <button
               className="inline-flex h-10 items-center justify-center gap-3 rounded-md bg-gms-blue px-4 text-sm font-medium text-white shadow-button"
               type="button"
-              onClick={() => setModalOpen(true)}
+              onClick={() => {
+                setEditingPolicy(null);
+                setModalOpen(true);
+              }}
             >
               <Plus className="h-5 w-5" />
               Create Policy
@@ -232,6 +530,8 @@ export default function PoliciesPage() {
           policies={paginatedPolicies}
           sort={sort}
           totalCount={visiblePolicies.length}
+          onDelete={handleDeletePolicy}
+          onEdit={handleEditPolicy}
           onPageChange={setPage}
           onSort={handleSort}
         />
@@ -253,25 +553,60 @@ export default function PoliciesPage() {
 
       <CreatePolicyModal
         appName={selectedApp || null}
+        initialPolicy={
+          editingPolicy
+            ? policyRowToDraft(editingPolicy, policyDefinitions)
+            : null
+        }
         isAdmin
+        mode={editingPolicy ? "edit" : "create"}
         open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        onCreate={(policy) => {
-          setPolicies((current) => [policy, ...current]);
+        onClose={() => {
+          setEditingPolicy(null);
           setModalOpen(false);
         }}
+        onSubmit={editingPolicy ? handleUpdatePolicy : handleCreatePolicy}
       />
+
+      {notice && (
+        <div
+          className={`fixed right-6 top-6 z-[70] flex max-w-md items-start gap-4 rounded-md border bg-white px-5 py-4 text-sm shadow-modal ${
+            notice.tone === "warning"
+              ? "border-[#f1c66a] text-[#74510b]"
+              : "border-[#8bc9a7] text-[#245d3b]"
+          }`}
+          role="alert"
+        >
+          <span>{notice.message}</span>
+          <button
+            aria-label="Dismiss notification"
+            className="shrink-0"
+            type="button"
+            onClick={() => setNotice(null)}
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
     </main>
   );
 }
 
 function mapGlobalAssignmentToPolicyRow(
-  assignment: GlobalPolicyAssignment
+  assignment: GlobalPolicyAssignment,
+  definitions: PolicyRecord[]
 ): PolicyRow {
   return {
-    id: assignment.policy_id,
+    id: `global-${assignment.id}`,
+    policyId: assignment.policy_id,
+    assignmentId: assignment.id,
+    scope: "global",
     connector: assignment.connector ?? "Policy",
-    name: assignment.policy_label,
+    name: assignment.display_name?.trim() || getPolicyDisplayName(
+      assignment.policy_id,
+      assignment.policy_label,
+      definitions
+    ),
     created: assignment.created_at,
     global: true,
     app: null
@@ -280,14 +615,110 @@ function mapGlobalAssignmentToPolicyRow(
 
 function mapEffectiveAssignmentToPolicyRow(
   assignment: EffectivePolicyAssignment,
+  definitions: PolicyRecord[],
   appName: string | null = null
 ): PolicyRow {
   return {
-    id: assignment.policy_id,
+    id: `${assignment.scope}-${assignment.assignment_id}`,
+    policyId: assignment.policy_id,
+    assignmentId: assignment.assignment_id,
+    scope: assignment.scope,
     connector: assignment.connector ?? "Policy",
-    name: assignment.policy_label,
+    name: assignment.display_name?.trim() || getPolicyDisplayName(
+      assignment.policy_id,
+      assignment.policy_label,
+      definitions
+    ),
     created: assignment.created_at,
     global: assignment.scope === "global",
     app: assignment.scope === "app" ? appName : null
+  };
+}
+
+function getPolicyDisplayName(
+  policyId: number,
+  fallback: string,
+  definitions: PolicyRecord[]
+) {
+  return (
+    definitions.find((policy) => policy.id === policyId)?.description?.trim() ||
+    fallback
+  );
+}
+
+function toApiKey(value: string) {
+  return value.trim().toLowerCase().replace(/\s+/g, "_");
+}
+
+function buildPolicyPayload(draft: PolicyDraft) {
+  return {
+    policy_type: "input" as const,
+    connector: toApiKey(draft.connector),
+    action: toApiKey(draft.action),
+    resource: toApiKey(draft.resource),
+    description: draft.name,
+    effect: "block" as const,
+    priority: 100,
+    conditions: draft.customResource
+      ? { custom_resource: draft.customResource }
+      : {},
+    enabled: true
+  };
+}
+
+function getSelectedApp(apps: ClientApp[], selectedApp: string) {
+  const app = apps.find((item) => item.display_label === selectedApp);
+  if (!app) {
+    throw new Error("Selected app was not found.");
+  }
+  return app;
+}
+
+function policyRowToDraft(
+  row: PolicyRow,
+  definitions: PolicyRecord[]
+): PolicyDraft {
+  const definition = definitions.find((policy) => policy.id === row.policyId);
+  const customResource = definition?.conditions?.custom_resource;
+  return {
+    connector: toDisplayValue(definition?.connector ?? row.connector),
+    action: toDisplayValue(definition?.action ?? ""),
+    resource: toDisplayValue(definition?.resource ?? ""),
+    customResource:
+      typeof customResource === "string" ? customResource : "",
+    name: row.name,
+    global: row.global
+  };
+}
+
+function toDisplayValue(value: string) {
+  if (value.toLowerCase() === "github") {
+    return "GitHub";
+  }
+  return value
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function resolutionNotice(
+  resolution: "created" | "reused" | "already_assigned",
+  policyLabel: string
+): Notice {
+  if (resolution === "already_assigned") {
+    return {
+      tone: "warning",
+      message: `${policyLabel} is already active for this policy scope.`
+    };
+  }
+  if (resolution === "reused") {
+    return {
+      tone: "success",
+      message: `An equivalent reusable policy was found and assigned: ${policyLabel}.`
+    };
+  }
+  return {
+    tone: "success",
+    message: `Policy created and assigned: ${policyLabel}.`
   };
 }

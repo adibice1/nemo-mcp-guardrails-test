@@ -1,7 +1,9 @@
+import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -11,6 +13,9 @@ from nemo_mcp_guardrails.api.global_policy_assignments import (
     router as global_policy_assignments_router,
 )
 from nemo_mcp_guardrails.api.policies import router as policies_router
+from nemo_mcp_guardrails.api.policy_assignment_resolution import (
+    router as policy_assignment_resolution_router,
+)
 from nemo_mcp_guardrails.api.runtime import router as runtime_router
 from nemo_mcp_guardrails.database.connection import create_database_tables, get_db
 
@@ -29,10 +34,28 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+cors_origins = [
+    origin.strip()
+    for origin in os.getenv(
+        "NEMO_CORS_ORIGINS",
+        "http://127.0.0.1:3000,http://localhost:3000",
+    ).split(",")
+    if origin.strip()
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(allowed_test_cases_router)
 app.include_router(apps_router)
 app.include_router(global_policy_assignments_router)
 app.include_router(policies_router)
+app.include_router(policy_assignment_resolution_router)
 app.include_router(runtime_router)
 
 
@@ -41,6 +64,7 @@ def root() -> dict[str, str]:
     """Return a welcome message at the root endpoint."""
 
     return {"message": "Welcome to the NeMo MCP Guardrails API!"}
+
 
 @app.get("/health")
 def health() -> dict[str, str]:

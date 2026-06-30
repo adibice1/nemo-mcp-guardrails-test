@@ -7,4 +7,6 @@ __pycache__/
 node_modules/
 .next/
 dev-server*.log
+api-server*.log
 .waylog/
+.env*.local

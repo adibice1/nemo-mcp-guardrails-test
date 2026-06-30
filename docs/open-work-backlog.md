@@ -30,11 +30,31 @@ The GMS backend prototype now has these core runtime pieces:
 - The first Next.js 13 frontend scaffold now exists under `frontend/`. It
   implements the uploaded Figma screens:
   `/login`, `/signup`, `/policies`, and `/settings`.
-- The `/policies` page now has a read-only typed API adapter. When
+- The `/policies` page now has a typed read/write API adapter. When
   `frontend/.env.local` sets
   `NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000`, it loads real apps, global
   policy assignments, and app effective policy assignments from FastAPI. When
   the env var is absent, it stays in mock mode for static/Vercel design demos.
+- The create-policy modal now writes through FastAPI when backend mode is
+  enabled: it creates the reusable policy, assigns it globally or to the
+  selected app, reloads DB-backed assignments, and closes only after success.
+- Policy creation now resolves structural equivalence before inserting. The
+  backend returns `created`, `reused`, or `already_assigned`; equivalent names
+  do not create duplicate policy definitions, and app requests do not add a
+  redundant assignment when the same policy is already active globally.
+- Frontend Delete now removes only the selected app/global assignment. The
+  reusable policy definition remains available for other apps.
+- Frontend Edit is assignment-safe. It resolves the edited behavior, switches
+  only that app/global assignment to an existing or newly created reusable
+  policy, and leaves other apps on their previous policy.
+- App/global assignments now store optional `display_name` values, so each app
+  can name a shared policy independently. The frontend prefers this name.
+- `scripts/deduplicate_policies.py` consolidates legacy equivalent policy rows;
+  `scripts/migrate_policy_assignment_display_names.py` adds/backfills the
+  assignment display-name columns.
+- FastAPI allows configured frontend origins through `NEMO_CORS_ORIGINS`; the
+  committed local default covers `http://127.0.0.1:3000` and
+  `http://localhost:3000`.
 - Policy create/update now automatically refreshes `compiled_policy_rules`;
   old compiled rows are marked stale and disabled.
 - HTTP runtime integration coverage now proves an authenticated app can pass an
@@ -250,11 +270,11 @@ Current prep:
 
 Next implementation slice:
 
-- Wire `/policies` create/edit/delete to FastAPI. Creating a policy should call
-  `POST /policies`, then assign it through either global assignments or
-  app-specific assignments depending on the selected view/admin checkbox.
-- Replace local create/edit/delete behavior with backend mutation calls and
-  refresh the read model after mutation.
+- Add protected admin-only policy-definition deletion with assigned-policy
+  checks and explicit force-delete behavior.
+- Add explicit argument-level compiler support before claiming that
+  `conditions.custom_resource` restricts a policy to a named issue, branch,
+  file, or other specific resource. It is currently stored as metadata only.
 - Add `/apps` list/create/edit after the policy page mutation path works.
 - Add `/apps/[clientId]` connector management before the runtime tester screen.
 

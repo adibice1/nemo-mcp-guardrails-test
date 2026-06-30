@@ -171,7 +171,7 @@ Recommended frontend slice from the current state:
 ```text
 1. Keep the existing Next.js 13 scaffold in `frontend/`.
 2. Use `frontend/.env.local` with NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000 for local backend mode.
-3. Wire /policies create/edit/delete to `POST/PUT/DELETE /policies` and app/global assignment endpoints.
+3. Create and assignment-only Delete are complete; implement assignment-safe Edit through resolve-and-swap behavior.
 4. Implement /apps with list/create/edit behavior.
 5. Implement /apps/[clientId] with the Connectors tab first.
 6. Wire GitHub connector linking with credential_reference="env:VAR_NAME".
@@ -186,7 +186,8 @@ frontend/ implements /login, /signup, /policies, and /settings
 /policies reads GET /apps, GET /global-policy-assignments, and
 GET /apps/by-client-id/{client_id}/effective-policy-assignments when
 NEXT_PUBLIC_API_BASE_URL is configured
-create/edit/delete controls are not backend-wired yet
+create and assignment-only delete are backend-wired
+assignment-safe edit is not backend-wired yet
 ```
 
 The app connector management API slice is complete. Developers can now link

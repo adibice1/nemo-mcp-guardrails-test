@@ -16,7 +16,7 @@ X-API-Key: <plaintext app api key>
 
 ## Current Frontend Integration State
 
-The first frontend backend slice is read-only and lives in:
+The frontend policy integration lives in:
 
 ```text
 frontend/lib/api-client.ts
@@ -40,8 +40,31 @@ GET /global-policy-assignments
 GET /apps/by-client-id/{client_id}/effective-policy-assignments
 ```
 
-The current `/policies` page does not yet write to the backend. Create, edit,
-and delete are the next integration slice.
+The current `/policies` page reads and mutates through the backend. Creation
+uses the resolve endpoints below, so equivalent reusable policies are reused
+instead of inserted again. Edit resolves and swaps only the selected assignment;
+Delete removes the assignment only.
+
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| `POST` | `/apps/by-client-id/{client_id}/policy-assignments/resolve` | Create/reuse and assign one app policy |
+| `POST` | `/global-policy-assignments/resolve` | Create/reuse and assign one global policy |
+| `PUT` | `/apps/by-client-id/{client_id}/policy-assignments/{assignment_id}/resolve` | Edit one app assignment by resolving reusable behavior |
+| `PUT` | `/global-policy-assignments/{assignment_id}/resolve` | Edit one global assignment by resolving reusable behavior |
+
+Resolution responses return `created`, `reused`, or `already_assigned` plus
+the reusable `policy_id`, concrete `assignment_id`, and assignment-specific
+`display_name`.
+
+Browser access from the local frontend is controlled by:
+
+```env
+NEMO_CORS_ORIGINS=http://127.0.0.1:3000,http://localhost:3000
+```
+
+Optional custom-resource text is stored under
+`conditions.custom_resource`. The current compiler does not yet enforce that
+condition, so the compiled action/resource rule remains broad.
 
 ## Health
 

@@ -14,10 +14,6 @@ from nemo_mcp_guardrails.api.policy_schemas import (
 from nemo_mcp_guardrails.database.connection import get_db
 from nemo_mcp_guardrails.database.models import (
     CompiledPolicyRuleRecord,
-    ConnectorActionRecord,
-    ConnectorRecord,
-    ConnectorResourceRecord,
-    ConnectorToolMappingRecord,
     PolicyRecord,
 )
 from nemo_mcp_guardrails.policy_compiler import (
@@ -30,125 +26,13 @@ from nemo_mcp_guardrails.policy_rule_service import (
     to_input_policy_object,
     to_output_policy_object,
 )
+from nemo_mcp_guardrails.policy_service import (
+    find_equivalent_policy,
+    resolve_policy_references,
+)
 
 
 router = APIRouter(prefix="/policies", tags=["policies"])
-
-
-def _resolve_policy_references(policy: PolicyRecord, db: Session) -> None:
-    """Resolve human-readable policy names into normalized database IDs."""
-
-    if policy.policy_type == "input":
-        missing_fields = [
-            field
-            for field in ("connector", "action", "resource")
-            if not getattr(policy, field)
-        ]
-        if missing_fields:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=(
-                    "Input policy is missing required fields: "
-                    + ", ".join(missing_fields)
-                ),
-            )
-
-    if policy.policy_type == "output" and not policy.connector:
-        policy.connector = "global"
-
-    if not policy.connector:
-        policy.connector_id = None
-        policy.action_id = None
-        policy.resource_id = None
-        return
-
-    connector_name = policy.connector.strip().lower()
-    connector = db.scalar(
-        select(ConnectorRecord).where(ConnectorRecord.name == connector_name)
-    )
-
-    if not connector:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unknown connector: {policy.connector}",
-        )
-
-    policy.connector = connector.name
-    policy.connector_id = connector.id
-    policy.normalized_connector = connector
-
-    if policy.action:
-        action_name = policy.action.strip().lower()
-        action = db.scalar(
-            select(ConnectorActionRecord).where(
-                ConnectorActionRecord.connector_id == connector.id,
-                ConnectorActionRecord.name == action_name,
-            )
-        )
-
-        if not action:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=(
-                    f"Unknown action '{policy.action}' "
-                    f"for connector '{connector.name}'"
-                ),
-            )
-
-        policy.action = action.name
-        policy.action_id = action.id
-        policy.normalized_action = action
-    else:
-        policy.action_id = None
-        policy.normalized_action = None
-
-    if policy.resource:
-        resource_name = policy.resource.strip().lower()
-        resource = db.scalar(
-            select(ConnectorResourceRecord).where(
-                ConnectorResourceRecord.connector_id == connector.id,
-                ConnectorResourceRecord.name == resource_name,
-            )
-        )
-
-        if not resource:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=(
-                    f"Unknown resource '{policy.resource}' "
-                    f"for connector '{connector.name}'"
-                ),
-            )
-
-        policy.resource = resource.name
-        policy.resource_id = resource.id
-        policy.normalized_resource = resource
-    else:
-        policy.resource_id = None
-        policy.normalized_resource = None
-
-    if (
-        policy.policy_type == "input"
-        and policy.action_id is not None
-        and policy.resource_id is not None
-    ):
-        tool_mapping = db.scalar(
-            select(ConnectorToolMappingRecord).where(
-                ConnectorToolMappingRecord.connector_id == policy.connector_id,
-                ConnectorToolMappingRecord.action_id == policy.action_id,
-                ConnectorToolMappingRecord.resource_id == policy.resource_id,
-                ConnectorToolMappingRecord.enabled.is_(True),
-            )
-        )
-
-        if not tool_mapping:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=(
-                    "Unsupported policy combination: "
-                    f"{policy.connector} + {policy.action} + {policy.resource}"
-                ),
-            )
 
 
 @router.get("", response_model=list[PolicyRead])
@@ -262,7 +146,16 @@ def create_policy(
     """Create one policy record."""
 
     policy = PolicyRecord(**payload.model_dump())
-    _resolve_policy_references(policy, db)
+    resolve_policy_references(policy, db)
+    equivalent = find_equivalent_policy(policy, db)
+    if equivalent is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "equivalent_policy_exists",
+                "policy_id": equivalent.id,
+            },
+        )
     db.add(policy)
 
     try:
@@ -300,7 +193,20 @@ def update_policy(
     for field, value in updates.items():
         setattr(policy, field, value)
 
-    _resolve_policy_references(policy, db)
+    resolve_policy_references(policy, db)
+    equivalent = find_equivalent_policy(
+        policy,
+        db,
+        exclude_policy_id=policy.id,
+    )
+    if equivalent is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "equivalent_policy_exists",
+                "policy_id": equivalent.id,
+            },
+        )
     policy.policy_version += 1
 
     try:

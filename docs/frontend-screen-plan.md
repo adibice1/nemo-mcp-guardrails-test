@@ -326,7 +326,11 @@ Current implementation note:
   `NEXT_PUBLIC_API_BASE_URL` is configured.
 - Without `NEXT_PUBLIC_API_BASE_URL`, it intentionally falls back to mock data
   for static design demos.
-- Create/edit/delete controls are not backend-wired yet.
+- Create is backend-wired through duplicate-aware global/app resolution.
+- Delete is backend-wired as assignment removal; shared definitions remain.
+- Assignment-safe Edit is not backend-wired yet.
+- Optional custom-resource text is persisted as policy metadata but is not yet
+  an enforced compiler condition.
 
 Table columns:
 
@@ -455,8 +459,8 @@ components/
    `/signup`, `/policies`, and `/settings`.
 2. API client and typed fetch wrappers. First read-only `/policies` adapter is
    done in `frontend/lib/api-client.ts`.
-3. Wire policy creation, edit, and delete to `/policies` and assignment
-   endpoints.
+3. Policy creation and assignment-only Delete are backend-wired. Next,
+   implement assignment-safe Edit through resolve-and-swap behavior.
 4. Apps list and create/edit forms.
 5. App detail with connector tab.
 6. App policy assignment tab.

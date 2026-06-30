@@ -150,6 +150,9 @@ The system successfully:
   and switches `/policies` to read real apps/global assignments/effective app
   assignments from FastAPI when `frontend/.env.local` sets
   `NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000`.
+- The backend-backed policy page now supports duplicate-aware Create,
+  assignment-safe Edit, and assignment-only Delete. Assignment `display_name`
+  values keep app-specific labels separate from reusable policy behavior.
 
 ## Current Runtime Flow
 

@@ -60,7 +60,7 @@ Current handoff status:
 - Input/output diagnostic scripts now distinguish Azure `content_filter`
   blocks from completed NeMo classifications.
 - The Next.js 13 frontend scaffold exists in `frontend/`. Its `/policies` page
-  has a read-only FastAPI adapter that uses real app/global/effective policy
+  has a FastAPI adapter that uses real app/global/effective policy
   assignment data when `frontend/.env.local` sets
   `NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000`; otherwise it uses mock data
   for static demos.

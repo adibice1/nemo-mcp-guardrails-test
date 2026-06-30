@@ -35,7 +35,8 @@ Current frontend behavior:
 - Settings placeholder toggles are interactive, and Save Changes enables only
   after a setting is changed.
 
-The `/policies` page has a read-only FastAPI adapter. It stays in mock mode
+The `/policies` page has a FastAPI adapter for policy reads, duplicate-aware
+creation, assignment-safe editing, and assignment-only deletion. It stays in mock mode
 when no API base URL is configured, which keeps the static/Vercel design demo
 usable without a backend.
 
@@ -55,9 +56,15 @@ GET /global-policy-assignments
 GET /apps/by-client-id/{client_id}/effective-policy-assignments
 ```
 
-Create/edit/delete controls are still local UI behavior. The next frontend
-slice should wire those controls to the backend policy and assignment endpoints
-from `docs/frontend-api-map.md`.
+Create is backend-wired: the modal creates a reusable policy, assigns it to the
+selected app or global scope, reloads the DB-backed view, and then closes.
+Equivalent policy behavior is reused and produces a visible `created`,
+`reused`, or `already assigned` notice. Delete removes only the assignment,
+leaving the reusable definition available to other apps. Assignment-safe Edit
+is the next frontend slice.
+
+Optional custom-resource text is stored as `conditions.custom_resource`, but
+the current backend compiler does not enforce that condition yet.
 
 ## Component Layout
 

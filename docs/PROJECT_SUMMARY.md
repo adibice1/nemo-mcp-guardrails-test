@@ -66,6 +66,11 @@ Current backend/API state:
 - Effective policy assignment views are available under
   `/apps/{app_id}/effective-policy-assignments` and
   `/apps/by-client-id/{client_id}/effective-policy-assignments`.
+- Duplicate-aware resolve endpoints create or reuse policy definitions for
+  frontend Create and assignment-safe Edit. Assignment-level `display_name`
+  values let different apps name one shared definition independently.
+- `scripts/deduplicate_policies.py` consolidates legacy equivalent definitions
+  without removing another app's effective assignment.
 - App API keys are hashed before persistence and omitted from API responses.
 - `require_authenticated_app` verifies `X-App-ID` and `X-API-Key` before
   protected runtime work and returns a generic `401` for invalid requests.
@@ -85,9 +90,10 @@ Current backend/API state:
 - `guarded_execution.py` coordinates reusable single-request input rail,
   agent/guarded-tool execution with trimmed history, output rail, and
   structured results.
-- The Next.js 13 frontend scaffold exists under `frontend/` with `/login`,
-  `/signup`, `/policies`, and `/settings`. The `/policies` page now has a
-  read-only FastAPI adapter that loads `GET /apps`,
+- The Next.js 13 frontend exists under `frontend/` with `/login`, `/signup`,
+  `/policies`, and `/settings`. The `/policies` page loads and mutates real
+  FastAPI data, including duplicate-aware Create, assignment-safe Edit, and
+  assignment-only Delete. It loads `GET /apps`,
   `GET /global-policy-assignments`, and
   `GET /apps/by-client-id/{client_id}/effective-policy-assignments` when
   `NEXT_PUBLIC_API_BASE_URL` is configured. Without that env var, it stays in

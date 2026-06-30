@@ -99,6 +99,10 @@ Blocked actions:
 - `app_policy_assignments` and `global_policy_assignments` reference the existing reusable definitions in `policies`. The connector-independent credential output policy is globally assigned; GitHub write policies remain unassigned.
 - FastAPI client-app CRUD lives under `/apps`; nested app-policy-assignment CRUD lives under `/apps/{app_id}/policy-assignments`; global assignment CRUD lives under `/global-policy-assignments`.
 - App/global assignment POST bodies use `policy_ids`, so the same endpoints handle single and bulk assignment. Assignment responses include readable app and policy labels beside numeric IDs for Swagger/frontend use.
+- Duplicate-aware policy resolution is available under `/apps/by-client-id/{client_id}/policy-assignments/resolve` and `/global-policy-assignments/resolve`. It returns `created`, `reused`, or `already_assigned`; direct equivalent policy create/update requests return `409`.
+- Assignment-safe edit resolution is available under `PUT /apps/by-client-id/{client_id}/policy-assignments/{assignment_id}/resolve` and `PUT /global-policy-assignments/{assignment_id}/resolve`. Assignments have optional `display_name` values so apps can label shared definitions independently.
+- `scripts/migrate_policy_assignment_display_names.py` adds/backfills assignment names. `scripts/deduplicate_policies.py` previews legacy duplicate consolidation and applies it only with `--apply`.
+- `tests/test_policy_resolution_api.py` proves App A/App B policy reuse, shared-policy-safe edits, duplicate rejection, assignment-only deletion, and global-equivalent behavior. `tests/test_policy_deduplication.py` proves legacy merges preserve assignments and names.
 - App/global assignment bulk update/delete also uses `policy_ids`; the API returns `404` if a requested policy is not assigned in that app/global scope.
 - Developer-friendly client-ID aliases exist under `/apps/by-client-id/{client_id}` and `/apps/by-client-id/{client_id}/policy-assignments`; they resolve to the same internal app rows and full assignment CRUD logic.
 - App connector CRUD exists under `/apps/{app_id}/connectors` and `/apps/by-client-id/{client_id}/connectors`; connector references can use a numeric connector ID or connector name such as `github`.
@@ -138,9 +142,9 @@ The assignment-aware, app-authentication, protected HTTP boundary,
 authenticated runtime endpoint, reusable guarded-execution slice,
 conversation-history persistence/truncation, app-selected main/guardrail LLM
 selection, policy CRUD auto-compilation, app connector CRUD, env-based
-connector credential resolution, frontend planning docs, and the first
-Next.js 13 mock frontend scaffold are green. The next main implementation
-slice is wiring the frontend to the FastAPI backend for the GitHub MCP demo.
+connector credential resolution, frontend policy Create/Edit/Delete integration,
+and duplicate consolidation are green. The next main implementation slice is
+the app-management frontend for the GitHub MCP demo.
 Use `docs/frontend-api-map.md`, `docs/frontend-screen-plan.md`, and
 `docs/frontend-demo-flow.md` before changing UI code:
 
@@ -174,8 +178,8 @@ policy CRUD auto-refreshes compiled_policy_rules
 frontend-api-map.md maps backend endpoints to UI screens
 frontend-screen-plan.md defines the first Next.js 13 screens/components
 frontend-demo-flow.md defines the presentation GitHub MCP demo path
-frontend/ contains the first mock Next.js 13 pages: /login, /signup, /policies, /settings
--> wire /policies to the FastAPI policy/app endpoints
+frontend/ contains Next.js 13 pages: /login, /signup, /policies, /settings
+/policies supports backend-backed duplicate-aware Create, assignment-safe Edit, and assignment-only Delete
 -> build /apps list and /apps/[clientId] connector tab next
 -> defer production secrets-manager and admin auth unless specifically requested
 -> keep policy CRUD auto-compilation covered by test_policy_auto_compile.py

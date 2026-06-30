@@ -1027,8 +1027,32 @@ Backend-backed local mode:
    ```
 
 The current backend-backed `/policies` page reads apps, global policy
-assignments, and effective app policy assignments. Create/edit/delete controls
-are not backend-wired yet.
+assignments, and effective app policy assignments. Create now writes the
+policy through duplicate-aware resolution and assigns it globally or to one
+app. Delete removes only the assignment. Edit is not backend-wired yet.
+
+Run the self-cleaning resolver integration check:
+
+```powershell
+.\.venv\Scripts\python.exe tests\test_policy_resolution_api.py
+```
+
+It proves:
+
+- App A creates one reusable policy.
+- App B reuses the same policy ID.
+- a duplicate App A request returns `already_assigned`.
+- direct duplicate policy creation returns `409`.
+- deleting App A's assignment leaves App B's assignment and policy intact.
+- an active global equivalent prevents a redundant app assignment.
+
+CORS preflight can be checked with an Origin of
+`http://127.0.0.1:3000`. Expected response:
+
+```text
+status: 200
+access-control-allow-origin: http://127.0.0.1:3000
+```
 
 Avoid running `npm run build` while the dev server is already running. Both
 commands write `.next`; if the page renders as raw HTML or CSS appears missing,

@@ -1,5 +1,8 @@
 export type PolicyRow = {
-  id: number;
+  id: number | string;
+  policyId?: number;
+  assignmentId?: number;
+  scope?: "app" | "global";
   connector: string;
   name: string;
   created: string;
