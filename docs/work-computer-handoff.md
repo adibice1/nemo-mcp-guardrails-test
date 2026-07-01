@@ -168,9 +168,40 @@ frontend/app/policies/page.tsx
 frontend/.env.example
 ```
 
+The normal-developer Apps workflow is now implemented:
+
+```text
+/apps
+-> real app list, search, pagination, create and delete
+-> click row to open /apps/[clientId]
+
+/apps/[clientId]
+-> Overview: edit name/client ID and rotate API key
+-> Connectors: link/enable/disable/unlink GitHub
+-> LLM: update main and guardrail config IDs
+-> Policies: effective summary and link to filtered policy management
+-> Runtime Test: authenticated POST /v1/guardrails/run
+```
+
+SharePoint is shown as coming soon because only GitHub has normalized runtime
+metadata and an executable adapter. The LLM tab uses numeric config IDs until a
+readable LLM-config listing endpoint is added.
+
 The Settings dark-mode toggle now applies an app-wide Tailwind `dark` class.
 Saving writes `gms:theme` to browser `localStorage`; `app/layout.tsx` restores
 the class before rendering to reduce theme flashing.
+
+The policy builder loads valid connector/action/resource choices from
+`GET /policy-options`; currently only GitHub has mappings, so SharePoint is not
+offered in the policy form. In the policy table, global assignments use a globe
+icon, app-specific GitHub and SharePoint assignments use connector marks, and
+unknown connector values fall back to the folder icon.
+
+The shared Create/Edit Policy modal now has an Input/Output rail selector.
+Policy naming is unlocked immediately. Input mode keeps the cascading GitHub
+fields and optional custom resource; output mode hides connector fields and
+requires a free-text output rule. Output definitions use category `custom`,
+while their app/global assignment display name remains independent.
 
 By default, the deployed/mock frontend still uses local mock policy data. To
 switch local development to real FastAPI data, create `frontend/.env.local`:
@@ -215,6 +246,12 @@ Assignments now have optional `display_name` values. Run
 schema change. Legacy duplicate definitions can be previewed with
 `python scripts/deduplicate_policies.py` and applied with `--apply`.
 
+Clicking a policy row now opens
+`frontend/components/policies/policy-summary-modal.tsx`. The shared modal is
+used by both `/policies` and `/apps/[clientId]` Policies, loads
+`GET /policies/{policy_id}`, and shows connector/action/resource/custom-resource
+metadata plus effect and status. Row Edit/Delete buttons stop propagation.
+
 Direct `POST /policies` and `PUT /policies/{policy_id}` now return `409` when
 the requested enforcement behavior is equivalent to another enabled policy.
 Equivalence ignores description/name and compares normalized policy structure,
@@ -228,9 +265,16 @@ NEMO_CORS_ORIGINS=http://127.0.0.1:3000,http://localhost:3000
 ```
 
 The modal stores optional custom resource text in
-`conditions.custom_resource`, but the current compiler does not enforce that
-condition yet. Current action/resource policies still apply to the whole
-resource class.
+`conditions.custom_resource`. The compiler includes it in the NeMo input rule,
+and `tool_guard.py` checks normalized exact MCP argument values before execution.
+Blank custom resources continue to apply to the whole action/resource class.
+The backend canonicalizes equivalent natural-language variants before policy
+reuse checks, so capitalization and phrases such as `Issues named test` do not
+create duplicate definitions.
+
+`GET /policy-options` supplies the frontend policy builder from enabled
+connector tool mappings. Its dropdown sequence is connector -> action -> valid
+resource; SharePoint remains absent until it has executable mappings.
 
 ## Important Current Files
 
@@ -341,11 +385,9 @@ Recommended incremental slice:
 2. Read docs/frontend-screen-plan.md.
 3. Read docs/frontend-demo-flow.md.
 4. Add admin-only reusable-definition deletion safeguards.
-5. Add compiler support for explicit custom-resource/argument conditions.
-6. Implement `/apps` with list/create/edit behavior.
-7. Implement `/apps/[clientId]` with the Connectors tab first.
-8. Wire GitHub connector linking with credential_reference="env:VAR_NAME".
-9. Add app policy assignment and runtime tester tabs after connector flow works.
+5. Add a readable LLM-config catalogue endpoint and named selectors.
+6. Add management-user authentication, ownership filtering and role-aware nav.
+7. Keep User Management and Logs as admin-only post-presentation slices.
 ```
 
 Keep `GITHUB_MCP_READ_ONLY=1` for scripted tests. Do not add write-capable

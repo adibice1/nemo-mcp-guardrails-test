@@ -99,11 +99,19 @@ def _to_input_policy_object(record: PolicyRecord) -> InputPolicyObject | None:
     if not (connector and action and resource and record.effect):
         return None
 
+    custom_resource_value = (record.conditions or {}).get("custom_resource")
+    custom_resource = (
+        str(custom_resource_value).strip()
+        if custom_resource_value is not None
+        else None
+    )
+
     return InputPolicyObject(
         connector=connector,
         action=action,
         resource=resource,
         effect=record.effect,
+        custom_resource=custom_resource or None,
     )
 
 

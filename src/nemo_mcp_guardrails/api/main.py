@@ -13,6 +13,7 @@ from nemo_mcp_guardrails.api.global_policy_assignments import (
     router as global_policy_assignments_router,
 )
 from nemo_mcp_guardrails.api.policies import router as policies_router
+from nemo_mcp_guardrails.api.policy_metadata import router as policy_metadata_router
 from nemo_mcp_guardrails.api.policy_assignment_resolution import (
     router as policy_assignment_resolution_router,
 )
@@ -55,6 +56,7 @@ app.include_router(allowed_test_cases_router)
 app.include_router(apps_router)
 app.include_router(global_policy_assignments_router)
 app.include_router(policies_router)
+app.include_router(policy_metadata_router)
 app.include_router(policy_assignment_resolution_router)
 app.include_router(runtime_router)
 

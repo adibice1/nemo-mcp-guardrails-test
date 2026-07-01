@@ -18,6 +18,50 @@ export type ClientApp = {
   updated_at: string;
 };
 
+export type AppCreatePayload = {
+  name: string;
+  client_id: string;
+  api_key: string;
+  authorized: boolean;
+  main_llm_config_id: number | null;
+  guardrail_llm_config_id: number | null;
+};
+
+export type AppUpdatePayload = Partial<AppCreatePayload>;
+
+export type AppConnector = {
+  id: number;
+  app_id: number;
+  app_label: string;
+  connector_id: number;
+  connector_name: string;
+  connector_display_name: string;
+  credential_reference: string | null;
+  enabled: boolean;
+  connector_enabled: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type GuardrailsRunResponse = {
+  status: string;
+  app_id: number;
+  client_id: string;
+  conversation_id: string | null;
+  response: string;
+  input_rail_status: string;
+  output_rail_status: string | null;
+  tool_names: string[];
+  input_policy_count: number;
+  input_rule_count: number;
+  output_rule_count: number;
+  blocked_tools: string[];
+  history_truncated: boolean;
+  history_messages_received: number;
+  history_messages_loaded: number;
+  history_messages_used: number;
+};
+
 export type GlobalPolicyAssignment = {
   id: number;
   policy_id: number;
@@ -76,6 +120,19 @@ export type PolicyRecord = {
   updated_at: string;
 };
 
+export type PolicyConnectorOption = {
+  value: string;
+  label: string;
+  actions: Array<{
+    value: string;
+    label: string;
+    resources: Array<{
+      value: string;
+      label: string;
+    }>;
+  }>;
+};
+
 export type PolicyCreatePayload = {
   policy_type: "input" | "output";
   connector?: string | null;
@@ -107,7 +164,8 @@ async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
     headers: {
       Accept: "application/json",
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
+      ...init?.headers
     },
     cache: "no-store"
   });
@@ -135,6 +193,103 @@ export function listApps() {
   return apiRequest<ClientApp[]>("/apps");
 }
 
+export function createApp(payload: AppCreatePayload) {
+  return apiRequest<ClientApp>("/apps", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function getApp(clientId: string) {
+  return apiRequest<ClientApp>(
+    `/apps/by-client-id/${encodeURIComponent(clientId)}`
+  );
+}
+
+export function updateApp(appId: number, payload: AppUpdatePayload) {
+  return apiRequest<ClientApp>(`/apps/${appId}`, {
+    method: "PUT",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function deleteApp(appId: number) {
+  return apiRequest<void>(`/apps/${appId}`, { method: "DELETE" });
+}
+
+export function listAppConnectors(clientId: string) {
+  return apiRequest<AppConnector[]>(
+    `/apps/by-client-id/${encodeURIComponent(clientId)}/connectors`
+  );
+}
+
+export function saveAppConnector(
+  clientId: string,
+  payload: {
+    connector_name: string;
+    credential_reference: string | null;
+    enabled: boolean;
+  }
+) {
+  return apiRequest<AppConnector>(
+    `/apps/by-client-id/${encodeURIComponent(clientId)}/connectors`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload)
+    }
+  );
+}
+
+export function updateAppConnector(
+  clientId: string,
+  connectorName: string,
+  payload: { credential_reference?: string | null; enabled?: boolean }
+) {
+  return apiRequest<AppConnector>(
+    `/apps/by-client-id/${encodeURIComponent(
+      clientId
+    )}/connectors/${encodeURIComponent(connectorName)}`,
+    {
+      method: "PUT",
+      body: JSON.stringify(payload)
+    }
+  );
+}
+
+export function deleteAppConnector(
+  clientId: string,
+  connectorName: string
+) {
+  return apiRequest<void>(
+    `/apps/by-client-id/${encodeURIComponent(
+      clientId
+    )}/connectors/${encodeURIComponent(connectorName)}`,
+    { method: "DELETE" }
+  );
+}
+
+export function runGuardrails(
+  clientId: string,
+  apiKey: string,
+  payload: {
+    message: string;
+    conversation_id?: string | null;
+    conversation_history?: Array<{
+      role: "user" | "assistant";
+      content: string;
+    }>;
+  }
+) {
+  return apiRequest<GuardrailsRunResponse>("/v1/guardrails/run", {
+    method: "POST",
+    headers: {
+      "X-App-ID": clientId,
+      "X-API-Key": apiKey
+    },
+    body: JSON.stringify(payload)
+  });
+}
+
 export function listGlobalPolicyAssignments() {
   return apiRequest<GlobalPolicyAssignment[]>("/global-policy-assignments");
 }
@@ -149,6 +304,14 @@ export function getEffectivePolicyAssignments(clientId: string) {
 
 export function listPolicies() {
   return apiRequest<PolicyRecord[]>("/policies");
+}
+
+export function listPolicyOptions() {
+  return apiRequest<PolicyConnectorOption[]>("/policy-options");
+}
+
+export function getPolicy(policyId: number) {
+  return apiRequest<PolicyRecord>(`/policies/${policyId}`);
 }
 
 export function createPolicy(payload: PolicyCreatePayload) {

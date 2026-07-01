@@ -95,31 +95,65 @@ export const initialPolicies: PolicyRow[] = [
   }
 ];
 
-export const connectorOptions = [
-  "GitHub",
-  "SharePoint"
-];
-
-export const actionOptions = [
-  "Create",
-  "Update",
-  "Delete",
-  "Merge",
-  "Review",
-  "Comment",
-  "Fork",
-  "Push"
-];
-
-export const resourceOptions = [
-  "Issue",
-  "Pull Request",
-  "Repository",
-  "Branch",
-  "File",
-  "Commit",
-  "Release",
-  "Tag",
-  "Comment",
-  "Review"
+export const mockPolicyOptions = [
+  {
+    value: "github",
+    label: "GitHub",
+    actions: [
+      { value: "create", label: "Create", resources: [
+        { value: "branch", label: "Branch" },
+        { value: "file", label: "File" },
+        { value: "issue", label: "Issue" },
+        { value: "pull_request", label: "Pull Request" },
+        { value: "repository", label: "Repository" }
+      ] },
+      { value: "update", label: "Update", resources: [
+        { value: "file", label: "File" },
+        { value: "issue", label: "Issue" },
+        { value: "pull_request", label: "Pull Request" }
+      ] },
+      { value: "delete", label: "Delete", resources: [
+        { value: "file", label: "File" }
+      ] },
+      { value: "merge", label: "Merge", resources: [
+        { value: "pull_request", label: "Pull Request" }
+      ] },
+      { value: "review", label: "Review", resources: [
+        { value: "pull_request", label: "Pull Request" }
+      ] },
+      { value: "comment", label: "Comment", resources: [
+        { value: "issue", label: "Issue" }
+      ] },
+      { value: "fork", label: "Fork", resources: [
+        { value: "repository", label: "Repository" }
+      ] },
+      { value: "push", label: "Push", resources: [
+        { value: "file", label: "File" }
+      ] },
+      { value: "search", label: "Search", resources: [
+        { value: "file", label: "File" },
+        { value: "issue", label: "Issue" },
+        { value: "pull_request", label: "Pull Request" },
+        { value: "repository", label: "Repository" }
+      ] },
+      { value: "list", label: "List", resources: [
+        { value: "branch", label: "Branch" },
+        { value: "commit", label: "Commit" },
+        { value: "issue", label: "Issue" },
+        { value: "issue_type", label: "Issue Type" },
+        { value: "pull_request", label: "Pull Request" },
+        { value: "release", label: "Release" },
+        { value: "tag", label: "Tag" }
+      ] },
+      { value: "read", label: "Read", resources: [
+        { value: "commit", label: "Commit" },
+        { value: "file", label: "File" },
+        { value: "issue", label: "Issue" },
+        { value: "label", label: "Label" },
+        { value: "pull_request", label: "Pull Request" },
+        { value: "release", label: "Release" },
+        { value: "tag", label: "Tag" }
+      ] }
+    ]
+  }
 ];

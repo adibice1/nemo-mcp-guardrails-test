@@ -23,8 +23,9 @@ from nemo_mcp_guardrails.prompt_rule_compiler import (
     build_rails_config_with_prompt_rules,
 )
 from nemo_mcp_guardrails.tool_guard import (
-    blocked_tool_names_for_app,
+    ToolGuardRule,
     guard_mcp_tool,
+    tool_guard_rules_for_app,
 )
 
 
@@ -276,6 +277,7 @@ def build_chat_model(
 async def build_guarded_github_tools(
     environment: RuntimeEnvironment,
     blocked_tool_names: frozenset[str],
+    guard_rules: tuple[ToolGuardRule, ...],
 ) -> McpToolBundle:
     """Build GitHub MCP tools wrapped with the tool guard."""
 
@@ -308,7 +310,11 @@ async def build_guarded_github_tools(
     )
     raw_tools = await client.get_tools()
     guarded_tools = tuple(
-        guard_mcp_tool(tool, blocked_tool_names=blocked_tool_names)
+        guard_mcp_tool(
+            tool,
+            blocked_tool_names=blocked_tool_names,
+            guard_rules=guard_rules,
+        )
         for tool in raw_tools
     )
 
@@ -338,10 +344,16 @@ async def build_guardrails_runtime_parts(app_id: int) -> GuardrailsRuntimeParts:
         app_id=app_id,
     )
     rails = LLMRails(prompt_rule_config.rails_config, llm=guardrail_model)
-    blocked_tools = blocked_tool_names_for_app(app_id=app_id)
+    guard_rules = tool_guard_rules_for_app(app_id=app_id)
+    blocked_tools = frozenset(
+        tool_name
+        for rule in guard_rules
+        for tool_name in rule.tool_names
+    )
     tool_bundle = await build_guarded_github_tools(
         environment,
         blocked_tools,
+        guard_rules,
     )
     agent = create_agent(model=main_model, tools=list(tool_bundle.tools))
 

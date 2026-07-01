@@ -45,6 +45,13 @@ uses the resolve endpoints below, so equivalent reusable policies are reused
 instead of inserted again. Edit resolves and swaps only the selected assignment;
 Delete removes the assignment only.
 
+The shared Create/Edit modal supports both rail types. Input policies submit
+the selected connector/action/resource plus optional
+`conditions.custom_resource`. Output policies omit connector metadata and
+submit `policy_type: output`, `category: custom`, and the required free-text
+output rule as `description`. The policy display name is always editable and
+is passed separately as the assignment `display_name`.
+
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
 | `POST` | `/apps/by-client-id/{client_id}/policy-assignments/resolve` | Create/reuse and assign one app policy |
@@ -63,8 +70,25 @@ NEMO_CORS_ORIGINS=http://127.0.0.1:3000,http://localhost:3000
 ```
 
 Optional custom-resource text is stored under
-`conditions.custom_resource`. The current compiler does not yet enforce that
-condition, so the compiled action/resource rule remains broad.
+`conditions.custom_resource`. The compiler includes it in the NeMo input rule,
+and the execution-level tool guard recursively compares the normalized value
+against exact MCP argument values. Leaving it blank keeps the action/resource
+policy broad.
+
+Before storage and duplicate resolution, custom-resource phrases are
+canonicalized. For an Issue policy, `issue name test`, `Issue name test`,
+`Issues name test`, and `issues named test` all resolve to `test` and reuse the
+same policy definition.
+
+## Policy Options
+
+| Screen | Method | Endpoint | Purpose |
+| --- | --- | --- | --- |
+| Create/Edit Policy | `GET` | `/policy-options` | Enabled connector/action/resource combinations from normalized tool mappings |
+
+The frontend filters actions by connector and resources by action. Connectors
+without enabled mappings, including the current SharePoint placeholder, are not
+offered in the policy form.
 
 ## Health
 
@@ -75,7 +99,10 @@ condition, so the compiled action/resource rule remains broad.
 
 ## Apps
 
-Use these for the app list and app detail header.
+These endpoints now power `/apps` and `/apps/[clientId]`. The list supports
+search, pagination, create, delete, connector/policy counts, and row navigation.
+The detail route provides Overview, Connectors, LLM, Policies, and Runtime Test
+tabs.
 
 | Method | Endpoint | Purpose |
 | --- | --- | --- |

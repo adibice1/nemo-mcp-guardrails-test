@@ -45,6 +45,29 @@ class PolicyAssignmentResolutionCreate(BaseModel):
     display_name: str | None = Field(default=None, max_length=300)
 
 
+class PolicyResourceOption(BaseModel):
+    """One resource available for a connector action."""
+
+    value: str
+    label: str
+
+
+class PolicyActionOption(BaseModel):
+    """One connector action and its valid resources."""
+
+    value: str
+    label: str
+    resources: list[PolicyResourceOption]
+
+
+class PolicyConnectorOption(BaseModel):
+    """One connector and its policy-capable action catalogue."""
+
+    value: str
+    label: str
+    actions: list[PolicyActionOption]
+
+
 class PolicyRead(BaseModel):
     """Response body for a stored policy."""
 

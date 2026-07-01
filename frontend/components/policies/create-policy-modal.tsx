@@ -2,19 +2,17 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Check, ChevronDown, Plus, X } from "lucide-react";
-import {
-  actionOptions,
-  connectorOptions,
-  resourceOptions
-} from "@/lib/mock-data";
+import { type PolicyConnectorOption } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import { FormField } from "@/components/shared/form-field";
 
 export type PolicyDraft = {
+  policyType: "input" | "output";
   connector: string;
   action: string;
   resource: string;
   customResource: string;
+  outputRule: string;
   name: string;
   global: boolean;
 };
@@ -25,6 +23,7 @@ type CreatePolicyModalProps = {
   isAdmin?: boolean;
   mode?: "create" | "edit";
   initialPolicy?: PolicyDraft | null;
+  policyOptions: PolicyConnectorOption[];
   onClose: () => void;
   onSubmit: (policy: PolicyDraft) => Promise<boolean> | boolean;
 };
@@ -35,13 +34,16 @@ export function CreatePolicyModal({
   isAdmin = false,
   mode = "create",
   initialPolicy = null,
+  policyOptions,
   onClose,
   onSubmit
 }: CreatePolicyModalProps) {
+  const [policyType, setPolicyType] = useState<"input" | "output">("input");
   const [connector, setConnector] = useState("");
   const [action, setAction] = useState("");
   const [resourceType, setResourceType] = useState("");
   const [customResource, setCustomResource] = useState("");
+  const [outputRule, setOutputRule] = useState("");
   const [policyName, setPolicyName] = useState("");
   const [setGlobal, setSetGlobal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -49,28 +51,41 @@ export function CreatePolicyModal({
   const actionLocked = !connector;
   const resourceLocked = !action;
   const customResourceLocked = !resourceType;
-  const nameLocked = !resourceType;
   const globalSelected = setGlobal || appName === null;
+  const selectedConnector = policyOptions.find(
+    (option) => option.value === connector
+  );
+  const connectorOptions = policyOptions.map(({ value, label }) => ({
+    value,
+    label
+  }));
+  const actionOptions = selectedConnector?.actions ?? [];
+  const selectedAction = actionOptions.find((option) => option.value === action);
+  const resourceOptions = selectedAction?.resources ?? [];
 
   useEffect(() => {
     if (!open) {
       return;
     }
+    setPolicyType(initialPolicy?.policyType ?? "input");
     setConnector(initialPolicy?.connector ?? "");
     setAction(initialPolicy?.action ?? "");
     setResourceType(initialPolicy?.resource ?? "");
     setCustomResource(initialPolicy?.customResource ?? "");
+    setOutputRule(initialPolicy?.outputRule ?? "");
     setPolicyName(initialPolicy?.name ?? "");
     setSetGlobal(initialPolicy?.global ?? false);
   }, [initialPolicy, open]);
 
   const canCreate = useMemo(
     () =>
-      connector &&
-      action &&
-      resourceType &&
-      policyName.trim(),
-    [action, connector, policyName, resourceType]
+      Boolean(
+        policyName.trim() &&
+          (policyType === "output"
+            ? outputRule.trim()
+            : connector && action && resourceType)
+      ),
+    [action, connector, outputRule, policyName, policyType, resourceType]
   );
 
   if (!open) {
@@ -78,10 +93,12 @@ export function CreatePolicyModal({
   }
 
   function resetForm() {
+    setPolicyType("input");
     setConnector("");
     setAction("");
     setResourceType("");
     setCustomResource("");
+    setOutputRule("");
     setPolicyName("");
     setSetGlobal(false);
   }
@@ -98,10 +115,12 @@ export function CreatePolicyModal({
 
     setSubmitting(true);
     const created = await onSubmit({
+      policyType,
       connector,
       action,
       resource: resourceType,
       customResource: customResource.trim(),
+      outputRule: outputRule.trim(),
       name: policyName.trim(),
       global:
         mode === "edit" && initialPolicy
@@ -120,11 +139,11 @@ export function CreatePolicyModal({
       <section className="relative w-full max-w-[840px] rounded-[14px] bg-white px-5 pb-5 pt-16 shadow-modal dark:bg-[#20242c]">
         <button
           aria-label={`Close ${mode} policy modal`}
-          className="absolute left-4 top-6 flex h-12 w-12 items-center justify-center rounded-xl bg-white text-gms-text shadow-[0_3px_12px_rgba(40,48,78,0.12)] dark:bg-[#2a2f39]"
+          className="absolute left-4 top-4 flex h-10 w-10 items-center justify-center rounded-xl bg-white text-gms-text shadow-[0_3px_12px_rgba(40,48,78,0.12)] dark:bg-[#2a2f39]"
           type="button"
           onClick={handleClose}
         >
-          <X className="h-5 w-5" />
+          <X className="h-4 w-4" />
         </button>
 
         <div className="px-1">
@@ -132,72 +151,10 @@ export function CreatePolicyModal({
             {mode === "edit" ? "Edit Policy:" : "Create Policy:"}
           </h2>
 
-          <div className="mt-6 grid grid-cols-1 gap-7 md:grid-cols-3">
-            <SelectField
-              label="Choose Connector:"
-              required
-              placeholder="Connector"
-              value={connector}
-              options={connectorOptions}
-              onChange={(value) => {
-                setConnector(value);
-                setAction("");
-                setResourceType("");
-                setCustomResource("");
-                setPolicyName("");
-              }}
-            />
-            <SelectField
-              label="Choose Action:"
-              required
-              placeholder="Action"
-              value={action}
-              options={actionOptions}
-              disabled={actionLocked}
-              onChange={(value) => {
-                setAction(value);
-                setResourceType("");
-                setCustomResource("");
-                setPolicyName("");
-              }}
-            />
-            <SelectField
-              label="Choose Resource Type:"
-              required
-              placeholder="Resource Type"
-              value={resourceType}
-              options={resourceOptions}
-              disabled={resourceLocked}
-              onChange={(value) => {
-                setResourceType(value);
-                setCustomResource("");
-                setPolicyName("");
-              }}
-            />
-          </div>
-
-          <FormField label="Customise Resource:" className="mt-6">
-            <textarea
-              className={cn(
-                "h-[96px] w-full resize-none rounded border border-gms-blue px-3 py-3 text-sm outline-none",
-                customResourceLocked
-                  ? "bg-[#bdbdbd] text-white placeholder:text-white"
-                  : "bg-white text-gms-text placeholder:text-[#a9bdff] dark:bg-[#252932]"
-              )}
-              disabled={customResourceLocked}
-              placeholder="Type your Resource"
-              value={customResource}
-              onChange={(event) => {
-                setCustomResource(event.target.value);
-              }}
-            />
-          </FormField>
-
           <div className="mt-6 grid grid-cols-1 gap-8 md:grid-cols-[240px_1fr]">
             <FormField label="Name Policy:" required>
               <input
                 className="h-14 w-full rounded border border-gms-blue bg-white px-3 text-sm text-gms-text outline-none placeholder:text-[#a9bdff] disabled:bg-[#f2f2f2] dark:bg-[#252932] dark:disabled:bg-[#363b45]"
-                disabled={nameLocked}
                 placeholder="Type your Policy Name"
                 value={policyName}
                 onChange={(event) => setPolicyName(event.target.value)}
@@ -226,6 +183,102 @@ export function CreatePolicyModal({
             )}
           </div>
 
+          <div className="mt-6 grid grid-cols-1 gap-7 md:grid-cols-4">
+            <SelectField
+              label="Choose Rail Type:"
+              required
+              placeholder="Rail Type"
+              value={policyType}
+              options={[
+                { value: "input", label: "Input" },
+                { value: "output", label: "Output" }
+              ]}
+              onChange={(value) => {
+                if (value !== "input" && value !== "output") {
+                  return;
+                }
+                setPolicyType(value as "input" | "output");
+                setConnector("");
+                setAction("");
+                setResourceType("");
+                setCustomResource("");
+                setOutputRule("");
+              }}
+            />
+            {policyType === "input" && (
+              <SelectField
+                label="Choose Connector:"
+                required
+                placeholder="Connector"
+                value={connector}
+                options={connectorOptions}
+                onChange={(value) => {
+                  setConnector(value);
+                  setAction("");
+                  setResourceType("");
+                  setCustomResource("");
+                }}
+              />
+            )}
+            {policyType === "input" && (
+              <SelectField
+                label="Choose Action:"
+                required
+                placeholder="Action"
+                value={action}
+                options={actionOptions}
+                disabled={actionLocked}
+                onChange={(value) => {
+                  setAction(value);
+                  setResourceType("");
+                  setCustomResource("");
+                }}
+              />
+            )}
+            {policyType === "input" && (
+              <SelectField
+                label="Choose Resource Type:"
+                required
+                placeholder="Resource Type"
+                value={resourceType}
+                options={resourceOptions}
+                disabled={resourceLocked}
+                onChange={(value) => {
+                  setResourceType(value);
+                  setCustomResource("");
+                }}
+              />
+            )}
+          </div>
+
+          {policyType === "input" ? (
+            <FormField label="Customise Resource:" className="mt-6">
+              <textarea
+                className={cn(
+                  "h-[96px] w-full resize-none rounded border border-gms-blue px-3 py-3 text-sm outline-none",
+                  customResourceLocked
+                    ? "bg-[#bdbdbd] text-white placeholder:text-white"
+                    : "bg-white text-gms-text placeholder:text-[#a9bdff] dark:bg-[#252932]"
+                )}
+                disabled={customResourceLocked}
+                placeholder="Type your Resource"
+                value={customResource}
+                onChange={(event) => {
+                  setCustomResource(event.target.value);
+                }}
+              />
+            </FormField>
+          ) : (
+            <FormField label="Output Rule:" required className="mt-6">
+              <textarea
+                className="h-[96px] w-full resize-none rounded border border-gms-blue bg-white px-3 py-3 text-sm text-gms-text outline-none placeholder:text-[#a9bdff] dark:bg-[#252932]"
+                placeholder="Example: Do not allow profanity in assistant responses."
+                value={outputRule}
+                onChange={(event) => setOutputRule(event.target.value)}
+              />
+            </FormField>
+          )}
+
           <div className="mt-6 flex justify-end">
             <button
               className="inline-flex h-10 items-center gap-3 rounded-md bg-gms-blue px-5 text-sm font-medium text-white shadow-button disabled:opacity-50"
@@ -253,7 +306,7 @@ type SelectFieldProps = {
   label: string;
   placeholder: string;
   value: string;
-  options: string[];
+  options: Array<{ value: string; label: string }>;
   required?: boolean;
   disabled?: boolean;
   onChange: (value: string) => void;
@@ -269,6 +322,7 @@ function SelectField({
   onChange
 }: SelectFieldProps) {
   const [open, setOpen] = useState(false);
+  const selectedLabel = options.find((option) => option.value === value)?.label;
 
   function handleSelect(nextValue: string) {
     onChange(nextValue);
@@ -290,7 +344,7 @@ function SelectField({
           type="button"
           onClick={() => setOpen((current) => !current)}
         >
-          <span>{value || placeholder}</span>
+          <span>{selectedLabel || value || placeholder}</span>
           <ChevronDown className="h-4 w-4 shrink-0 text-[#a9bdff]" />
         </button>
 
@@ -305,17 +359,17 @@ function SelectField({
             </button>
             {options.map((option) => (
               <button
-                key={option}
+                key={option.value}
                 className={cn(
                   "block w-full px-4 py-2 text-left text-sm hover:bg-gms-blue hover:text-white",
-                  value === option
+                  value === option.value
                     ? "bg-gms-blue text-white"
                     : "bg-white text-gms-text dark:bg-[#252932]"
                 )}
                 type="button"
-                onClick={() => handleSelect(option)}
+                onClick={() => handleSelect(option.value)}
               >
-                {option}
+                {option.label}
               </button>
             ))}
           </div>

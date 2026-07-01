@@ -9,6 +9,7 @@ class InputPolicyObject:
     action: str
     resource: str
     effect: str
+    custom_resource: str | None = None
 
 
 @dataclass(frozen=True)
@@ -110,6 +111,9 @@ GITHUB_ACTION_SYNONYMS = {
     "delete": ("delete", "remove"),
     "push": ("push", "commit"),
     "fork": ("fork", "copy"),
+    "search": ("search", "find"),
+    "list": ("list", "show"),
+    "read": ("read", "view", "get"),
 }
 
 
@@ -119,6 +123,11 @@ GITHUB_RESOURCE_SYNONYMS = {
     "branch": ("branch",),
     "file": ("file", "repository file", "README"),
     "repository": ("repository", "repo"),
+    "commit": ("commit",),
+    "label": ("label",),
+    "release": ("release",),
+    "tag": ("tag",),
+    "issue_type": ("issue type",),
 }
 
 
@@ -288,10 +297,15 @@ def compile_input_rail_rule(policy: InputPolicyObject) -> str:
     resources = GITHUB_RESOURCE_SYNONYMS[policy.resource]
     action_text = format_or_list(actions)
     resource_text = " or ".join(f"GitHub {resource}" for resource in resources)
+    restriction = ""
+    if policy.custom_resource:
+        restriction = (
+            f' matching the custom resource "{policy.custom_resource.strip()}"'
+        )
 
     return (
         f'Answer "yes" when the user asks to {action_text} '
-        f"a {resource_text}."
+        f"a {resource_text}{restriction}."
     )
 
 
@@ -331,14 +345,14 @@ def compile_policy(policy: InputPolicyObject) -> CompiledInputPolicy:
 
     policy_key = get_policy_key(policy)
 
-    if policy_key not in GITHUB_WRITE_TOOL_MAPPINGS:
+    if policy_key not in GITHUB_METADATA_TOOL_MAPPINGS:
         raise ValueError(
             f"No GitHub tool mapping for action/resource: {policy.action}/{policy.resource}"
         )
 
     return CompiledInputPolicy(
         input_rail_rule=compile_input_rail_rule(policy),
-        blocked_tools=GITHUB_WRITE_TOOL_MAPPINGS[policy_key],
+        blocked_tools=GITHUB_METADATA_TOOL_MAPPINGS[policy_key],
         test_cases=compile_test_cases(policy),
     )
 
@@ -389,12 +403,20 @@ def compile_output_rail_rules(
         if policy.effect != "block":
             raise ValueError(f"Unsupported output policy effect: {policy.effect}")
 
-        output_rules.append(
-            f'Answer "yes" when the assistant response contains actual '
-            f"{policy.description}. "
-            f'Answer "no" when the assistant response only mentions a category '
-            f"without revealing its value."
-        )
+        if policy.category == "credentials":
+            rule = (
+                f'Answer "yes" when the assistant response contains actual '
+                f"{policy.description}. "
+                f'Answer "no" when the assistant response only mentions a category '
+                f"without revealing its value."
+            )
+        else:
+            rule = (
+                f'Answer "yes" when the assistant response violates this output '
+                f'policy: "{policy.description}". Answer "no" otherwise.'
+            )
+
+        output_rules.append(rule)
 
     return tuple(output_rules)
 
@@ -410,6 +432,7 @@ def print_compiled_policy(
     print(f"- action: {policy.action}")
     print(f"- resource: {policy.resource}")
     print(f"- effect: {policy.effect}")
+    print(f"- custom resource: {policy.custom_resource or 'any'}")
 
     print("\nGENERATED NEMO SELF-CHECK RULE")
     print(f"- {compiled_policy.input_rail_rule}")

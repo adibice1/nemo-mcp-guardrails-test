@@ -30,6 +30,9 @@ The GMS backend prototype now has these core runtime pieces:
 - The first Next.js 13 frontend scaffold now exists under `frontend/`. It
   implements the uploaded Figma screens:
   `/login`, `/signup`, `/policies`, and `/settings`.
+- The normal-developer Apps workflow is implemented: `/apps` lists, creates,
+  opens, and deletes client applications; `/apps/[clientId]` provides Overview,
+  Connectors, LLM, Policies, and Runtime Test tabs backed by FastAPI.
 - Settings now provides a class-based app-wide dark theme. It previews
   immediately, saves the selected theme in browser `localStorage`, and restores
   it before rendering on later visits.
@@ -41,6 +44,11 @@ The GMS backend prototype now has these core runtime pieces:
 - The create-policy modal now writes through FastAPI when backend mode is
   enabled: it creates the reusable policy, assigns it globally or to the
   selected app, reloads DB-backed assignments, and closes only after success.
+- The same Create/Edit modal now supports input and output policies. Policy
+  naming is available immediately; input mode uses the cascading structured
+  fields, while output mode replaces them with a required free-text output
+  rule. Custom output categories compile through a general NeMo output
+  classifier while the credential category keeps its specialized wording.
 - Policy creation now resolves structural equivalence before inserting. The
   backend returns `created`, `reused`, or `already_assigned`; equivalent names
   do not create duplicate policy definitions, and app requests do not add a
@@ -50,6 +58,21 @@ The GMS backend prototype now has these core runtime pieces:
 - Frontend Edit is assignment-safe. It resolves the edited behavior, switches
   only that app/global assignment to an existing or newly created reusable
   policy, and leaves other apps on their previous policy.
+- Policy rows on the main Policies page and app-detail Policies tab now open a
+  shared backend-backed summary modal without interfering with Edit/Delete.
+- Optional `conditions.custom_resource` values now flow into compiled input
+  rules and immutable MCP guard rules. Runtime recursively checks normalized
+  exact tool-argument values, so a targeted issue title, branch, path, or
+  identifier can be blocked without denying every call to that tool.
+- Custom-resource phrases are canonicalized for reuse across case,
+  singular/plural resource wording, and `name`/`named`/`called`/`titled`
+  variants. Legacy consolidation applies the same canonical identity.
+- `GET /policy-options` exposes enabled normalized tool mappings. The policy
+  form cascades connector -> action -> valid resources and omits connectors
+  without mappings, including the current SharePoint placeholder.
+- Policy mutation warnings render above open dialogs, policy naming/global
+  controls appear first, and the Apps list omits redundant client-ID and
+  authorization columns.
 - App/global assignments now store optional `display_name` values, so each app
   can name a shared policy independently. The frontend prefers this name.
 - `scripts/deduplicate_policies.py` consolidates legacy equivalent policy rows;
@@ -73,6 +96,9 @@ Current presentation/demo scope:
 - The frontend currently exposes only GitHub and SharePoint in its connector
   selector. GitHub is executable; SharePoint remains a UI/metadata placeholder
   until backend mappings and runtime support are implemented.
+- Policy-table icons distinguish scope and connector: global assignments use a
+  globe, app-specific GitHub/SharePoint assignments use connector marks, and
+  unknown legacy connectors use a folder fallback.
 - SharePoint, Outlook, and other connectors remain target-architecture
   extensions and should not block the near-term backend/frontend milestone.
 
@@ -271,18 +297,17 @@ Current prep:
 - `docs/frontend-demo-flow.md` defines the GitHub MCP presentation flow.
 - `docs/figma-design-intake.md` records the uploaded Figma screens and
   interaction notes.
-- `frontend/` contains the first Figma-matched implementation and a read-only
-  API-backed `/policies` adapter.
+- `frontend/` contains the Figma-matched implementation, a read/write
+  API-backed `/policies` adapter, and functional app list/detail routes.
 
 Next implementation slice:
 
 - Add protected admin-only policy-definition deletion with assigned-policy
   checks and explicit force-delete behavior.
-- Add explicit argument-level compiler support before claiming that
-  `conditions.custom_resource` restricts a policy to a named issue, branch,
-  file, or other specific resource. It is currently stored as metadata only.
-- Add `/apps` list/create/edit after the policy page mutation path works.
-- Add `/apps/[clientId]` connector management before the runtime tester screen.
+- Add a readable LLM-config catalogue endpoint so the app LLM tab can replace
+  numeric IDs with named model choices.
+- Add real management-user authentication and ownership filtering before
+  treating `/apps` and policy CRUD as production multi-user boundaries.
 
 ### 11. Audit, Analytics, And Caching
 

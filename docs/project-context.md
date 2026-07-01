@@ -89,13 +89,13 @@ The system successfully:
 - Blocks unsafe write/credential prompts through NeMo input rails.
 - Blocks unsafe secret-like assistant responses through NeMo output rails.
 - Keeps deterministic Python pre-checks only as a comparison/safety fallback.
-- Wraps MCP tools with `src/nemo_mcp_guardrails/tool_guard.py` so restricted tool names can be blocked before execution.
+- Wraps MCP tools with `src/nemo_mcp_guardrails/tool_guard.py` so broad tool restrictions and custom-resource argument matches can be blocked before execution.
 - Uses `src/nemo_mcp_guardrails/policy_compiler.py` to prototype admin-style policy objects and generated policy artifacts.
 - Feeds curated policy-generated tests into `tests/test_nemo_mcp.py`.
 - Stores prototype policy rows in local Postgres through FastAPI CRUD endpoints.
 - Previews compiler output from enabled database policy rows through `POST /policies/compile-preview`.
 - Loads enabled Postgres input policies into runtime code through `src/nemo_mcp_guardrails/database/policy_loader.py`.
-- Uses DB-loaded input policies to compile `tool_guard.py` blocked tools and `tests/test_nemo_mcp.py` generated blocked tests.
+- Uses DB-loaded input policies to compile `tool_guard.py` executable guard rules, blocked-tool reporting, and `tests/test_nemo_mcp.py` generated blocked tests.
 - Verifies DB policy loading through `tests/test_policy_loader.py`.
 - Stores compiled NeMo rule text in `compiled_policy_rules`.
 - Automatically refreshes `compiled_policy_rules` when policies are created or

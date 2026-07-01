@@ -31,11 +31,19 @@ def to_input_policy_object(policy: PolicyRecord) -> InputPolicyObject:
     if not (connector and action and resource and policy.effect):
         raise ValueError(f"Policy {policy.id} is missing required input policy fields")
 
+    custom_resource_value = (policy.conditions or {}).get("custom_resource")
+    custom_resource = (
+        str(custom_resource_value).strip()
+        if custom_resource_value is not None
+        else None
+    )
+
     return InputPolicyObject(
         connector=connector,
         action=action,
         resource=resource,
         effect=policy.effect,
+        custom_resource=custom_resource or None,
     )
 
 

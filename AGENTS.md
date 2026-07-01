@@ -19,6 +19,10 @@ Confirmed target terminology:
 - Global policies are mandatory across every app.
 - Main-agent and guardrail-classification LLM configurations may differ.
 - Policy rules should compile automatically when rules or assignments change.
+- Input-policy `conditions.custom_resource` values are canonicalized before
+  storage/equivalence checks. Case, singular/plural resource prefixes and
+  wording such as `name`, `named`, `called` and `titled` do not create separate
+  reusable enforcement definitions.
 
 ## Current Architecture
 
@@ -70,14 +74,14 @@ Blocked actions:
 - Output self-check prompts intentionally inspect only `{{ bot_response }}` and do not echo `{{ user_input }}`, because unsafe user prompts containing fake token-like text can trigger Azure content filtering before NeMo can classify the assistant output.
 - `tests/test_nemo_mcp.py` manually creates `LLMRails(rails_config, llm=model)` so NeMo uses the same working AzureChatOpenAI model as the LangChain agent.
 - Do not switch back to stock `GuardrailsMiddleware(config_path="config")` without testing, because it constructs its own NeMo LLM and previously hit an old OpenAI client path.
-- `src/nemo_mcp_guardrails/tool_guard.py` contains the execution-level MCP tool guard. `blocked_tool_names_for_app(app_id=...)` compiles a per-app blocked-tool set from enabled global plus app-assigned input policies, and `guard_mcp_tool(..., blocked_tool_names=...)` applies that immutable set to wrapped tools.
+- `src/nemo_mcp_guardrails/tool_guard.py` contains the execution-level MCP tool guard. `tool_guard_rules_for_app(app_id=...)` compiles immutable per-app broad or `conditions.custom_resource`-specific rules from enabled global plus app-assigned input policies. `blocked_tool_names_for_app(app_id=...)` remains the reporting summary, while `guard_mcp_tool(..., guard_rules=...)` checks normalized exact MCP argument values before execution.
 - `src/nemo_mcp_guardrails/policy_compiler.py` contains the structured policy-object prototype. It uses `InputPolicyObject` for input/tool policies and `OutputPolicyObject` for output policies. It currently covers GitHub issue, pull request, branch, file, repository, and fork write actions plus credential/secret output checks.
 - GitHub compiler metadata is split into `GITHUB_WRITE_TOOL_MAPPINGS`, `GITHUB_READ_TOOL_MAPPINGS`, and `GITHUB_METADATA_TOOL_MAPPINGS`. Runtime blocking uses write mappings only; normalized metadata seeding uses the combined metadata mapping.
 - To add a runtime input policy in the current prototype, add an enabled policy row through the FastAPI CRUD endpoints or DBeaver. Edit `src/nemo_mcp_guardrails/policy_compiler.py` only when adding a new action/resource mapping, synonym, or template that the compiler does not yet understand.
 - `config/prompts.yml` is now a stable prompt template. `src/nemo_mcp_guardrails/database/prompt_rule_loader.py` loads enabled rows from `compiled_policy_rules`, and `src/nemo_mcp_guardrails/prompt_rule_compiler.py` injects those rules into the template before `LLMRails` is created.
 - `tests/test_nemo_mcp.py` imports curated generated tests with `compile_policy_test_prompts(load_input_policy_objects())`, so generated blocked tests follow enabled DB input policies.
 - `scripts/debug_nemo_self_check.py` is an isolated diagnostic script for NeMo input rails without GitHub MCP. It uses `build_rails_config_with_prompt_rules("config")` so it tests the same DB-injected prompt configuration as the full runner.
-- `tests/test_tool_guard.py` is an isolated diagnostic script for the MCP tool guard without Docker, Postgres, GitHub MCP, Azure OpenAI, or real credentials. It forces `NEMO_POLICY_SOURCE=defaults` and proves the same tool can be blocked for App A and allowed for App B using different scoped sets.
+- `tests/test_tool_guard.py` is an isolated diagnostic script for the MCP tool guard without Docker, Postgres, GitHub MCP, Azure OpenAI, or real credentials. It forces `NEMO_POLICY_SOURCE=defaults`, proves the same tool can be blocked for App A and allowed for App B using different scoped sets, and proves a custom issue-title restriction blocks only the matching MCP call.
 - `tests/test_policy_loader.py` is an isolated diagnostic script for Postgres policy loading and compilation without Azure OpenAI or GitHub MCP.
 - `tests/test_app_policy_scope.py` is a self-cleaning Postgres integration diagnostic. It creates two temporary apps, assigns GitHub issue creation only to App A, verifies app-scoped NeMo rules and blocked tools, and deletes both apps and their assignments in `finally`.
 - `scripts/debug_nemo_output_check.py` is an isolated diagnostic script for NeMo output rails without GitHub MCP. It uses `build_rails_config_with_prompt_rules("config")` so it tests the same DB-injected prompt configuration as the full runner.
@@ -99,10 +103,18 @@ Blocked actions:
 - `app_policy_assignments` and `global_policy_assignments` reference the existing reusable definitions in `policies`. The connector-independent credential output policy is globally assigned; GitHub write policies remain unassigned.
 - FastAPI client-app CRUD lives under `/apps`; nested app-policy-assignment CRUD lives under `/apps/{app_id}/policy-assignments`; global assignment CRUD lives under `/global-policy-assignments`.
 - App/global assignment POST bodies use `policy_ids`, so the same endpoints handle single and bulk assignment. Assignment responses include readable app and policy labels beside numeric IDs for Swagger/frontend use.
+- `GET /policy-options` returns enabled connector/action/resource combinations
+  from normalized `connector_tool_mappings`; the frontend uses it for cascading
+  policy-builder dropdowns and does not offer unmapped combinations.
 - Duplicate-aware policy resolution is available under `/apps/by-client-id/{client_id}/policy-assignments/resolve` and `/global-policy-assignments/resolve`. It returns `created`, `reused`, or `already_assigned`; direct equivalent policy create/update requests return `409`.
 - Assignment-safe edit resolution is available under `PUT /apps/by-client-id/{client_id}/policy-assignments/{assignment_id}/resolve` and `PUT /global-policy-assignments/{assignment_id}/resolve`. Assignments have optional `display_name` values so apps can label shared definitions independently.
 - `scripts/migrate_policy_assignment_display_names.py` adds/backfills assignment names. `scripts/deduplicate_policies.py` previews legacy duplicate consolidation and applies it only with `--apply`.
 - `tests/test_policy_resolution_api.py` proves App A/App B policy reuse, shared-policy-safe edits, duplicate rejection, assignment-only deletion, and global-equivalent behavior. `tests/test_policy_deduplication.py` proves legacy merges preserve assignments and names.
+- `tests/test_policy_metadata_api.py` proves `/policy-options` returns only
+  connectors with enabled mappings and filters resources by action.
+- The frontend policy builder currently lists GitHub and SharePoint only. Global policy rows display a globe; app-specific rows display GitHub or Microsoft/SharePoint connector marks, with a folder fallback for unknown connectors. SharePoint is not runtime-enabled yet.
+- The frontend now has `/apps` and `/apps/[clientId]`. The list uses real app, connector-count, and effective-policy data; the detail page provides Overview, GitHub Connectors, numeric LLM configuration, effective Policies, and an authenticated Runtime Test. SharePoint remains a disabled coming-soon choice.
+- Main and app-detail policy rows open a shared `policy-summary-modal.tsx` backed by `GET /policies/{policy_id}`. Edit/Delete buttons stop row propagation.
 - App/global assignment bulk update/delete also uses `policy_ids`; the API returns `404` if a requested policy is not assigned in that app/global scope.
 - Developer-friendly client-ID aliases exist under `/apps/by-client-id/{client_id}` and `/apps/by-client-id/{client_id}/policy-assignments`; they resolve to the same internal app rows and full assignment CRUD logic.
 - App connector CRUD exists under `/apps/{app_id}/connectors` and `/apps/by-client-id/{client_id}/connectors`; connector references can use a numeric connector ID or connector name such as `github`.
@@ -178,9 +190,10 @@ policy CRUD auto-refreshes compiled_policy_rules
 frontend-api-map.md maps backend endpoints to UI screens
 frontend-screen-plan.md defines the first Next.js 13 screens/components
 frontend-demo-flow.md defines the presentation GitHub MCP demo path
-frontend/ contains Next.js 13 pages: /login, /signup, /policies, /settings
+frontend/ contains Next.js 13 pages: /login, /signup, /apps, /apps/[clientId], /policies, /settings
 /policies supports backend-backed duplicate-aware Create, assignment-safe Edit, and assignment-only Delete
--> build /apps list and /apps/[clientId] connector tab next
+Apps list/detail and GitHub connector/runtime management are backend-backed
+-> add a readable LLM-config catalogue and named selectors next
 -> defer production secrets-manager and admin auth unless specifically requested
 -> keep policy CRUD auto-compilation covered by test_policy_auto_compile.py
 -> keep normal GitHub MCP tests read-only
@@ -203,6 +216,7 @@ Useful verification commands for the current state:
 - `python tests/test_app_auth_http.py`
 - `python tests/test_policy_assignment_api.py`
 - `python tests/test_policy_auto_compile.py`
+- `python tests/test_policy_metadata_api.py`
 - `python tests/test_guardrails_run_http.py`
 - `python tests/test_runtime_connector_access.py`
 - `python tests/test_app_connector_api.py`

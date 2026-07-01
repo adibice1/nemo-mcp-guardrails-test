@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 import json
+import re
+import unicodedata
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
@@ -35,6 +37,56 @@ class PolicyConsolidation:
     reassigned_app_assignments: int
     merged_app_assignments: int
     global_assignment_merged: bool
+
+
+RESOURCE_PLURALS = {
+    "branch": "branches",
+    "issue": "issues",
+    "pull request": "pull requests",
+    "repository": "repositories",
+}
+
+
+def canonicalize_custom_resource(
+    value: object,
+    resource: str | None,
+) -> str:
+    """Convert equivalent custom-resource phrases into one identity."""
+
+    text = unicodedata.normalize("NFKC", str(value)).casefold()
+    text = re.sub(r'''["'`]''', "", text)
+    text = re.sub(r"\s+", " ", text).strip()
+
+    resource_name = (resource or "").strip().casefold().replace("_", " ")
+    resource_names = {
+        resource_name,
+        RESOURCE_PLURALS.get(resource_name, f"{resource_name}s"),
+    }
+    for candidate in sorted(resource_names, key=len, reverse=True):
+        if candidate:
+            text = re.sub(rf"^{re.escape(candidate)}\s+", "", text)
+
+    text = re.sub(r"^(?:name|named|called|titled)\s+", "", text)
+    return text.strip(" .")
+
+
+def canonicalize_policy_conditions(
+    conditions: dict[str, object] | None,
+    resource: str | None,
+) -> dict[str, object]:
+    """Return conditions with a canonical custom-resource identity."""
+
+    normalized = dict(conditions or {})
+    custom_resource = normalized.get("custom_resource")
+    if custom_resource is None:
+        return normalized
+
+    canonical = canonicalize_custom_resource(custom_resource, resource)
+    if canonical:
+        normalized["custom_resource"] = canonical
+    else:
+        normalized.pop("custom_resource", None)
+    return normalized
 
 
 def resolve_policy_references(policy: PolicyRecord, db: Session) -> None:
@@ -127,6 +179,11 @@ def resolve_policy_references(policy: PolicyRecord, db: Session) -> None:
         policy.resource_id = None
         policy.normalized_resource = None
 
+    policy.conditions = canonicalize_policy_conditions(
+        policy.conditions,
+        policy.resource,
+    )
+
     if (
         policy.policy_type == "input"
         and policy.action_id is not None
@@ -166,7 +223,6 @@ def find_equivalent_policy(
         PolicyRecord.category == candidate.category,
         PolicyRecord.effect == candidate.effect,
         PolicyRecord.priority == candidate.priority,
-        PolicyRecord.conditions == (candidate.conditions or {}),
         PolicyRecord.enabled == candidate.enabled,
     )
     if candidate.policy_type == "output":
@@ -176,7 +232,17 @@ def find_equivalent_policy(
     if exclude_policy_id is not None:
         statement = statement.where(PolicyRecord.id != exclude_policy_id)
 
-    return db.scalar(statement.order_by(PolicyRecord.id).limit(1))
+    candidate_conditions = canonicalize_policy_conditions(
+        candidate.conditions,
+        candidate.resource,
+    )
+    for policy in db.scalars(statement.order_by(PolicyRecord.id)):
+        if canonicalize_policy_conditions(
+            policy.conditions,
+            policy.resource,
+        ) == candidate_conditions:
+            return policy
+    return None
 
 
 def policy_equivalence_key(policy: PolicyRecord) -> tuple[object, ...]:
@@ -196,7 +262,11 @@ def policy_equivalence_key(policy: PolicyRecord) -> tuple[object, ...]:
         output_description,
         policy.effect,
         policy.priority,
-        json.dumps(policy.conditions or {}, sort_keys=True, separators=(",", ":")),
+        json.dumps(
+            canonicalize_policy_conditions(policy.conditions, policy.resource),
+            sort_keys=True,
+            separators=(",", ":"),
+        ),
         policy.enabled,
     )
 
@@ -206,6 +276,10 @@ def consolidate_equivalent_policies(db: Session) -> list[PolicyConsolidation]:
 
     groups: dict[tuple[object, ...], list[PolicyRecord]] = {}
     for policy in db.scalars(select(PolicyRecord).order_by(PolicyRecord.id)):
+        policy.conditions = canonicalize_policy_conditions(
+            policy.conditions,
+            policy.resource,
+        )
         groups.setdefault(policy_equivalence_key(policy), []).append(policy)
 
     results: list[PolicyConsolidation] = []

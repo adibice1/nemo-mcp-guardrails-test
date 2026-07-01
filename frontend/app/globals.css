@@ -53,3 +53,9 @@ select:disabled,
 textarea:disabled {
   cursor: not-allowed;
 }
+
+@layer components {
+  .detail-input {
+    @apply h-11 w-full rounded-md border border-gms-line bg-white px-3 text-sm text-gms-text outline-none placeholder:text-gms-muted focus:border-gms-blue dark:bg-[#252932];
+  }
+}

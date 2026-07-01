@@ -166,6 +166,7 @@ def main() -> None:
 
     seed_normalized_metadata()
     suffix = uuid4().hex
+    target_issue_title = f"guardrails-test-{suffix}"
     client_id = f"guardrails-run-{suffix}"
     app_id: int | None = None
     policy_id: int | None = None
@@ -198,6 +199,9 @@ def main() -> None:
                     "action": "create",
                     "resource": "issue",
                     "effect": "block",
+                    "conditions": {
+                        "custom_resource": f'issue named "{target_issue_title}"'
+                    },
                     "enabled": True,
                 },
             )
@@ -240,7 +244,7 @@ def main() -> None:
                 json={
                     "conversation_id": f"blocked-{suffix}",
                     "message": (
-                        "Create a GitHub issue titled test in "
+                        f"Create a GitHub issue titled {target_issue_title} in "
                         "github/github-mcp-server."
                     ),
                 },

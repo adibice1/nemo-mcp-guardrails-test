@@ -8,6 +8,8 @@ This first UI slice recreates the uploaded Figma screens:
 
 - `/login`
 - `/signup`
+- `/apps`
+- `/apps/[clientId]`
 - `/policies`
 - `/settings`
 
@@ -30,8 +32,9 @@ Current frontend behavior:
 - Modal dropdowns are custom scrollable menus so larger connector/action/resource
   lists fit later.
 - The frontend connector selector is intentionally limited to GitHub and
-  SharePoint for the current demo scope. Policy rows display a GitHub brand icon
-  or a Microsoft/SharePoint-colored connector mark instead of a generic folder.
+  SharePoint for the current demo scope. Global policy rows use a globe icon;
+  app-specific rows use a GitHub brand icon or a Microsoft/SharePoint-colored
+  connector mark. Unknown legacy connectors retain the folder fallback.
 - Policy rows default to newest-created first and can sort by `Created` or
   `Global`.
 - Policy pagination uses 8 rows per page.
@@ -66,8 +69,20 @@ Create is backend-wired: the modal creates a reusable policy, assigns it to the
 selected app or global scope, reloads the DB-backed view, and then closes.
 Equivalent policy behavior is reused and produces a visible `created`,
 `reused`, or `already assigned` notice. Delete removes only the assignment,
-leaving the reusable definition available to other apps. Assignment-safe Edit
-is the next frontend slice.
+leaving the reusable definition available to other apps. Edit resolves and
+switches only the selected assignment.
+
+Clicking a policy row on either `/policies` or the app-detail Policies tab opens
+the same policy-summary modal. It loads the reusable definition and displays
+scope, connector, action, resource type, custom resource, effect, policy type,
+and status. Edit/Delete controls stop row-click propagation and retain their
+existing actions.
+
+The `/apps` page lists real database applications, connector/policy counts,
+creates apps with one-way API-key hashing, deletes apps, and opens a dedicated
+`/apps/[clientId]` management page. App details provide functional Overview,
+Connectors, LLM, Policies, and Runtime Test tabs. GitHub connector management is
+active; SharePoint is visibly deferred until backend/runtime support exists.
 
 Optional custom-resource text is stored as `conditions.custom_resource`, but
 the current backend compiler does not enforce that condition yet.
@@ -83,6 +98,15 @@ components/
   policies/
     create-policy-modal.tsx
     policy-table.tsx
+    policy-summary-modal.tsx
+  apps/
+    app-table.tsx
+    create-app-modal.tsx
+    app-overview.tsx
+    app-connectors.tsx
+    app-llm-settings.tsx
+    app-policy-summary.tsx
+    app-runtime-test.tsx
   settings/
     settings-form.tsx
 ```

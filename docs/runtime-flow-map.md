@@ -591,17 +591,21 @@ BLOCKED_GITHUB_MCP_TOOLS = ...
 ```
 
 The backward-compatible constant loads the no-app all-enabled blocked-tool set.
-`blocked_tool_names_for_app(app_id=...)` can instead compile a per-app set once
-for a request.
+`tool_guard_rules_for_app(app_id=...)` compiles per-app immutable rules that
+retain optional `conditions.custom_resource` values.
 
 ```text
 -> policy_loader.py:121
    load_input_policy_objects()
--> policy_compiler.py:319
-   compile_blocked_tools()
+-> policy_compiler.py
+   compile_policy()
+-> tool_guard.py
+   ToolGuardRule(tool_names, custom_resource)
 ```
 
-The result is the runtime blocked tool set, for example:
+`blocked_tool_names_for_app(app_id=...)` flattens those rules for API reporting.
+At execution, broad rules block every matching tool call; conditional rules
+recursively compare normalized exact MCP argument values before blocking.
 
 ```text
 issue_write

@@ -187,6 +187,8 @@ It verifies:
 
 - Every DB-derived compiler-generated blocked tool is blocked before its `ainvoke` method is called.
 - A fake allowed tool named `search_repositories` passes through normally.
+- A conditional `issue_write` rule for `issue named "test"` blocks title
+  `test` while allowing a different issue title to execute.
 
 Run:
 
@@ -207,6 +209,7 @@ Expected final line:
 - Allowed tool executed normally: search_repositories
 - App A blocked issue_write using its scoped tool set
 - App B allowed issue_write using its scoped tool set
+- Conditional rule blocked title "test" and allowed another title
 ```
 
 This isolated proof passes different immutable blocked-tool sets into two
@@ -1029,7 +1032,8 @@ Backend-backed local mode:
 The current backend-backed `/policies` page reads apps, global policy
 assignments, and effective app policy assignments. Create now writes the
 policy through duplicate-aware resolution and assigns it globally or to one
-app. Delete removes only the assignment. Edit is not backend-wired yet.
+app. Delete removes only the assignment. Edit uses assignment-safe
+resolve-and-swap behavior.
 
 Run the self-cleaning resolver integration check:
 
@@ -1042,9 +1046,20 @@ It proves:
 - App A creates one reusable policy.
 - App B reuses the same policy ID.
 - a duplicate App A request returns `already_assigned`.
+- case/plural/wording variants of the same custom resource reuse that policy.
 - direct duplicate policy creation returns `409`.
 - deleting App A's assignment leaves App B's assignment and policy intact.
 - an active global equivalent prevents a redundant app assignment.
+
+Run the policy-option catalogue check:
+
+```powershell
+.\.venv\Scripts\python.exe tests\test_policy_metadata_api.py
+```
+
+It proves only connectors with enabled mappings appear and that actions expose
+only mapped resources, including `merge -> pull_request` and
+`comment -> issue`.
 
 CORS preflight can be checked with an Origin of
 `http://127.0.0.1:3000`. Expected response:

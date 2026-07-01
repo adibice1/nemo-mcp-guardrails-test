@@ -38,7 +38,8 @@ User prompt
 -> NeMo self_check_input using the app's guardrail AzureChatOpenAI config
 -> LangChain agent
 -> src/nemo_mcp_guardrails/tool_guard.py wraps MCP tools
--> blocked tool names are compiled from enabled Postgres input policies
+-> broad and custom-resource-specific tool rules are compiled from enabled Postgres input policies
+-> matching custom-resource rules inspect MCP arguments before execution
 -> GitHub MCP tools run when allowed; `.env` `GITHUB_MCP_READ_ONLY=1` keeps the safe read-only default
 -> NeMo self_check_output uses the app's guardrail AzureChatOpenAI config
 -> final response
@@ -91,13 +92,32 @@ Current backend/API state:
   agent/guarded-tool execution with trimmed history, output rail, and
   structured results.
 - The Next.js 13 frontend exists under `frontend/` with `/login`, `/signup`,
-  `/policies`, and `/settings`. The `/policies` page loads and mutates real
+  `/apps`, `/apps/[clientId]`, `/policies`, and `/settings`. The `/policies`
+  page loads and mutates real
   FastAPI data, including duplicate-aware Create, assignment-safe Edit, and
   assignment-only Delete. It loads `GET /apps`,
   `GET /global-policy-assignments`, and
   `GET /apps/by-client-id/{client_id}/effective-policy-assignments` when
   `NEXT_PUBLIC_API_BASE_URL` is configured. Without that env var, it stays in
   mock mode for design/Vercel preview.
+- The shared policy modal creates and edits both input and output policies.
+  Input mode uses DB-mapped connector/action/resource selections with an
+  optional custom resource. Output mode accepts a required free-text rule and
+  does not expose irrelevant connector fields. Policy names are independently
+  editable from the beginning of either workflow.
+- The current frontend connector scope is GitHub and SharePoint. Global policy
+  rows use a globe icon, while app-specific rows use connector icons with a
+  folder fallback for unknown legacy connectors.
+- `/apps` provides a backend-backed application table and create/delete flow.
+  `/apps/[clientId]` provides app Overview, GitHub connector management,
+  numeric LLM configuration, effective policy summary, and guarded runtime
+  testing.
+- Policy rows in both policy-management views open a shared summary modal backed
+  by `GET /policies/{policy_id}`.
+- `GET /policy-options` supplies database-mapped cascading connector, action and
+  resource choices to the policy form.
+- Custom-resource phrases are canonicalized before duplicate resolution, while
+  assignment display names remain app-specific.
 - `POST /policies/compile-preview` previews compiler output from enabled DB rows.
 - `POST /policies` and `PUT /policies/{policy_id}` automatically refresh
   generated NeMo rule text in `compiled_policy_rules`.

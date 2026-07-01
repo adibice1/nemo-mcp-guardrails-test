@@ -36,6 +36,7 @@ from nemo_mcp_guardrails.prompt_rule_compiler import (
 from nemo_mcp_guardrails.tool_guard import (
     blocked_tool_names_for_app,
     guard_mcp_tool,
+    tool_guard_rules_for_app,
 )
 
 
@@ -382,8 +383,13 @@ async def main(app_id: int | None = None) -> None:
     # Convert GitHub MCP capabilities into LangChain-compatible tools.
     raw_tools = await client.get_tools()
     blocked_tool_names = blocked_tool_names_for_app(app_id=app_id)
+    guard_rules = tool_guard_rules_for_app(app_id=app_id)
     tools = [
-        guard_mcp_tool(tool, blocked_tool_names=blocked_tool_names)
+        guard_mcp_tool(
+            tool,
+            blocked_tool_names=blocked_tool_names,
+            guard_rules=guard_rules,
+        )
         for tool in raw_tools
     ]
 

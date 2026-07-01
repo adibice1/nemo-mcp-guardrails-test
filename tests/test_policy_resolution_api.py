@@ -125,6 +125,11 @@ def main() -> None:
                     "policy": {
                         **payload["policy"],
                         "description": "Different name, equivalent behavior",
+                        "conditions": {
+                            "custom_resource": (
+                                f"Issues named '{condition_value.upper()}'"
+                            )
+                        },
                     }
                 },
             )
@@ -132,6 +137,13 @@ def main() -> None:
             assert duplicate.json()["resolution"] == "already_assigned"
             assert duplicate.json()["policy_id"] == policy_id
             assert duplicate.json()["assignment_id"] == app_a_assignment_id
+
+            with SessionLocal() as db:
+                stored_policy = db.get(PolicyRecord, policy_id)
+                assert stored_policy is not None
+                assert stored_policy.conditions == {
+                    "custom_resource": condition_value
+                }
 
             reused = client.post(
                 f"/apps/by-client-id/{client_b}/policy-assignments/resolve",

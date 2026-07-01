@@ -119,12 +119,13 @@ Data:
 Table columns:
 
 - app name
-- client ID
-- authorized
-- main LLM config ID
-- guardrail LLM config ID
+- connector count
+- effective policy count
 - created at
 - actions
+
+The backend retains `authorized` as a runtime kill switch. The normal developer
+UI hides the status because managed apps are authorized by default.
 
 Actions:
 
@@ -138,7 +139,6 @@ Create form fields:
 - name
 - client ID
 - API key
-- authorized
 - main LLM config ID
 - guardrail LLM config ID
 
@@ -328,9 +328,13 @@ Current implementation note:
   for static design demos.
 - Create is backend-wired through duplicate-aware global/app resolution.
 - Delete is backend-wired as assignment removal; shared definitions remain.
-- Assignment-safe Edit is not backend-wired yet.
-- Optional custom-resource text is persisted as policy metadata but is not yet
-  an enforced compiler condition.
+- Assignment-safe Edit is backend-wired through resolve-and-swap behavior.
+- Optional custom-resource text is compiled into the input rule and enforced
+  again against MCP tool arguments before execution.
+- Custom-resource identity is canonicalized so case/plural/wording variants
+  reuse one definition.
+- Connector, action and resource dropdowns cascade from `GET /policy-options`.
+- Mutation errors use top-right warning notices above open dialogs.
 
 Table columns:
 

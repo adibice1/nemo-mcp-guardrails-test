@@ -5,6 +5,7 @@ bootstrap_src()
 import argparse
 
 from nemo_mcp_guardrails.database.connection import SessionLocal
+from nemo_mcp_guardrails.policy_rule_service import refresh_all_compiled_policy_rules
 from nemo_mcp_guardrails.policy_service import consolidate_equivalent_policies
 
 
@@ -22,6 +23,7 @@ def main() -> None:
     with SessionLocal() as db:
         results = consolidate_equivalent_policies(db)
         if args.apply:
+            refresh_all_compiled_policy_rules(db)
             db.commit()
         else:
             db.rollback()

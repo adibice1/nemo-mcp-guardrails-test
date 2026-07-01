@@ -19,6 +19,7 @@ type PolicyTableProps = {
   totalCount: number;
   onDelete: (policy: PolicyRow) => void;
   onEdit: (policy: PolicyRow) => void;
+  onOpen: (policy: PolicyRow) => void;
   onPageChange: (page: number) => void;
   onSort: (key: PolicySort["key"]) => void;
 };
@@ -31,6 +32,7 @@ export function PolicyTable({
   totalCount,
   onDelete,
   onEdit,
+  onOpen,
   onPageChange,
   onSort
 }: PolicyTableProps) {
@@ -71,6 +73,7 @@ export function PolicyTable({
               policy={policy}
               onDelete={onDelete}
               onEdit={onEdit}
+              onOpen={onOpen}
             />
           ))
         ) : (
@@ -158,15 +161,28 @@ function PolicyRowItem({
   index,
   policy,
   onDelete,
-  onEdit
+  onEdit,
+  onOpen
 }: {
   index: number;
   policy: PolicyRow;
   onDelete: (policy: PolicyRow) => void;
   onEdit: (policy: PolicyRow) => void;
+  onOpen: (policy: PolicyRow) => void;
 }) {
   return (
-    <div className="group grid min-h-[56px] grid-cols-[46px_66px_180px_1fr_180px_150px_90px_94px_34px] items-center rounded-md border border-gms-line bg-white px-1 text-sm text-gms-text shadow-[0_1px_2px_rgba(55,70,110,0.04)] transition hover:border-gms-blue hover:bg-gms-blue hover:text-white dark:bg-[#20242c]">
+    <div
+      className="group grid min-h-[56px] cursor-pointer grid-cols-[46px_66px_180px_1fr_180px_150px_90px_94px_34px] items-center rounded-md border border-gms-line bg-white px-1 text-sm text-gms-text shadow-[0_1px_2px_rgba(55,70,110,0.04)] transition hover:border-gms-blue hover:bg-gms-blue hover:text-white dark:bg-[#20242c]"
+      role="button"
+      tabIndex={0}
+      onClick={() => onOpen(policy)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onOpen(policy);
+        }
+      }}
+    >
       <span className="text-center text-xl font-extrabold text-[#a7bcf8] group-hover:text-white">
         {index}
       </span>
@@ -190,7 +206,10 @@ function PolicyRowItem({
           className="flex h-8 w-8 items-center justify-center rounded-full bg-gms-blue-soft text-gms-blue group-hover:bg-[#c8d7ff] group-hover:text-[#2f63e8]"
           type="button"
           aria-label={`Edit ${policy.name}`}
-          onClick={() => onEdit(policy)}
+          onClick={(event) => {
+            event.stopPropagation();
+            onEdit(policy);
+          }}
         >
           <Edit2 className="h-4 w-4" />
         </button>
@@ -203,7 +222,10 @@ function PolicyRowItem({
           )}
           type="button"
           aria-label={`Delete ${policy.name}`}
-          onClick={() => onDelete(policy)}
+          onClick={(event) => {
+            event.stopPropagation();
+            onDelete(policy);
+          }}
         >
           <Trash2 className="h-4 w-4" />
         </button>
@@ -212,6 +234,7 @@ function PolicyRowItem({
         className="text-[#d7deea] group-hover:text-white"
         type="button"
         aria-label={`More actions for ${policy.name}`}
+        onClick={(event) => event.stopPropagation()}
       >
         <MoreVertical className="h-6 w-6" />
       </button>
