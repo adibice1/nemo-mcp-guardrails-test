@@ -118,12 +118,18 @@ def _to_input_policy_object(record: PolicyRecord) -> InputPolicyObject | None:
 def _to_output_policy_object(record: PolicyRecord) -> OutputPolicyObject | None:
     """Convert one enabled database row into an output policy object."""
 
-    if not (record.category and record.description and record.effect):
+    output_rule_value = (record.conditions or {}).get("output_rule")
+    output_rule = (
+        str(output_rule_value).strip()
+        if output_rule_value is not None
+        else (record.description or "").strip()
+    )
+    if not (record.category and output_rule and record.effect):
         return None
 
     return OutputPolicyObject(
         category=record.category,
-        description=record.description,
+        description=output_rule,
         effect=record.effect,
     )
 

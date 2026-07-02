@@ -176,10 +176,15 @@ POST /v1/guardrails/run
 -> select guardrail LLM config for NeMo rails
 -> select main LLM config for the LangChain agent
 -> input rail checks latest message
+-> Azure input-filter exceptions return a categorized controlled block
 -> agent receives trimmed history + latest message
+-> tool guard raises a first-class block before matching MCP execution
 -> connector tool failures return status=tool_error instead of HTTP 500
+-> explicit quoted output prohibitions are checked deterministically
 -> output rail checks assistant response
 -> Azure output content-filter failures return a controlled blocked response
+-> return output source and any Azure-reported filtered categories
+-> return tool-guard status/source
 -> store latest user/assistant turn when conversation_id exists
 -> return response plus history metadata
 ```
@@ -192,6 +197,7 @@ guarded_execution.py
 -> input rail
 -> early block or agent with guarded tools and trimmed history
 -> controlled tool_error for connector ToolException failures
+-> deterministic explicit-phrase output check
 -> output rail
 -> controlled blocked response for Azure output content_filter failures
 -> GuardedExecutionResult

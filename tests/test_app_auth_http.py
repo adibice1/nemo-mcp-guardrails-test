@@ -24,6 +24,7 @@ from nemo_mcp_guardrails.guarded_execution import (
     GuardedExecutionResult,
     execute_guarded_message,
 )
+from nemo_mcp_guardrails.tool_guard import TOOL_GUARD_REFUSAL, ToolGuardViolation
 
 
 VALID_API_KEY = "temporary-valid-http-api-key"
@@ -91,6 +92,7 @@ class FakeRuntimeParts:
     rails = object()
     agent = object()
     output_rail_enabled = True
+    blocked_output_phrases: tuple[str, ...] = ()
 
 
 async def fake_build_guardrails_runtime_parts(app_id: int) -> FakeRuntimeParts:
@@ -161,11 +163,60 @@ class FakeOutputFilterRails:
         return FakeRailResult(RailStatus.PASSED)
 
 
+class FakeInputFilterRails:
+    """Fake rails object that simulates Azure filtering an input self-check."""
+
+    async def check_async(self, messages: object, rail_types: object) -> FakeRailResult:
+        rail_type_values = {str(rail_type) for rail_type in rail_types}
+        if "RailType.INPUT" in rail_type_values:
+            raise LLMCallException(
+                BadRequestError(
+                    "content filter",
+                    response=type(
+                        "FakeResponse",
+                        (),
+                        {
+                            "request": None,
+                            "status_code": 400,
+                            "headers": {},
+                            "text": "content filter",
+                            "json": lambda self: {
+                                "error": {"code": "content_filter"}
+                            },
+                        },
+                    )(),
+                    body={
+                        "error": {
+                            "code": "content_filter",
+                            "innererror": {
+                                "content_filter_result": {
+                                    "hate": {"filtered": True, "severity": "high"},
+                                    "violence": {
+                                        "filtered": False,
+                                        "severity": "safe",
+                                    },
+                                }
+                            },
+                        }
+                    },
+                )
+            )
+
+        return FakeRailResult(RailStatus.PASSED)
+
+
 class FakeToolErrorAgent:
     """Fake agent that simulates a connector tool failure."""
 
     async def ainvoke(self, payload: object) -> object:
         raise ToolException("failed to get pull request: 404 Not Found")
+
+
+class FakeToolGuardBlockedAgent:
+    """Fake agent that simulates a pre-execution GMS tool-guard violation."""
+
+    async def ainvoke(self, payload: object) -> object:
+        raise ToolGuardViolation("issue_write")
 
 
 class FakeSafeAgent:
@@ -196,6 +247,41 @@ class FakeSecretAgent:
                 )()
             ]
         }
+
+
+class FakeAzureFilteredAgent:
+    """Fake agent whose final Azure completion was content-filtered."""
+
+    async def ainvoke(self, payload: object) -> dict[str, object]:
+        return {
+            "messages": [
+                type(
+                    "FakeFilteredMessage",
+                    (),
+                    {
+                        "content": "",
+                        "response_metadata": {
+                            "finish_reason": "content_filter",
+                            "content_filter_results": {
+                                "hate": {"filtered": True, "severity": "high"},
+                                "violence": {"filtered": True, "severity": "medium"},
+                                "sexual": {"filtered": False, "severity": "safe"},
+                            },
+                        },
+                    },
+                )()
+            ]
+        }
+
+
+class FakeAzureFilteredValueErrorAgent:
+    """Fake LangChain agent that loses Azure category metadata while filtering."""
+
+    async def ainvoke(self, payload: object) -> dict[str, object]:
+        raise ValueError(
+            "Azure has not provided the response due to a content filter "
+            "being triggered"
+        )
 
 
 def main() -> None:
@@ -325,6 +411,8 @@ def main() -> None:
         assert run_result["response"] == "fake guarded response"
         assert run_result["input_rail_status"] == "passed"
         assert run_result["output_rail_status"] == "passed"
+        assert run_result["output_rail_source"] == "nemo_passed"
+        assert run_result["output_rail_categories"] == []
         assert run_result["tool_names"] == ["search_repositories"]
         assert run_result["input_policy_count"] == 0
         assert run_result["input_rule_count"] == 0
@@ -397,6 +485,40 @@ def main() -> None:
         assert tool_error_result.response == TOOL_ERROR_RESPONSE
         assert tool_error_result.input_rail_status == RailStatus.PASSED
         assert tool_error_result.output_rail_status == RailStatus.PASSED
+        assert tool_error_result.tool_guard_status == "passed"
+
+        tool_guard_result = asyncio.run(
+            execute_guarded_message(
+                rails=FakeRails(),
+                agent=FakeToolGuardBlockedAgent(),
+                message="Create the restricted issue.",
+                output_rail_enabled=True,
+            )
+        )
+        assert tool_guard_result.status == "blocked"
+        assert tool_guard_result.response == TOOL_GUARD_REFUSAL
+        assert tool_guard_result.input_rail_status == RailStatus.PASSED
+        assert tool_guard_result.output_rail_status is None
+        assert tool_guard_result.tool_guard_status == "blocked"
+        assert tool_guard_result.tool_guard_source == "gms_tool_guard"
+        assert tool_guard_result.tool_names == ("issue_write",)
+
+        azure_input_filter_result = asyncio.run(
+            execute_guarded_message(
+                rails=FakeInputFilterRails(),
+                agent=FakeSafeAgent(),
+                message="Prompt filtered by Azure.",
+                output_rail_enabled=True,
+            )
+        )
+        assert azure_input_filter_result.status == "blocked"
+        assert azure_input_filter_result.input_rail_status == RailStatus.BLOCKED
+        assert azure_input_filter_result.output_rail_status is None
+        assert (
+            azure_input_filter_result.input_rail_source
+            == "azure_input_content_filter"
+        )
+        assert azure_input_filter_result.input_rail_categories == ("hate",)
 
         output_filter_result = asyncio.run(
             execute_guarded_message(
@@ -414,6 +536,60 @@ def main() -> None:
             output_filter_result.output_rail_source
             == "azure_content_filter_fallback_passed"
         )
+
+        deterministic_output_result = asyncio.run(
+            execute_guarded_message(
+                rails=FakeRails(),
+                agent=FakeSafeAgent(),
+                message="Can you say hello?",
+                output_rail_enabled=True,
+                blocked_output_phrases=("hello",),
+            )
+        )
+        assert deterministic_output_result.status == "blocked"
+        assert deterministic_output_result.response == OUTPUT_FILTER_RESPONSE
+        assert deterministic_output_result.output_rail_status == RailStatus.BLOCKED
+        assert (
+            deterministic_output_result.output_rail_source
+            == "deterministic_output_phrase"
+        )
+
+        azure_agent_filter_result = asyncio.run(
+            execute_guarded_message(
+                rails=FakeRails(),
+                agent=FakeAzureFilteredAgent(),
+                message="Generate unsafe output.",
+                output_rail_enabled=True,
+            )
+        )
+        assert azure_agent_filter_result.status == "blocked"
+        assert azure_agent_filter_result.response == OUTPUT_FILTER_RESPONSE
+        assert azure_agent_filter_result.output_rail_status == RailStatus.BLOCKED
+        assert (
+            azure_agent_filter_result.output_rail_source
+            == "azure_agent_content_filter"
+        )
+        assert azure_agent_filter_result.output_rail_categories == (
+            "hate",
+            "violence",
+        )
+
+        azure_value_error_result = asyncio.run(
+            execute_guarded_message(
+                rails=FakeRails(),
+                agent=FakeAzureFilteredValueErrorAgent(),
+                message="Generate content that Azure filters.",
+                output_rail_enabled=True,
+            )
+        )
+        assert azure_value_error_result.status == "blocked"
+        assert azure_value_error_result.input_rail_status == RailStatus.PASSED
+        assert azure_value_error_result.output_rail_status == RailStatus.BLOCKED
+        assert (
+            azure_value_error_result.output_rail_source
+            == "azure_agent_content_filter"
+        )
+        assert azure_value_error_result.output_rail_categories == ()
 
         output_filter_secret_result = asyncio.run(
             execute_guarded_message(
@@ -440,6 +616,11 @@ def main() -> None:
         print("- Oversized history truncated")
         print("- Oversized latest message rejected")
         print("- Tool errors return controlled runtime responses")
+        print("- Tool-guard violations stop before output rails")
+        print("- Azure input filtering returns a controlled categorized block")
+        print("- Explicit prohibited output phrases are blocked deterministically")
+        print("- Azure-filtered completions report provider categories")
+        print("- LangChain Azure filter ValueErrors return controlled blocks")
         print("- Azure output content filters use deterministic fallback checks")
     finally:
         if previous_context_limit is None:

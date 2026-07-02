@@ -41,6 +41,7 @@ User prompt
 -> broad and custom-resource-specific tool rules are compiled from enabled Postgres input policies
 -> matching custom-resource rules inspect MCP arguments before execution
 -> GitHub MCP tools run when allowed; `.env` `GITHUB_MCP_READ_ONLY=1` keeps the safe read-only default
+-> explicit quoted output prohibitions are checked deterministically
 -> NeMo self_check_output uses the app's guardrail AzureChatOpenAI config
 -> final response
 ```
@@ -91,6 +92,24 @@ Current backend/API state:
 - `guarded_execution.py` coordinates reusable single-request input rail,
   agent/guarded-tool execution with trimmed history, output rail, and
   structured results.
+- Output enforcement is defense in depth. `output_guard.py` extracts explicit
+  quoted phrase restrictions such as `Cannot say 'hello'` from app-scoped DB
+  output policies and checks the agent response case-insensitively before NeMo.
+  Broader semantic output rules continue through NeMo.
+- `/run` publicly reports the output enforcement source and Azure-filtered
+  categories. Runtime Test renders Azure provider blocks separately from GMS
+  NeMo/deterministic blocks.
+- Azure content-filter exceptions raised during NeMo input classification no
+  longer escape as HTTP `500`. `/run` returns a controlled block with the Azure
+  input source/category and does not run the agent or output rail.
+- Azure-filtered agent completions surfaced by LangChain as
+  `Azure has not provided the response...` `ValueError`s are also controlled
+  output blocks. Because LangChain omits category metadata on this path, the UI
+  displays `blocked (Azure)` without a category.
+- Tool-guard matches are first-class pre-execution blocks. The guarded MCP
+  wrapper raises `ToolGuardViolation`, `execute_guarded_message()` returns a
+  controlled blocked result without running output rails, and `/run` exposes
+  tool-guard status/source for Runtime Test.
 - The Next.js 13 frontend exists under `frontend/` with `/login`, `/signup`,
   `/apps`, `/apps/[clientId]`, `/policies`, and `/settings`. The `/policies`
   page loads and mutates real
@@ -105,6 +124,13 @@ Current backend/API state:
   optional custom resource. Output mode accepts a required free-text rule and
   does not expose irrelevant connector fields. Policy names are independently
   editable from the beginning of either workflow.
+- Policy names are stored in `policies.description`; output enforcement text
+  is stored separately in `conditions.output_rule`. Existing output rows can
+  be backfilled and recompiled with `scripts/migrate_output_policy_rules.py`.
+  The app Runtime Test displays both input-policy and output-policy counts.
+- Compiled output policies are pure restriction statements. The outer NeMo
+  self-check prompt makes one combined yes/no decision across every active
+  output policy, avoiding conflicting per-policy `no otherwise` instructions.
 - The current frontend connector scope is GitHub and SharePoint. Global policy
   rows use a globe icon, while app-specific rows use connector icons with a
   folder fallback for unknown legacy connectors.

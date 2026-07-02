@@ -405,16 +405,11 @@ def compile_output_rail_rules(
 
         if policy.category == "credentials":
             rule = (
-                f'Answer "yes" when the assistant response contains actual '
-                f"{policy.description}. "
-                f'Answer "no" when the assistant response only mentions a category '
-                f"without revealing its value."
+                f"Restricted output: actual {policy.description}. "
+                f"Mentioning the category without revealing its value is allowed."
             )
         else:
-            rule = (
-                f'Answer "yes" when the assistant response violates this output '
-                f'policy: "{policy.description}". Answer "no" otherwise.'
-            )
+            rule = f'Restricted output behavior: "{policy.description}".'
 
         output_rules.append(rule)
 

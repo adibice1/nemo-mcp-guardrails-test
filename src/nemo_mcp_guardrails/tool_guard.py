@@ -2,7 +2,7 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from langchain_core.tools import StructuredTool
+from langchain_core.tools import StructuredTool, ToolException
 
 from nemo_mcp_guardrails.database.policy_loader import load_input_policy_objects
 from nemo_mcp_guardrails.policy_compiler import compile_policy
@@ -13,6 +13,14 @@ TOOL_GUARD_REFUSAL = (
     "I can inspect GitHub information, but I cannot perform write actions "
     "or reveal credentials."
 )
+
+
+class ToolGuardViolation(ToolException):
+    """Raised before an MCP tool executes when a GMS policy matches."""
+
+    def __init__(self, tool_name: str) -> None:
+        self.tool_name = tool_name
+        super().__init__(TOOL_GUARD_REFUSAL)
 
 
 @dataclass(frozen=True)
@@ -149,7 +157,7 @@ def guard_mcp_tool(
                 rule.custom_resource,
                 kwargs,
             ):
-                return f"Tool call blocked by guard: {TOOL_GUARD_REFUSAL}"
+                raise ToolGuardViolation(tool.name)
 
         return await tool.ainvoke(kwargs)
 

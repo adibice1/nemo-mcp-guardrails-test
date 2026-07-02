@@ -17,7 +17,11 @@ from nemo_mcp_guardrails.database.models import (
     ConnectorRecord,
     LlmConfigRecord,
 )
-from nemo_mcp_guardrails.database.policy_loader import load_input_policy_entries
+from nemo_mcp_guardrails.database.policy_loader import (
+    load_input_policy_entries,
+    load_output_policy_objects,
+)
+from nemo_mcp_guardrails.output_guard import compile_blocked_output_phrases
 from nemo_mcp_guardrails.prompt_rule_compiler import (
     PromptRuleConfig,
     build_rails_config_with_prompt_rules,
@@ -93,6 +97,7 @@ class GuardrailsRuntimeParts:
     rails: LLMRails
     agent: Any
     output_rail_enabled: bool
+    blocked_output_phrases: tuple[str, ...]
     tool_bundle: McpToolBundle
 
 
@@ -356,6 +361,9 @@ async def build_guardrails_runtime_parts(app_id: int) -> GuardrailsRuntimeParts:
         guard_rules,
     )
     agent = create_agent(model=main_model, tools=list(tool_bundle.tools))
+    blocked_output_phrases = compile_blocked_output_phrases(
+        policy.description for policy in load_output_policy_objects(app_id=app_id)
+    )
 
     return GuardrailsRuntimeParts(
         prompt_rule_config=prompt_rule_config,
@@ -364,5 +372,6 @@ async def build_guardrails_runtime_parts(app_id: int) -> GuardrailsRuntimeParts:
         rails=rails,
         agent=agent,
         output_rail_enabled=bool(prompt_rule_config.rails_config.rails.output.flows),
+        blocked_output_phrases=blocked_output_phrases,
         tool_bundle=tool_bundle,
     )

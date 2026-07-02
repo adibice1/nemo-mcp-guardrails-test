@@ -43,6 +43,7 @@ class FakeRuntimeParts:
     rails: object
     agent: object
     output_rail_enabled: bool
+    blocked_output_phrases: tuple[str, ...]
 
 
 class FakeRailResult:
@@ -105,6 +106,7 @@ async def fake_build_guardrails_runtime_parts(app_id: int) -> FakeRuntimeParts:
         rails=FakePolicyRails(),
         agent=FakeAgent(),
         output_rail_enabled=True,
+        blocked_output_phrases=(),
     )
 
 

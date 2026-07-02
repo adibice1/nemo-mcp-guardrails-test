@@ -17,6 +17,7 @@ python tests/test_app_auth_http.py
 python tests/test_policy_assignment_api.py
 python tests/test_policy_auto_compile.py
 python tests/test_guardrails_run_http.py
+python tests/test_output_guard.py
 python tests/test_runtime_connector_access.py
 python tests/test_app_connector_api.py
 python tests/test_runtime_connector_credentials.py
@@ -115,10 +116,41 @@ execute_guarded_message()
 -> stop before action execution when blocked
 -> otherwise run LangChain agent with guarded MCP tools
 -> return status=tool_error when a connector tool raises ToolException
+-> deterministically check explicit quoted prohibited output phrases
 -> NeMo output rail
 -> return controlled blocked response when Azure filters output self-check
 -> GuardedExecutionResult
 ```
+
+`runtime_factory.py` loads app-scoped output policy objects and uses
+`output_guard.py` to compile explicit quoted prohibitions such as
+`Cannot say 'hello'`. `guarded_execution.py` checks those phrases
+case-insensitively before NeMo classifies broader semantic rules. A match uses
+the normal output safety refusal and debug source
+`deterministic_output_phrase`.
+
+`POST /v1/guardrails/run` now exposes `output_rail_source` and
+`output_rail_categories` outside debug mode. The app Runtime Test displays
+`blocked (Azure: category)` for confirmed Azure completion filtering,
+`blocked (Azure)` when no category is available, and `blocked (GMS)` for NeMo
+or deterministic GMS enforcement. A normal polite model refusal is not an
+Azure filter event and may still pass the output rail.
+
+Azure can also filter the prompt used by NeMo `self_check_input`. Those
+`LLMCallException` failures are caught in `execute_guarded_message()` and
+returned as `Input: blocked (Azure: category)`, with output marked `not run`,
+instead of surfacing to the frontend as `Failed to fetch` from an HTTP `500`.
+
+When Azure filters the main agent completion, the current LangChain Azure
+adapter may raise a plain `ValueError` and discard category metadata. The
+runtime recognizes its exact provider-filter message and returns
+`Output: blocked (Azure)` rather than an HTTP `500`.
+
+Tool-guard policy matches now raise `ToolGuardViolation` before the wrapped MCP
+tool executes. Runtime Test displays `Tool guard: blocked (GMS)` and leaves the
+output rail as `not run`; connector failures remain the separate `tool_error`
+path. `Guarded tool types` is a policy-coverage count, not a count of calls made
+by the current request.
 
 `tests/test_nemo_mcp.py` calls this reusable function and still prints the
 same detailed terminal workflow. The full read-only NeMo + GitHub MCP run
@@ -202,6 +234,16 @@ Policy naming is unlocked immediately. Input mode keeps the cascading GitHub
 fields and optional custom resource; output mode hides connector fields and
 requires a free-text output rule. Output definitions use category `custom`,
 while their app/global assignment display name remains independent.
+
+The stored output rule lives in `policies.conditions.output_rule`; the
+`description` column holds the policy name consistently with input policies.
+Run `python scripts/migrate_output_policy_rules.py` after pulling this change
+to backfill legacy output rows and regenerate active compiled rules. Runtime
+loaders fall back to legacy `description` values until migration is run.
+Compiled output rules must remain restriction statements; do not add `Answer
+no otherwise` to each individual rule because multiple active policies would
+produce contradictory classifier instructions. The outer output prompt owns
+the single combined yes/no decision.
 
 By default, the deployed/mock frontend still uses local mock policy data. To
 switch local development to real FastAPI data, create `frontend/.env.local`:

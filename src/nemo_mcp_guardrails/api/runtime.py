@@ -241,6 +241,7 @@ async def run_guardrails(
         conversation_history=[
             turn.as_message() for turn in history_context.selected_turns
         ],
+        blocked_output_phrases=runtime_parts.blocked_output_phrases,
     )
     _store_conversation_turns(
         payload,
@@ -259,7 +260,13 @@ async def run_guardrails(
         conversation_id=payload.conversation_id,
         response=execution_result.response,
         input_rail_status=_rail_status_text(execution_result.input_rail_status) or "",
+        input_rail_source=execution_result.input_rail_source,
+        input_rail_categories=list(execution_result.input_rail_categories),
         output_rail_status=_rail_status_text(execution_result.output_rail_status),
+        output_rail_source=execution_result.output_rail_source,
+        output_rail_categories=list(execution_result.output_rail_categories),
+        tool_guard_status=execution_result.tool_guard_status,
+        tool_guard_source=execution_result.tool_guard_source,
         tool_names=list(execution_result.tool_names),
         input_policy_count=runtime_parts.input_policy_count,
         input_rule_count=runtime_parts.prompt_rule_config.input_rule_count,

@@ -13,6 +13,7 @@ from nemo_mcp_guardrails.tool_guard import (
     BLOCKED_GITHUB_MCP_TOOLS,
     TOOL_GUARD_REFUSAL,
     ToolGuardRule,
+    ToolGuardViolation,
     guard_mcp_tool,
 )
 
@@ -45,6 +46,17 @@ class FakeTool:
         }
 
 
+async def assert_guard_violation(tool: Any, kwargs: dict[str, Any]) -> None:
+    """Assert a guarded tool raises before its underlying MCP call executes."""
+
+    try:
+        await tool.ainvoke(kwargs)
+    except ToolGuardViolation as error:
+        assert str(error) == TOOL_GUARD_REFUSAL
+    else:
+        raise AssertionError("Expected ToolGuardViolation")
+
+
 async def main() -> None:
     """Verify restricted tools are blocked and allowed tools still execute."""
 
@@ -54,13 +66,10 @@ async def main() -> None:
     guarded_allowed_tool = guard_mcp_tool(allowed_tool)
     allowed_result = await guarded_allowed_tool.ainvoke({})
 
-    expected_blocked_result = f"Tool call blocked by guard: {TOOL_GUARD_REFUSAL}"
-
     for blocked_tool in blocked_tools:
         guarded_blocked_tool = guard_mcp_tool(blocked_tool)
-        blocked_result = await guarded_blocked_tool.ainvoke({})
+        await assert_guard_violation(guarded_blocked_tool, {})
 
-        assert blocked_result == expected_blocked_result
         assert blocked_tool.calls == []
 
     assert allowed_result == {
@@ -81,10 +90,9 @@ async def main() -> None:
         blocked_tool_names=frozenset(),
     )
 
-    app_a_result = await app_a_guard.ainvoke({})
+    await assert_guard_violation(app_a_guard, {})
     app_b_result = await app_b_guard.ainvoke({})
 
-    assert app_a_result == expected_blocked_result
     assert app_a_issue_tool.calls == []
     assert app_b_result == {
         "tool": "issue_write",
@@ -103,12 +111,11 @@ async def main() -> None:
         ),
     )
 
-    matching_result = await conditional_issue_guard.ainvoke({"title": "test"})
+    await assert_guard_violation(conditional_issue_guard, {"title": "test"})
     nonmatching_result = await conditional_issue_guard.ainvoke(
         {"title": "another issue"}
     )
 
-    assert matching_result == expected_blocked_result
     assert nonmatching_result == {
         "tool": "issue_write",
         "called": True,

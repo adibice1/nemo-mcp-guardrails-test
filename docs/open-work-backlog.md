@@ -16,6 +16,24 @@ The GMS backend prototype now has these core runtime pieces:
 - Separate app-selected LLM configs for guardrail rails and the main agent.
 - Controlled runtime responses for connector tool errors and Azure output
   content-filter failures.
+- App-scoped deterministic checks for explicit quoted output prohibitions such
+  as `Cannot say 'hello'`; broad rules such as `No profanities` remain NeMo
+  semantic classifications.
+- Runtime responses expose `output_rail_source` and Azure-reported filtered
+  categories. The frontend distinguishes `blocked (Azure: category)` from
+  `blocked (GMS)`; generic Azure events fall back to `blocked (Azure)`.
+- Azure filtering during NeMo input self-checks is converted from an unhandled
+  `500` into a controlled runtime block. Responses expose `input_rail_source`
+  and `input_rail_categories`, and Runtime Test renders labels such as
+  `Input: blocked (Azure: hate)` while leaving output as `not run`.
+- LangChain can convert an Azure-filtered agent completion into a category-less
+  `ValueError`. The runtime recognizes that exact provider message and returns
+  `Output: blocked (Azure)` instead of HTTP `500`.
+- MCP policy matches now raise `ToolGuardViolation` before the connector call.
+  `/run` reports `tool_guard_status` and `tool_guard_source`, skips output rails
+  after a guard violation, and Runtime Test shows `Tool guard: blocked (GMS)`.
+  The coverage count is labelled `Guarded tool types` rather than implying the
+  current request invoked every covered tool.
 - Centralized single/bulk policy assignment payloads for app and global
   assignments, with readable app and policy labels in API responses.
 - Developer-friendly client-ID aliases for app lookup and app-specific policy
@@ -49,6 +67,17 @@ The GMS backend prototype now has these core runtime pieces:
   fields, while output mode replaces them with a required free-text output
   rule. Custom output categories compile through a general NeMo output
   classifier while the credential category keeps its specialized wording.
+- Policy storage now keeps names in `policies.description` and output behavior
+  in `conditions.output_rule`. Loaders retain a legacy-description fallback.
+  `scripts/migrate_output_policy_rules.py` backfills existing output rows and
+  refreshes their compiled rules. Runtime Test displays input and output policy
+  counters separately.
+- Output rules now compile as restriction statements rather than independent
+  yes/no instructions. `self_check_output` performs one OR-style decision: a
+  violation of any active output policy blocks the response.
+- `output_guard.py` extracts quoted phrases from explicit `cannot`, `must not`,
+  `do not`, and `never` rules. Matching is case-insensitive and reports debug
+  source `deterministic_output_phrase`.
 - Policy creation now resolves structural equivalence before inserting. The
   backend returns `created`, `reused`, or `already_assigned`; equivalent names
   do not create duplicate policy definitions, and app requests do not add a

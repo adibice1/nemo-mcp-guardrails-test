@@ -89,6 +89,24 @@ def canonicalize_policy_conditions(
     return normalized
 
 
+def output_policy_rule(policy: PolicyRecord) -> str:
+    """Return an output policy's rule with legacy-description fallback."""
+
+    output_rule = (policy.conditions or {}).get("output_rule")
+    if output_rule is not None and str(output_rule).strip():
+        return str(output_rule).strip()
+    return (policy.description or "").strip()
+
+
+def policy_conditions_for_equivalence(policy: PolicyRecord) -> dict[str, object]:
+    """Return conditions excluding the separately compared output rule."""
+
+    conditions = canonicalize_policy_conditions(policy.conditions, policy.resource)
+    if policy.policy_type == "output":
+        conditions.pop("output_rule", None)
+    return conditions
+
+
 def resolve_policy_references(policy: PolicyRecord, db: Session) -> None:
     """Resolve readable connector metadata into normalized foreign keys."""
 
@@ -225,22 +243,18 @@ def find_equivalent_policy(
         PolicyRecord.priority == candidate.priority,
         PolicyRecord.enabled == candidate.enabled,
     )
-    if candidate.policy_type == "output":
-        statement = statement.where(
-            PolicyRecord.description == candidate.description
-        )
     if exclude_policy_id is not None:
         statement = statement.where(PolicyRecord.id != exclude_policy_id)
 
-    candidate_conditions = canonicalize_policy_conditions(
-        candidate.conditions,
-        candidate.resource,
-    )
+    candidate_output_rule = output_policy_rule(candidate).casefold()
+    candidate_conditions = policy_conditions_for_equivalence(candidate)
     for policy in db.scalars(statement.order_by(PolicyRecord.id)):
-        if canonicalize_policy_conditions(
-            policy.conditions,
-            policy.resource,
-        ) == candidate_conditions:
+        if (
+            candidate.policy_type == "output"
+            and output_policy_rule(policy).casefold() != candidate_output_rule
+        ):
+            continue
+        if policy_conditions_for_equivalence(policy) == candidate_conditions:
             return policy
     return None
 
@@ -248,8 +262,8 @@ def find_equivalent_policy(
 def policy_equivalence_key(policy: PolicyRecord) -> tuple[object, ...]:
     """Return a stable in-memory key for duplicate consolidation."""
 
-    output_description = (
-        (policy.description or "").strip()
+    output_rule = (
+        output_policy_rule(policy).casefold()
         if policy.policy_type == "output"
         else None
     )
@@ -259,11 +273,11 @@ def policy_equivalence_key(policy: PolicyRecord) -> tuple[object, ...]:
         policy.action_id,
         policy.resource_id,
         policy.category,
-        output_description,
+        output_rule,
         policy.effect,
         policy.priority,
         json.dumps(
-            canonicalize_policy_conditions(policy.conditions, policy.resource),
+            policy_conditions_for_equivalence(policy),
             sort_keys=True,
             separators=(",", ":"),
         ),

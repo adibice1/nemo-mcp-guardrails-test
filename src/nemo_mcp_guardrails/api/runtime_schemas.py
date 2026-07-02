@@ -46,7 +46,13 @@ class GuardrailsRunResponse(BaseModel):
     conversation_id: str | None
     response: str
     input_rail_status: str
+    input_rail_source: str | None
+    input_rail_categories: list[str] = Field(default_factory=list)
     output_rail_status: str | None
+    output_rail_source: str | None
+    output_rail_categories: list[str] = Field(default_factory=list)
+    tool_guard_status: str
+    tool_guard_source: str | None
     tool_names: list[str]
     input_policy_count: int
     input_rule_count: int

@@ -50,10 +50,20 @@ def to_input_policy_object(policy: PolicyRecord) -> InputPolicyObject:
 def to_output_policy_object(policy: PolicyRecord) -> OutputPolicyObject:
     """Convert a stored output policy row into the compiler dataclass."""
 
+    output_rule_value = (policy.conditions or {}).get("output_rule")
+    output_rule = (
+        str(output_rule_value).strip()
+        if output_rule_value is not None
+        else (policy.description or "").strip()
+    )
     missing_fields = [
         field
-        for field in ("category", "description", "effect")
-        if not getattr(policy, field)
+        for field, value in (
+            ("category", policy.category),
+            ("output_rule", output_rule),
+            ("effect", policy.effect),
+        )
+        if not value
     ]
     if missing_fields:
         raise ValueError(
@@ -63,7 +73,7 @@ def to_output_policy_object(policy: PolicyRecord) -> OutputPolicyObject:
 
     return OutputPolicyObject(
         category=policy.category or "",
-        description=policy.description or "",
+        description=output_rule,
         effect=policy.effect,
     )
 

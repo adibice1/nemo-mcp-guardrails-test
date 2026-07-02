@@ -48,9 +48,11 @@ Delete removes the assignment only.
 The shared Create/Edit modal supports both rail types. Input policies submit
 the selected connector/action/resource plus optional
 `conditions.custom_resource`. Output policies omit connector metadata and
-submit `policy_type: output`, `category: custom`, and the required free-text
-output rule as `description`. The policy display name is always editable and
-is passed separately as the assignment `display_name`.
+submit `policy_type: output`, `category: custom`, the policy name as
+`description`, and the required free-text restriction as
+`conditions.output_rule`. The assignment `display_name` remains the visible
+app/global label and allows different apps to name one reusable definition
+independently.
 
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
@@ -319,13 +321,23 @@ Run response fields to display:
 - `status`
 - `response`
 - `input_rail_status`
+- `input_rail_source`
+- `input_rail_categories`
 - `output_rail_status`
+- `output_rail_source`
+- `output_rail_categories`
+- `tool_guard_status`
+- `tool_guard_source`
 - `tool_names`
 - `input_policy_count`
 - `input_rule_count`
 - `output_rule_count`
 - `blocked_tools`
 - `history_truncated`
+
+Runtime Test formats confirmed provider filtering as
+`blocked (Azure: category)` and NeMo/deterministic enforcement as
+`blocked (GMS)`. If Azure does not report a category, show `blocked (Azure)`.
 
 ## Allowed Test Cases
 

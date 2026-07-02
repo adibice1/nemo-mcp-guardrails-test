@@ -676,10 +676,10 @@ function buildPolicyPayload(draft: PolicyDraft) {
     return {
       policy_type: "output" as const,
       category: "custom",
-      description: draft.outputRule,
+      description: draft.name,
       effect: "block" as const,
       priority: 100,
-      conditions: {},
+      conditions: { output_rule: draft.outputRule },
       enabled: true
     };
   }
@@ -721,7 +721,11 @@ function policyRowToDraft(
     customResource:
       typeof customResource === "string" ? customResource : "",
     outputRule:
-      definition?.policy_type === "output" ? definition.description ?? "" : "",
+      definition?.policy_type === "output"
+        ? typeof definition.conditions?.output_rule === "string"
+          ? definition.conditions.output_rule
+          : definition.description ?? ""
+        : "",
     name: row.name,
     global: row.global
   };

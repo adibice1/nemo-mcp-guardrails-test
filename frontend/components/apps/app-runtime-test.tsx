@@ -92,14 +92,16 @@ export function AppRuntimeTest({ clientId }: { clientId: string }) {
         <div className="mt-7 rounded-md border border-gms-line bg-[#f9fbff] p-5 dark:bg-[#20242c]">
           <div className="flex flex-wrap gap-2">
             <Status label={`Status: ${result.status}`} passed={result.status === "passed"} />
-            <Status label={`Input: ${result.input_rail_status}`} passed={result.input_rail_status === "passed"} />
-            <Status label={`Output: ${result.output_rail_status ?? "not run"}`} passed={result.output_rail_status === "passed"} />
+            <Status label={`Input: ${formatRailStatus(result.input_rail_status, result.input_rail_source, result.input_rail_categories)}`} passed={result.input_rail_status === "passed"} />
+            <Status label={`Tool guard: ${formatToolGuardStatus(result)}`} passed={result.tool_guard_status === "passed"} />
+            <Status label={`Output: ${formatRailStatus(result.output_rail_status, result.output_rail_source, result.output_rail_categories)}`} passed={result.output_rail_status === "passed"} />
           </div>
           <h3 className="mt-5 text-sm font-bold text-gms-text">Response</h3>
           <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gms-text">{result.response}</p>
-          <dl className="mt-5 grid gap-3 text-xs text-gms-muted md:grid-cols-3">
+          <dl className="mt-5 grid gap-3 text-xs text-gms-muted md:grid-cols-4">
             <div><dt>Input policies</dt><dd className="mt-1 text-lg font-bold text-gms-text">{result.input_policy_count}</dd></div>
-            <div><dt>Blocked tools</dt><dd className="mt-1 text-lg font-bold text-gms-text">{result.blocked_tools.length}</dd></div>
+            <div><dt>Output policies</dt><dd className="mt-1 text-lg font-bold text-gms-text">{result.output_rule_count}</dd></div>
+            <div><dt>Guarded tool types</dt><dd className="mt-1 text-lg font-bold text-gms-text">{result.blocked_tools.length}</dd></div>
             <div><dt>History used</dt><dd className="mt-1 text-lg font-bold text-gms-text">{result.history_messages_used}</dd></div>
           </dl>
         </div>
@@ -107,6 +109,27 @@ export function AppRuntimeTest({ clientId }: { clientId: string }) {
       {error && <p className="mt-4 text-sm text-gms-danger">{error}</p>}
     </div>
   );
+}
+
+function formatToolGuardStatus(result: GuardrailsRunResponse) {
+  if (result.tool_guard_status === "blocked") return "blocked (GMS)";
+  return result.tool_guard_status;
+}
+
+function formatRailStatus(
+  railStatus: string | null,
+  source: string | null,
+  categories: string[],
+) {
+  const status = railStatus ?? "not run";
+  if (status !== "blocked") return status;
+
+  if (source?.startsWith("azure")) {
+    const categoryLabel = categories.join(", ");
+    return categoryLabel ? `blocked (Azure: ${categoryLabel})` : "blocked (Azure)";
+  }
+
+  return "blocked (GMS)";
 }
 
 function Status({ label, passed }: { label: string; passed: boolean }) {

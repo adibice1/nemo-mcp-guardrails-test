@@ -50,7 +50,13 @@ export type GuardrailsRunResponse = {
   conversation_id: string | null;
   response: string;
   input_rail_status: string;
+  input_rail_source: string | null;
+  input_rail_categories: string[];
   output_rail_status: string | null;
+  output_rail_source: string | null;
+  output_rail_categories: string[];
+  tool_guard_status: string;
+  tool_guard_source: string | null;
   tool_names: string[];
   input_policy_count: number;
   input_rule_count: number;

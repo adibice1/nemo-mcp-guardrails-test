@@ -63,6 +63,8 @@ export function PolicySummaryModal({
   }
 
   const customResource = policy?.conditions?.custom_resource;
+  const outputRule = policy?.conditions?.output_rule;
+  const isOutputPolicy = policy?.policy_type === "output";
   const policyName =
     displayName?.trim() || policy?.description?.trim() || "Policy Summary";
 
@@ -111,10 +113,14 @@ export function PolicySummaryModal({
                 </span>
                 <div>
                   <p className="text-xs font-semibold uppercase text-gms-muted">
-                    Custom Resource
+                    {isOutputPolicy ? "Output Rule" : "Custom Resource"}
                   </p>
                   <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gms-text">
-                    {typeof customResource === "string" && customResource.trim()
+                    {isOutputPolicy
+                      ? typeof outputRule === "string" && outputRule.trim()
+                        ? outputRule
+                        : policy.description ?? "Not specified"
+                      : typeof customResource === "string" && customResource.trim()
                       ? customResource
                       : "Any resource"}
                   </p>

@@ -109,7 +109,10 @@ def main() -> None:
                 json={
                     "policy_type": "output",
                     "category": f"auto_compile_category_{suffix}",
-                    "description": "Temporary auto compile test policy.",
+                    "description": "Temporary output policy",
+                    "conditions": {
+                        "output_rule": "Do not return temporary test text."
+                    },
                     "effect": "block",
                     "enabled": True,
                 },
@@ -121,11 +124,18 @@ def main() -> None:
             assert len(created_rules) == 1
             assert created_rules[0].rail_type == "output"
             assert created_rules[0].policy_version == 1
+            assert "Do not return temporary test text" in created_rules[0].rule_text
+            assert created_rules[0].rule_text.startswith(
+                "Restricted output behavior:"
+            )
+            assert 'Answer "no" otherwise' not in created_rules[0].rule_text
 
             update_response = client.put(
                 f"/policies/{policy_id}",
                 json={
-                    "description": "Temporary auto compile test policy updated.",
+                    "conditions": {
+                        "output_rule": "Do not return updated temporary test text."
+                    },
                 },
             )
             assert update_response.status_code == 200, update_response.text
@@ -134,6 +144,7 @@ def main() -> None:
             updated_active_rules = active_compiled_rules(policy_id)
             assert len(updated_active_rules) == 1
             assert updated_active_rules[0].policy_version == 2
+            assert "updated temporary test text" in updated_active_rules[0].rule_text
 
             all_rules_after_update = all_compiled_rules(policy_id)
             assert len(all_rules_after_update) == 2
