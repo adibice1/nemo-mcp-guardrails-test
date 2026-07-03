@@ -67,6 +67,7 @@ Current handoff status:
 
 Start here for current project context:
 
+- `file-map.md`: one-line backend/frontend file index and symptom lookup
 - `work-computer-handoff.md`: exact 2026-06-16 continuation point and next slice
 - `open-work-backlog.md`: active unfinished work tracker
 - `project-context.md`: current architecture and implementation state
