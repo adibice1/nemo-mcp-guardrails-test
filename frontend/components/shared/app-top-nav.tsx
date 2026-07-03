@@ -1,7 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect } from "react";
 import { usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { getCurrentManagementUser } from "@/lib/api-client";
+import {
+  clearManagementSession,
+  loadManagementSession,
+  updateStoredManagementUser
+} from "@/lib/management-auth";
 import { cn } from "@/lib/utils";
 
 type AppTopNavProps = {
@@ -10,6 +18,7 @@ type AppTopNavProps = {
 
 export function AppTopNav({ active }: AppTopNavProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const activeKey =
     active ??
     (pathname.startsWith("/apps")
@@ -17,6 +26,21 @@ export function AppTopNav({ active }: AppTopNavProps) {
       : pathname.startsWith("/settings")
       ? "settings"
       : "policies");
+
+  useEffect(() => {
+    const session = loadManagementSession();
+    if (!session) {
+      router.replace("/login");
+      return;
+    }
+
+    getCurrentManagementUser(session.access_token)
+      .then(updateStoredManagementUser)
+      .catch(() => {
+        clearManagementSession();
+        router.replace("/login");
+      });
+  }, [router]);
 
   return (
     <header className="mx-auto flex max-w-[1480px] items-center justify-between">

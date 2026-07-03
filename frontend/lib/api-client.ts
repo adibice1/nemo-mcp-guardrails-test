@@ -1,3 +1,9 @@
+import {
+  clearManagementSession,
+  loadManagementSession
+} from "@/lib/management-auth";
+
+
 const rawApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
 export const apiBaseUrl = rawApiBaseUrl.replace(/\/$/, "");
@@ -5,6 +11,20 @@ export const apiBaseUrl = rawApiBaseUrl.replace(/\/$/, "");
 export function hasApiBaseUrl() {
   return apiBaseUrl.length > 0;
 }
+
+export type ManagementUser = {
+  id: number;
+  email: string;
+  name: string;
+  username: string;
+  system_role: "developer" | "admin";
+};
+
+export type ManagementSession = {
+  access_token: string;
+  token_type: "bearer";
+  user: ManagementUser;
+};
 
 export type ClientApp = {
   id: number;
@@ -28,6 +48,24 @@ export type AppCreatePayload = {
 };
 
 export type AppUpdatePayload = Partial<AppCreatePayload>;
+
+export type LlmConfig = {
+  id: number;
+  name: string;
+  provider: string;
+  model_name: string;
+  endpoint: string | null;
+  enabled: boolean;
+};
+
+export type LlmConfigCreatePayload = {
+  name: string;
+  provider: "azure" | "azure_openai";
+  model_name: string;
+  endpoint: string | null;
+  credential_reference: string | null;
+  enabled: boolean;
+};
 
 export type AppConnector = {
   id: number;
@@ -166,17 +204,23 @@ async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error("NEXT_PUBLIC_API_BASE_URL is not configured.");
   }
 
+  const headers = new Headers(init?.headers);
+  if (!headers.has("Accept")) headers.set("Accept", "application/json");
+  if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+
+  const session = loadManagementSession();
+  if (session && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${session.access_token}`);
+  }
+
   const response = await fetch(`${apiBaseUrl}${path}`, {
     ...init,
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      ...init?.headers
-    },
+    headers,
     cache: "no-store"
   });
 
   if (!response.ok) {
+    if (response.status === 401) clearManagementSession();
     const body = (await response.json().catch(() => null)) as {
       detail?: string | { code?: string; policy_id?: number };
     } | null;
@@ -193,6 +237,37 @@ async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   return response.status === 204
     ? (undefined as T)
     : ((await response.json()) as T);
+}
+
+export function signupManagementUser(email: string, password: string) {
+  return apiRequest<ManagementSession>("/management-auth/signup", {
+    method: "POST",
+    body: JSON.stringify({ email, password })
+  });
+}
+
+export function loginManagementUser(email: string, password: string) {
+  return apiRequest<ManagementSession>("/management-auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password })
+  });
+}
+
+export function getCurrentManagementUser(token: string) {
+  return apiRequest<ManagementUser>("/management-auth/me", {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+export function updateCurrentManagementUser(
+  token: string,
+  profile: { name: string; username: string }
+) {
+  return apiRequest<ManagementUser>("/management-auth/me", {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(profile)
+  });
 }
 
 export function listApps() {
@@ -221,6 +296,17 @@ export function updateApp(appId: number, payload: AppUpdatePayload) {
 
 export function deleteApp(appId: number) {
   return apiRequest<void>(`/apps/${appId}`, { method: "DELETE" });
+}
+
+export function listLlmConfigs() {
+  return apiRequest<LlmConfig[]>("/llm-configs");
+}
+
+export function createLlmConfig(payload: LlmConfigCreatePayload) {
+  return apiRequest<LlmConfig>("/llm-configs", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
 }
 
 export function listAppConnectors(clientId: string) {

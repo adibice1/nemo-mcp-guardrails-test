@@ -1,6 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  getCurrentManagementUser,
+  updateCurrentManagementUser
+} from "@/lib/api-client";
+import {
+  clearManagementSession,
+  loadManagementSession,
+  updateStoredManagementUser
+} from "@/lib/management-auth";
 import { cn } from "@/lib/utils";
 
 type SettingsState = {
@@ -24,22 +34,46 @@ const initialSettings: SettingsState = {
 };
 
 const initialProfile: ProfileState = {
-  name: "Peter Griffin",
-  username: "Peterdactyl2015",
-  email: "hello@designdrops.io"
+  name: "",
+  username: "",
+  email: ""
 };
 
 export function SettingsForm() {
+  const router = useRouter();
   const [settings, setSettings] = useState<SettingsState>(initialSettings);
   const [profile, setProfile] = useState<ProfileState>(initialProfile);
+  const [accessToken, setAccessToken] = useState("");
   const [dirty, setDirty] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const darkMode = window.localStorage.getItem("gms:theme") === "dark";
     setSettings((current) => ({ ...current, darkMode }));
     document.documentElement.classList.toggle("dark", darkMode);
-  }, []);
+
+    const session = loadManagementSession();
+    if (!session) {
+      router.replace("/login");
+      return;
+    }
+    setAccessToken(session.access_token);
+    getCurrentManagementUser(session.access_token)
+      .then((user) => {
+        setProfile({
+          name: user.name,
+          username: user.username,
+          email: user.email
+        });
+        updateStoredManagementUser(user);
+      })
+      .catch(() => {
+        clearManagementSession();
+        router.replace("/login");
+      });
+  }, [router]);
 
   function toggleSetting(key: keyof SettingsState) {
     setSettings((current) => ({
@@ -59,13 +93,38 @@ export function SettingsForm() {
     setSaved(false);
   }
 
-  function handleSave() {
-    window.localStorage.setItem(
-      "gms:theme",
-      settings.darkMode ? "dark" : "light"
-    );
-    setDirty(false);
-    setSaved(true);
+  async function handleSave() {
+    if (!accessToken || saving || !profile.name.trim() || !profile.username.trim()) {
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+    try {
+      const user = await updateCurrentManagementUser(accessToken, {
+        name: profile.name.trim(),
+        username: profile.username.trim()
+      });
+      updateStoredManagementUser(user);
+      setProfile({ name: user.name, username: user.username, email: user.email });
+      window.localStorage.setItem(
+        "gms:theme",
+        settings.darkMode ? "dark" : "light"
+      );
+      setDirty(false);
+      setSaved(true);
+    } catch (saveError) {
+      setError(
+        saveError instanceof Error ? saveError.message : "Could not save settings."
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function handleLogout() {
+    clearManagementSession();
+    router.replace("/login");
   }
 
   function toggleDarkMode() {
@@ -83,11 +142,11 @@ export function SettingsForm() {
             ? "bg-gms-blue text-white shadow-button"
             : "bg-[#dedede] text-[#777b85] dark:bg-[#30343e] dark:text-[#777f91]"
         )}
-        disabled={!dirty}
+        disabled={!dirty || saving || !profile.name.trim() || !profile.username.trim()}
         type="button"
         onClick={handleSave}
       >
-        {saved ? "Saved" : "Save Changes"}
+        {saving ? "Saving" : saved ? "Saved" : "Save Changes"}
       </button>
 
       <h1 className="text-[26px] font-extrabold text-gms-text">Account</h1>
@@ -123,20 +182,24 @@ export function SettingsForm() {
             onChange={(value) => updateProfile("username", value)}
           />
           <SettingsInput
+            disabled
             label="Email"
             value={profile.email}
-            onChange={(value) => updateProfile("email", value)}
           />
 
           <div className="-mt-6 grid grid-cols-[160px_1fr] items-center gap-10">
             <span />
-            <p className="whitespace-nowrap text-base text-[#ff4141]">
-              Email not verified.{" "}
-              <a className="underline" href="#">
-                Verify now
-              </a>
+            <p className="whitespace-nowrap text-sm text-gms-muted">
+              Email changes and verification are not available yet.
             </p>
           </div>
+
+          {error && (
+            <div className="grid grid-cols-[160px_1fr] gap-10">
+              <span />
+              <p className="text-sm font-semibold text-gms-danger">{error}</p>
+            </div>
+          )}
 
           <SettingsToggle
             enabled={settings.darkMode}
@@ -160,7 +223,11 @@ export function SettingsForm() {
           />
 
           <div className="ml-[200px] space-y-8 pt-2 text-sm font-extrabold uppercase tracking-widest">
-            <button className="block text-[#b8b8b8]" type="button">
+            <button
+              className="block text-[#b8b8b8] hover:text-gms-blue"
+              type="button"
+              onClick={handleLogout}
+            >
               Logout
             </button>
             <button className="block text-[#b8b8b8]" type="button">
@@ -186,21 +253,24 @@ export function SettingsForm() {
 }
 
 function SettingsInput({
+  disabled = false,
   label,
   value,
   onChange
 }: {
+  disabled?: boolean;
   label: string;
   value: string;
-  onChange: (value: string) => void;
+  onChange?: (value: string) => void;
 }) {
   return (
     <label className="grid grid-cols-[160px_1fr] items-center gap-10">
       <span className="text-right text-sm font-extrabold">{label}</span>
       <input
-        className="h-12 max-w-[390px] rounded-2xl border border-[#dddddd] bg-[#f7f7f7] px-3 text-xl text-[#545454] outline-none dark:border-gms-line dark:bg-[#252932] dark:text-gms-text"
+        className="h-12 max-w-[390px] rounded-2xl border border-[#dddddd] bg-[#f7f7f7] px-3 text-xl text-[#545454] outline-none disabled:cursor-not-allowed disabled:opacity-70 dark:border-gms-line dark:bg-[#252932] dark:text-gms-text"
+        disabled={disabled}
         value={value}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={(event) => onChange?.(event.target.value)}
       />
     </label>
   );

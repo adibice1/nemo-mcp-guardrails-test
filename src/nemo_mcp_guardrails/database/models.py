@@ -33,7 +33,18 @@ class UserRecord(Base):
         unique=True,
         index=True,
     )
+    name: Mapped[str] = mapped_column(String(320))
+    username: Mapped[str] = mapped_column(
+        String(320),
+        unique=True,
+        index=True,
+    )
     password_hash: Mapped[str] = mapped_column(String(255))
+    system_role: Mapped[str] = mapped_column(
+        String(20),
+        default="developer",
+        server_default="developer",
+    )
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

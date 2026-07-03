@@ -432,6 +432,13 @@ The `users`, `apps`, `app_users`, `connectors`, and `app_connectors`
 foundation now exists. The credential output policy is globally assigned;
 GitHub write policies are currently unassigned.
 
+Management CRUD now requires JWT authentication. Developers see only apps
+linked through `app_users`; new apps link only their creator as owner. App
+owner/admin links can mutate, viewers are read-only, and system admins can
+access every app. Global policy mutation and guardrail-LLM selection are
+system-admin-only. The existing pre-RBAC demo users/apps are linked by the
+idempotent `scripts/backfill_existing_app_users.py` script.
+
 Assignment management APIs exist. `policy_loader.py`, `prompt_rule_loader.py`,
 and `build_rails_config_with_prompt_rules()` now accept an optional app ID.
 With an app ID, they load enabled global assignments plus enabled assignments

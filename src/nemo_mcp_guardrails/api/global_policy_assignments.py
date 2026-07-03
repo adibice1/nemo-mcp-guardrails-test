@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from nemo_mcp_guardrails.api.assignment_serializers import (
     serialize_global_policy_assignment,
 )
+from nemo_mcp_guardrails.api.management_auth import require_management_user
 from nemo_mcp_guardrails.api.app_schemas import (
     GlobalPolicyAssignmentRead,
     PolicyAssignmentBulkDelete,
@@ -19,11 +20,13 @@ from nemo_mcp_guardrails.database.models import (
     GlobalPolicyAssignmentRecord,
     PolicyRecord,
 )
+from nemo_mcp_guardrails.management_permissions import require_system_admin
 
 
 router = APIRouter(
     prefix="/global-policy-assignments",
     tags=["global-policy-assignments"],
+    dependencies=[Depends(require_management_user)],
 )
 
 
@@ -98,6 +101,7 @@ def _require_global_assignments_by_policy_ids(
     "",
     response_model=list[GlobalPolicyAssignmentRead],
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_system_admin)],
 )
 def create_global_policy_assignment(
     payload: PolicyAssignmentCreate,
@@ -151,6 +155,7 @@ def create_global_policy_assignment(
 @router.put(
     "",
     response_model=list[GlobalPolicyAssignmentRead],
+    dependencies=[Depends(require_system_admin)],
 )
 def bulk_update_global_policy_assignments(
     payload: PolicyAssignmentBulkUpdate,
@@ -177,6 +182,7 @@ def bulk_update_global_policy_assignments(
 @router.delete(
     "",
     response_model=PolicyAssignmentBulkDeleteResponse,
+    dependencies=[Depends(require_system_admin)],
 )
 def bulk_delete_global_policy_assignments(
     payload: PolicyAssignmentBulkDelete,
@@ -205,6 +211,7 @@ def bulk_delete_global_policy_assignments(
 @router.put(
     "/{assignment_id}",
     response_model=GlobalPolicyAssignmentRead,
+    dependencies=[Depends(require_system_admin)],
 )
 def update_global_policy_assignment(
     assignment_id: int,
@@ -226,7 +233,11 @@ def update_global_policy_assignment(
     return serialize_global_policy_assignment(assignment)
 
 
-@router.delete("/{assignment_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{assignment_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_system_admin)],
+)
 def delete_global_policy_assignment(
     assignment_id: int,
     db: Session = Depends(get_db),

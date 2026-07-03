@@ -131,7 +131,22 @@ Blocked actions:
 - `tests/test_runtime_connector_access.py` proves linked apps can use the enabled GitHub connector and unlinked or disabled-link apps are rejected before MCP construction.
 - `tests/test_app_connector_api.py` proves app connector CRUD, connector lookup by name or ID, upsert behavior, and missing-link errors.
 - `tests/test_runtime_connector_credentials.py` proves default PAT fallback, app-specific `env:VAR_NAME` credential references, missing env vars, and unsupported reference schemes.
-- The management/admin CRUD endpoints are not authenticated yet. Do not describe the current HTTP dependency as protecting `/apps`, `/policies`, or assignment CRUD.
+- Management CRUD now requires the management JWT. `/apps` is filtered through
+  `app_users`; app owners/app admins can mutate their linked apps, viewers are
+  read-only, and system admins can access every app. Global assignments, direct
+  policy mutations/compilation, and allowed-test mutations are system-admin-only.
+- Management identity endpoints now exist at `/management-auth/signup`,
+  `/management-auth/login`, and `/management-auth/me`. Passwords use salted
+  scrypt hashes and JWTs require `GMS_JWT_SECRET`; signup can create developers
+  only. `require_management_user` authenticates management CRUD and
+  `management_permissions.py` enforces app membership and administrator roles.
+- `users.name` and unique `users.username` are added by
+  `scripts/migrate_management_auth.py` and backfilled from email. Authenticated
+  Settings updates them through `PUT /management-auth/me`; email remains
+  read-only and Logout clears the frontend session.
+- New apps create their creator's `app_users` owner link in the same
+  transaction. `scripts/backfill_existing_app_users.py` idempotently links the
+  current pre-RBAC demo users and apps.
 - Normal full-run GitHub MCP tests should keep `GITHUB_MCP_READ_ONLY=1`. Manual local write testing can set `GITHUB_MCP_READ_ONLY=0` in `.env` and restart the API. Future write-capable scripted testing should be a separate opt-in harness with a throwaway repo and limited token.
 - Do not add a custom `config/policies.yml` yet unless explicitly choosing to prototype the future admin/backend policy store. It is not a standard NeMo Guardrails file.
 
@@ -222,6 +237,10 @@ Useful verification commands for the current state:
 - `python tests/test_app_connector_api.py`
 - `python tests/test_runtime_connector_credentials.py`
 - `python tests/test_runtime_llm_selection.py`
+- `python scripts/migrate_management_auth.py`
+- `python tests/test_management_auth_http.py`
+- `python scripts/backfill_existing_app_users.py`
+- `python tests/test_management_rbac_http.py`
 - `python scripts/debug_nemo_output_check.py`
 - `python scripts/run_api.py`
 - `python -m py_compile src/nemo_mcp_guardrails/app_auth.py src/nemo_mcp_guardrails/guarded_execution.py src/nemo_mcp_guardrails/runtime_factory.py src/nemo_mcp_guardrails/api/app_schemas.py src/nemo_mcp_guardrails/api/apps.py src/nemo_mcp_guardrails/api/assignment_serializers.py src/nemo_mcp_guardrails/api/auth.py src/nemo_mcp_guardrails/api/runtime.py src/nemo_mcp_guardrails/api/runtime_schemas.py src/nemo_mcp_guardrails/policy_compiler.py src/nemo_mcp_guardrails/policy_rule_service.py src/nemo_mcp_guardrails/tool_guard.py src/nemo_mcp_guardrails/database/models.py src/nemo_mcp_guardrails/database/conversation_store.py src/nemo_mcp_guardrails/database/policy_loader.py src/nemo_mcp_guardrails/database/test_case_loader.py src/nemo_mcp_guardrails/database/prompt_rule_loader.py src/nemo_mcp_guardrails/prompt_rule_compiler.py scripts/seed_normalized_policy_metadata.py tests/test_nemo_mcp.py tests/test_tool_guard.py tests/test_policy_loader.py tests/test_app_policy_scope.py tests/test_app_auth.py tests/test_app_auth_http.py tests/test_policy_auto_compile.py tests/test_guardrails_run_http.py tests/test_runtime_connector_access.py tests/test_app_connector_api.py tests/test_runtime_connector_credentials.py tests/test_runtime_llm_selection.py scripts/debug_nemo_self_check.py scripts/debug_nemo_output_check.py`

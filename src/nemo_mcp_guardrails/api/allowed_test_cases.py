@@ -7,15 +7,21 @@ from nemo_mcp_guardrails.api.policy_schemas import (
     AllowedTestCaseRead,
     AllowedTestCaseUpdate,
 )
+from nemo_mcp_guardrails.api.management_auth import require_management_user
 from nemo_mcp_guardrails.database.connection import get_db
 from nemo_mcp_guardrails.database.models import (
     AllowedTestCaseExpectedToolRecord,
     AllowedTestCaseRecord,
     ConnectorToolMappingRecord,
 )
+from nemo_mcp_guardrails.management_permissions import require_system_admin
 
 
-router = APIRouter(prefix="/allowed-test-cases", tags=["allowed-test-cases"])
+router = APIRouter(
+    prefix="/allowed-test-cases",
+    tags=["allowed-test-cases"],
+    dependencies=[Depends(require_management_user)],
+)
 
 
 EXPECTED_TOOL_OPTIONS = (
@@ -121,6 +127,7 @@ def get_allowed_test_case(
     "",
     response_model=AllowedTestCaseRead,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_system_admin)],
 )
 def create_allowed_test_case(
     payload: AllowedTestCaseCreate,
@@ -140,7 +147,11 @@ def create_allowed_test_case(
     )
 
 
-@router.put("/{test_case_id}", response_model=AllowedTestCaseRead)
+@router.put(
+    "/{test_case_id}",
+    response_model=AllowedTestCaseRead,
+    dependencies=[Depends(require_system_admin)],
+)
 def update_allowed_test_case(
     test_case_id: int,
     payload: AllowedTestCaseUpdate,
@@ -176,7 +187,11 @@ def update_allowed_test_case(
     )
 
 
-@router.delete("/{test_case_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{test_case_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_system_admin)],
+)
 def delete_allowed_test_case(
     test_case_id: int,
     db: Session = Depends(get_db),

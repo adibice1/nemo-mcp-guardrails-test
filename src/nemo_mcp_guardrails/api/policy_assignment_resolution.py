@@ -13,6 +13,10 @@ from nemo_mcp_guardrails.database.models import (
     GlobalPolicyAssignmentRecord,
 )
 from nemo_mcp_guardrails.policy_service import resolve_or_create_policy
+from nemo_mcp_guardrails.management_permissions import (
+    require_app_route_access,
+    require_system_admin,
+)
 
 
 router = APIRouter(tags=["policy-assignment-resolution"])
@@ -40,6 +44,7 @@ def _resolution_response(
 @router.post(
     "/apps/by-client-id/{client_id}/policy-assignments/resolve",
     response_model=PolicyAssignmentResolutionRead,
+    dependencies=[Depends(require_app_route_access)],
 )
 def resolve_app_policy_assignment(
     client_id: str,
@@ -124,6 +129,7 @@ def resolve_app_policy_assignment(
 @router.post(
     "/global-policy-assignments/resolve",
     response_model=PolicyAssignmentResolutionRead,
+    dependencies=[Depends(require_system_admin)],
 )
 def resolve_global_policy_assignment(
     payload: PolicyAssignmentResolutionCreate,
@@ -180,6 +186,7 @@ def resolve_global_policy_assignment(
 @router.put(
     "/apps/by-client-id/{client_id}/policy-assignments/{assignment_id}/resolve",
     response_model=PolicyAssignmentResolutionRead,
+    dependencies=[Depends(require_app_route_access)],
 )
 def edit_app_policy_assignment(
     client_id: str,
@@ -266,6 +273,7 @@ def edit_app_policy_assignment(
 @router.put(
     "/global-policy-assignments/{assignment_id}/resolve",
     response_model=PolicyAssignmentResolutionRead,
+    dependencies=[Depends(require_system_admin)],
 )
 def edit_global_policy_assignment(
     assignment_id: int,

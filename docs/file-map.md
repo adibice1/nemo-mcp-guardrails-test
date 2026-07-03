@@ -29,6 +29,8 @@ excluded.
 
 - `src/nemo_mcp_guardrails/__init__.py` - Marks `nemo_mcp_guardrails` as an importable Python package.
 - `src/nemo_mcp_guardrails/app_auth.py` - Hashes app API keys and authenticates authorized client-ID/API-key pairs.
+- `src/nemo_mcp_guardrails/management_auth.py` - Hashes management passwords and creates/verifies signed JWT access tokens.
+- `src/nemo_mcp_guardrails/management_permissions.py` - Enforces system-admin roles and app membership/write roles across management routes.
 - `src/nemo_mcp_guardrails/guarded_execution.py` - Runs input rails, the agent and guarded tools, output rails, and structured Azure/GMS status handling.
 - `src/nemo_mcp_guardrails/output_guard.py` - Applies deterministic checks for explicit restricted phrases in generated output.
 - `src/nemo_mcp_guardrails/policy_compiler.py` - Converts structured input/output policy objects into NeMo rules, tool restrictions, and generated tests.
@@ -45,8 +47,11 @@ excluded.
 - `src/nemo_mcp_guardrails/api/__init__.py` - Marks the FastAPI module directory as a Python package.
 - `src/nemo_mcp_guardrails/api/main.py` - Creates FastAPI, configures CORS/lifespan, mounts routers, and exposes health endpoints.
 - `src/nemo_mcp_guardrails/api/auth.py` - Reads runtime auth headers and rejects invalid app credentials before runtime work.
+- `src/nemo_mcp_guardrails/api/management_auth.py` - Implements management signup, login, current-user identity, and bearer-token validation.
+- `src/nemo_mcp_guardrails/api/management_auth_schemas.py` - Defines management authentication request, user, and token response schemas.
 - `src/nemo_mcp_guardrails/api/runtime.py` - Implements authenticated auth-check/run endpoints, history trimming/storage, and runtime response assembly.
 - `src/nemo_mcp_guardrails/api/runtime_schemas.py` - Defines runtime conversation, request, and response Pydantic models.
+- `src/nemo_mcp_guardrails/api/llm_configs.py` - Lists and creates Azure LLM configuration metadata without exposing credential references.
 - `src/nemo_mcp_guardrails/api/policies.py` - Implements reusable policy CRUD, compile preview, and compiled-rule refresh endpoints.
 - `src/nemo_mcp_guardrails/api/policy_schemas.py` - Defines policy, assignment-resolution, metadata, test-case, and compile-response schemas.
 - `src/nemo_mcp_guardrails/api/policy_metadata.py` - Returns valid connector/action/resource combinations for cascading policy dropdowns.
@@ -87,18 +92,20 @@ excluded.
 - `frontend/components/policies/create-policy-modal.tsx` - Implements the input/output policy builder and cascading dropdown UI.
 - `frontend/components/policies/policy-table.tsx` - Renders sortable policy rows, connector icons, hover actions, and pagination controls.
 - `frontend/components/policies/policy-summary-modal.tsx` - Fetches and displays a readable summary of one reusable policy.
-- `frontend/components/settings/settings-form.tsx` - Manages profile fields, toggles, dirty state, saving, and dark-mode preview.
+- `frontend/components/settings/settings-form.tsx` - Loads/saves the authenticated profile, handles logout, and manages local theme/toggles.
 - `frontend/components/apps/app-table.tsx` - Renders the app list with navigation and row actions.
 - `frontend/components/apps/create-app-modal.tsx` - Collects a new app's identity and one-time API key.
+- `frontend/components/apps/create-llm-config-modal.tsx` - Collects Azure deployment metadata and an optional backend environment-variable reference.
 - `frontend/components/apps/app-overview.tsx` - Displays and edits core app details.
 - `frontend/components/apps/app-connectors.tsx` - Lists and manages an app's connector links and credential references.
-- `frontend/components/apps/app-llm-settings.tsx` - Edits the app's main and guardrail LLM configuration IDs.
+- `frontend/components/apps/app-llm-settings.tsx` - Creates and selects named main-agent and guardrail LLM configurations for an app.
 - `frontend/components/apps/app-policy-summary.tsx` - Lists the app's effective global and app-specific policy assignments.
 - `frontend/components/apps/app-runtime-test.tsx` - Sends authenticated runtime requests and displays rail/tool/history results.
 
 ## Frontend Data And Configuration
 
 - `frontend/lib/api-client.ts` - Defines frontend API types and all fetch calls to FastAPI.
+- `frontend/lib/management-auth.ts` - Saves, restores, and clears prototype management sessions in browser storage.
 - `frontend/lib/mock-data.ts` - Supplies fallback policies/options for static demos without a backend URL.
 - `frontend/lib/utils.ts` - Provides Tailwind class merging and policy date formatting helpers.
 - `frontend/next.config.js` - Configures Next.js behavior for the frontend project.
@@ -119,11 +126,14 @@ excluded.
 - `.env.example` - Documents backend environment variables without storing real secrets.
 - `docker-compose.yml` - Starts the local Postgres and pgAdmin services.
 - `scripts/run_api.py` - Starts the FastAPI/Uvicorn development server.
+- `scripts/migrate_management_auth.py` - Adds the system-wide developer/admin role to existing user tables.
+- `scripts/backfill_existing_app_users.py` - Idempotently links every existing demo user to every pre-RBAC app as an owner.
 - `AGENTS.md` - Stores project terminology, current architecture, safety rules, and agent handoff instructions.
 
 ## Tests, Scripts, And Deeper Explanations
 
 - Use `docs/testing-notes.md` for test/debug scripts and their commands.
+- `tests/test_management_rbac_http.py` proves creator ownership, developer isolation, and system-admin overrides.
 - Use `docs/policy-schema-design.md` for schema and migration details.
 - Use `docs/runtime-flow-map.md` when one-line descriptions are not enough and function-level execution order is needed.
 - Use `docs/troubleshooting.md` for known local setup, Postgres, DBeaver, NeMo, and GitHub MCP failures.

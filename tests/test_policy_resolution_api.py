@@ -6,6 +6,7 @@ bootstrap_src()
 
 from fastapi.testclient import TestClient
 from sqlalchemy import select
+from _management_auth import install_management_admin_override
 
 from nemo_mcp_guardrails.api.main import app
 from nemo_mcp_guardrails.app_auth import hash_api_key
@@ -86,6 +87,7 @@ def count_policy_assignments(app_id: int, policy_id: int) -> int:
 def main() -> None:
     """Verify equivalent policies are reused and app deletion only unassigns."""
 
+    install_management_admin_override()
     suffix = uuid4().hex
     condition_value = f"resolution-test-{suffix}"
     app_a_id, client_a, app_b_id, client_b = create_temporary_apps(suffix)

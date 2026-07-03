@@ -428,7 +428,8 @@ Recommended incremental slice:
 3. Read docs/frontend-demo-flow.md.
 4. Add admin-only reusable-definition deletion safeguards.
 5. Add a readable LLM-config catalogue endpoint and named selectors.
-6. Add management-user authentication, ownership filtering and role-aware nav.
+6. Completed: management JWT authentication, ownership filtering, and
+   role-aware policy/LLM controls.
 7. Keep User Management and Logs as admin-only post-presentation slices.
 ```
 
@@ -437,8 +438,8 @@ endpoint testing to the normal harness.
 
 ## Boundaries Not Yet Implemented
 
-- Admin CRUD endpoints are not authenticated.
-- User login and role authorization are not implemented.
+- User/admin management screens for assigning system and app roles are not
+  implemented.
 - Connector credentials and LLM credentials are not managed through a secrets
   manager yet.
 - Argument-level and workflow-state policies are not implemented.

@@ -6,6 +6,7 @@ bootstrap_src()
 
 from fastapi.testclient import TestClient
 from sqlalchemy import select
+from _management_auth import install_management_admin_override
 
 from nemo_mcp_guardrails.api.main import app
 from nemo_mcp_guardrails.app_auth import hash_api_key
@@ -108,6 +109,7 @@ def count_global_assignments(policy_ids: list[int]) -> int:
 def main() -> None:
     """Verify assignment APIs support single/bulk upserts and labels."""
 
+    install_management_admin_override()
     app_id, client_id, policy_ids = create_temporary_records()
 
     try:

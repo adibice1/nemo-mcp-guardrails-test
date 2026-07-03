@@ -6,6 +6,7 @@ bootstrap_src()
 
 from fastapi.testclient import TestClient
 from sqlalchemy import select
+from _management_auth import install_management_admin_override
 
 from nemo_mcp_guardrails.api.main import app
 from nemo_mcp_guardrails.app_auth import hash_api_key
@@ -79,6 +80,7 @@ def count_app_connector_links(app_id: int) -> int:
 def main() -> None:
     """Verify app connector management APIs."""
 
+    install_management_admin_override()
     seed_normalized_metadata()
     app_id, client_id = create_temporary_app()
 

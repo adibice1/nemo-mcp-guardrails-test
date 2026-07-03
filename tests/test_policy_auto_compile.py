@@ -6,6 +6,7 @@ bootstrap_src()
 
 from fastapi.testclient import TestClient
 from sqlalchemy import select
+from _management_auth import install_management_admin_override
 
 from nemo_mcp_guardrails.api.main import app
 from nemo_mcp_guardrails.database.connection import SessionLocal
@@ -98,6 +99,7 @@ def delete_global_connector_if_created(created: bool, connector_id: int) -> None
 def main() -> None:
     """Verify policy CRUD automatically refreshes compiled rail rules."""
 
+    install_management_admin_override()
     connector_id, created_connector = ensure_global_connector()
     suffix = uuid4().hex
     policy_id: int | None = None

@@ -183,11 +183,16 @@ response.
 ### users
 
 Developers or administrators who log into the Next.js management webapp.
+Existing profile names and usernames initially default to the user's email and
+can be changed later through authenticated Settings.
 
 ```text
 id
 email
+name
+username
 password_hash
+system_role
 enabled
 created_at
 updated_at
@@ -230,8 +235,14 @@ admin
 viewer
 ```
 
-Current implementation status: created. The relationship defaults to `viewer`
-until role-management endpoints and validation are implemented.
+Current implementation status: active. New apps create an `owner` link for
+their authenticated creator in the same transaction. App owners/admins may
+mutate, viewers are read-only, and system admins bypass app membership.
+Role-management endpoints are still future work.
+
+Management identities now also have a system-wide `developer` or `admin` role.
+Signup always creates a developer; administrator promotion remains an explicit
+database/administrative operation until user-management APIs are added.
 
 ### connectors
 
@@ -313,6 +324,10 @@ apps        -> created
 connectors  -> migrated from the former connector-shaped apps table
 ```
 
+The prototype now lists and creates Azure-compatible `llm_configs` through the
+API. Credential references are limited to backend `env:VARIABLE_NAME` values;
+raw LLM keys are never accepted by or returned to the frontend.
+
 The former temporary `client_apps` table is now the target `apps` table.
 
 The additive foundation schema is created by:
@@ -322,9 +337,9 @@ python scripts/migrate_client_app_foundation.py
 ```
 
 It initially created empty tables. App CRUD, API-key hashing, reusable app
-authentication, and the first protected runtime proof endpoint are now
-implemented. User login, API-key issuance/rotation workflows, and LLM
-credential management are not implemented yet.
+authentication, management email/password login, and protected runtime proof
+endpoints are now implemented. Management CRUD authorization, API-key rotation,
+and production secrets-manager integration remain unfinished.
 
 Current credential-storage decisions:
 

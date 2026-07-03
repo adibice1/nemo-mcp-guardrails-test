@@ -8,12 +8,24 @@ across machines or Codex sessions.
 The GMS backend prototype now has these core runtime pieces:
 
 - App authentication for runtime endpoints with `X-App-ID` and `X-API-Key`.
+- Management signup/login and `/management-auth/me` now use scrypt password
+  hashes and signed JWT bearer tokens. New accounts always receive the
+  system-wide `developer` role.
+- Existing users receive `name` and unique `username` values backfilled from
+  email. Settings loads the authenticated profile, saves those fields through
+  `PUT /management-auth/me`, and Logout returns to the real Login page.
 - App-scoped global plus app-specific policy assignment loading.
 - DB-backed compiled prompt rules injected into NeMo prompt templates.
 - App-scoped blocked GitHub MCP tool names.
 - Authenticated `POST /v1/guardrails/run`.
 - Postgres-backed conversation history with request-size trimming.
 - Separate app-selected LLM configs for guardrail rails and the main agent.
+- `GET /llm-configs` exposes readable configuration metadata without credential
+  references, and the app LLM tab uses named selectors instead of numeric IDs.
+- `POST /llm-configs` creates Azure-compatible configuration metadata with an
+  optional `env:VARIABLE_NAME` credential reference. The runtime resolves that
+  reference per selected main/guardrail model and otherwise uses the shared
+  `AZURE_OPENAI_API_KEY` fallback.
 - Controlled runtime responses for connector tool errors and Azure output
   content-filter failures.
 - App-scoped deterministic checks for explicit quoted output prohibitions such
@@ -220,6 +232,10 @@ Current state:
 
 - `main_llm_config_id` and `guardrail_llm_config_id` are respected.
 - Azure OpenAI-compatible provider rows are executable.
+- The app LLM tab can create Azure configuration metadata and select it by
+  readable name; raw keys never pass through the browser or API.
+- Selected LLM configurations can resolve distinct `env:VARIABLE_NAME` API
+  keys at runtime.
 - Non-Azure providers such as Gemini return a clear unsupported-provider error.
 
 Needed:
@@ -256,15 +272,18 @@ Needed:
 
 Current state:
 
-- Runtime endpoints are authenticated.
-- Management CRUD endpoints under `/apps`, `/policies`, assignments, and
-  allowed tests are not authenticated yet.
+- Completed. Management CRUD requires JWT authentication.
+- App reads/writes are filtered through `app_users`; owner/admin links can
+  mutate, viewers are read-only, and system admins bypass app membership.
+- New apps atomically link only their authenticated creator as owner.
+- Global assignments, direct policy mutation/compilation, and allowed-test
+  mutation are restricted to system admins.
+- The frontend automatically sends its saved JWT and hides or disables
+  admin-only global-policy and guardrail-LLM controls for developers.
 
-Needed:
+Follow-up:
 
-- Add user login/session or token authentication.
-- Add role checks for developer app owners versus admins.
-- Restrict global policy management to admins.
+- Add user/admin management screens for changing system and app roles.
 
 ## Later Backend Work
 
@@ -333,10 +352,9 @@ Next implementation slice:
 
 - Add protected admin-only policy-definition deletion with assigned-policy
   checks and explicit force-delete behavior.
-- Add a readable LLM-config catalogue endpoint so the app LLM tab can replace
-  numeric IDs with named model choices.
-- Add real management-user authentication and ownership filtering before
-  treating `/apps` and policy CRUD as production multi-user boundaries.
+- Add LLM configuration update/delete and ownership controls after the
+  organization confirms its provider-administration workflow.
+- Add user/admin management screens for assigning app roles.
 
 ### 11. Audit, Analytics, And Caching
 

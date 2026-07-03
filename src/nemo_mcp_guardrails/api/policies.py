@@ -11,6 +11,7 @@ from nemo_mcp_guardrails.api.policy_schemas import (
     PolicyRead,
     PolicyUpdate,
 )
+from nemo_mcp_guardrails.api.management_auth import require_management_user
 from nemo_mcp_guardrails.database.connection import get_db
 from nemo_mcp_guardrails.database.models import (
     CompiledPolicyRuleRecord,
@@ -30,9 +31,14 @@ from nemo_mcp_guardrails.policy_service import (
     find_equivalent_policy,
     resolve_policy_references,
 )
+from nemo_mcp_guardrails.management_permissions import require_system_admin
 
 
-router = APIRouter(prefix="/policies", tags=["policies"])
+router = APIRouter(
+    prefix="/policies",
+    tags=["policies"],
+    dependencies=[Depends(require_management_user)],
+)
 
 
 @router.get("", response_model=list[PolicyRead])
@@ -42,7 +48,11 @@ def list_policies(db: Session = Depends(get_db)) -> list[PolicyRecord]:
     return list(db.scalars(select(PolicyRecord).order_by(PolicyRecord.id)))
 
 
-@router.post("/compile-preview", response_model=CompilePreviewResponse)
+@router.post(
+    "/compile-preview",
+    response_model=CompilePreviewResponse,
+    dependencies=[Depends(require_system_admin)],
+)
 def compile_policy_preview(db: Session = Depends(get_db)) -> CompilePreviewResponse:
     """Preview compiler artifacts generated from enabled policy rows."""
 
@@ -102,7 +112,11 @@ def list_compiled_policy_rules(
     )
 
 
-@router.post("/compile-rules", response_model=CompileAndStoreRulesResponse)
+@router.post(
+    "/compile-rules",
+    response_model=CompileAndStoreRulesResponse,
+    dependencies=[Depends(require_system_admin)],
+)
 def compile_and_store_policy_rules(
     db: Session = Depends(get_db),
 ) -> CompileAndStoreRulesResponse:
@@ -138,7 +152,12 @@ def get_policy(policy_id: int, db: Session = Depends(get_db)) -> PolicyRecord:
     return policy
 
 
-@router.post("", response_model=PolicyRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=PolicyRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_system_admin)],
+)
 def create_policy(
     payload: PolicyCreate,
     db: Session = Depends(get_db),
@@ -173,7 +192,11 @@ def create_policy(
     return policy
 
 
-@router.put("/{policy_id}", response_model=PolicyRead)
+@router.put(
+    "/{policy_id}",
+    response_model=PolicyRead,
+    dependencies=[Depends(require_system_admin)],
+)
 def update_policy(
     policy_id: int,
     payload: PolicyUpdate,
@@ -223,7 +246,11 @@ def update_policy(
     return policy
 
 
-@router.delete("/{policy_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{policy_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_system_admin)],
+)
 def delete_policy(policy_id: int, db: Session = Depends(get_db)) -> None:
     """Delete one policy record."""
 

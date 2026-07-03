@@ -34,6 +34,7 @@ import {
   mockPolicyOptions,
   type PolicyRow
 } from "@/lib/mock-data";
+import { loadManagementSession } from "@/lib/management-auth";
 
 const SELECTED_APP_STORAGE_KEY = "gms:selected-app";
 const PAGE_SIZE = 8;
@@ -62,6 +63,7 @@ export default function PoliciesPage() {
   );
   const [apiError, setApiError] = useState("");
   const [notice, setNotice] = useState<Notice | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState<PolicySort>({
@@ -70,6 +72,7 @@ export default function PoliciesPage() {
   });
 
   useEffect(() => {
+    setIsAdmin(loadManagementSession()?.user.system_role === "admin");
     const savedApp = window.localStorage.getItem(SELECTED_APP_STORAGE_KEY);
     if (savedApp !== null) {
       setSelectedApp(savedApp);
@@ -570,7 +573,7 @@ export default function PoliciesPage() {
             ? policyRowToDraft(editingPolicy, policyDefinitions)
             : null
         }
-        isAdmin
+        isAdmin={isAdmin}
         mode={editingPolicy ? "edit" : "create"}
         open={modalOpen}
         policyOptions={policyOptions}

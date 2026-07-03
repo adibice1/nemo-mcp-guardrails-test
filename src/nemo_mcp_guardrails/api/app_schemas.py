@@ -67,6 +67,43 @@ class AppRead(BaseModel):
     updated_at: datetime
 
 
+class LlmConfigRead(BaseModel):
+    """Response body for one selectable LLM configuration."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    provider: str
+    model_name: str
+    endpoint: str | None
+    enabled: bool
+
+
+class LlmConfigCreate(BaseModel):
+    """Request body for creating one Azure-compatible LLM configuration."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "name": "Finance Bot GPT-4o",
+                "provider": "azure_openai",
+                "model_name": "gpt-4o-deployment",
+                "endpoint": "https://example.openai.azure.com",
+                "credential_reference": "env:FINANCE_BOT_AZURE_KEY",
+                "enabled": True,
+            }
+        }
+    )
+
+    name: str = Field(min_length=1, max_length=200)
+    provider: Literal["azure", "azure_openai"] = "azure_openai"
+    model_name: str = Field(min_length=1, max_length=200)
+    endpoint: str | None = Field(default=None, max_length=500)
+    credential_reference: str | None = Field(default=None, max_length=500)
+    enabled: bool = True
+
+
 class AppConnectorCreate(BaseModel):
     """Request body for linking an app to a connector."""
 

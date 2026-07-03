@@ -23,6 +23,13 @@ choose connector
 -> create policy at the top of the list
 ```
 
+`/login` and `/signup` now call the real management-authentication endpoints.
+Passwords are hashed with scrypt in the backend, and the frontend restores the
+signed JWT identity through `/management-auth/me`. Management CRUD authorization
+is the next slice; the current token does not yet restrict app/policy routes.
+Settings loads that identity, keeps email read-only, saves name/username to
+Postgres, and clears the stored session before Logout redirects to `/login`.
+
 Current frontend behavior:
 
 - The selected app is persisted in `localStorage`, so returning from Settings
@@ -83,6 +90,10 @@ creates apps with one-way API-key hashing, deletes apps, and opens a dedicated
 `/apps/[clientId]` management page. App details provide functional Overview,
 Connectors, LLM, Policies, and Runtime Test tabs. GitHub connector management is
 active; SharePoint is visibly deferred until backend/runtime support exists.
+The LLM tab loads `GET /llm-configs` and presents named main-agent and guardrail
+selectors without exposing connector or model credential references. It can
+also create Azure deployment metadata using an optional backend environment
+variable name; the browser never receives or submits the API key itself.
 
 Optional custom-resource text is stored as `conditions.custom_resource`, but
 the current backend compiler does not enforce that condition yet.

@@ -3,6 +3,7 @@ from _bootstrap import bootstrap_src
 bootstrap_src()
 
 from fastapi.testclient import TestClient
+from _management_auth import install_management_admin_override
 
 from nemo_mcp_guardrails.api.main import app
 from seed_normalized_policy_metadata import main as seed_normalized_metadata
@@ -11,6 +12,7 @@ from seed_normalized_policy_metadata import main as seed_normalized_metadata
 def main() -> None:
     """Verify policy options follow enabled database tool mappings."""
 
+    install_management_admin_override()
     seed_normalized_metadata()
     with TestClient(app) as client:
         response = client.get("/policy-options")

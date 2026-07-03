@@ -1,3 +1,5 @@
+import os
+
 from _bootstrap import bootstrap_src
 
 bootstrap_src()
@@ -33,11 +35,27 @@ def main() -> None:
             provider="azure_openai",
             model_name="custom-deployment",
             endpoint=None,
+            credential_reference=None,
             enabled=True,
         ),
         "main agent",
     )
     assert configured_model.deployment_name == "custom-deployment"
+
+    os.environ["APP_SPECIFIC_AZURE_KEY"] = "app-specific-key"
+    referenced_model = build_chat_model(
+        _environment(),
+        RuntimeLlmConfig(
+            name="referenced azure",
+            provider="azure_openai",
+            model_name="referenced-deployment",
+            endpoint="https://referenced.openai.azure.com",
+            credential_reference="env:APP_SPECIFIC_AZURE_KEY",
+            enabled=True,
+        ),
+        "main agent",
+    )
+    assert referenced_model.openai_api_key.get_secret_value() == "app-specific-key"
 
     try:
         build_chat_model(
@@ -47,6 +65,7 @@ def main() -> None:
                 provider="gemini",
                 model_name="gemini-1.5-pro",
                 endpoint=None,
+                credential_reference=None,
                 enabled=True,
             ),
             "main agent",
@@ -64,6 +83,7 @@ def main() -> None:
                 provider="azure_openai",
                 model_name="disabled-deployment",
                 endpoint=None,
+                credential_reference=None,
                 enabled=False,
             ),
             "guardrail",

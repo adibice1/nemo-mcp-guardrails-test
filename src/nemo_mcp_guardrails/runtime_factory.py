@@ -68,6 +68,7 @@ class RuntimeLlmConfig:
     provider: str
     model_name: str
     endpoint: str | None
+    credential_reference: str | None
     enabled: bool
 
 
@@ -101,12 +102,13 @@ class GuardrailsRuntimeParts:
     tool_bundle: McpToolBundle
 
 
-def resolve_connector_credential(
+def resolve_env_credential(
     credential_reference: str | None,
     *,
     default_env_var: str,
+    credential_kind: str,
 ) -> str:
-    """Resolve one connector credential reference into a secret value."""
+    """Resolve an env-based credential reference into a secret value."""
 
     reference = (credential_reference or "").strip()
     if not reference:
@@ -115,17 +117,19 @@ def resolve_connector_credential(
         env_var = reference.removeprefix("env:").strip()
         if not env_var:
             raise RuntimeError(
-                "Connector credential reference env: is missing a variable name"
+                f"{credential_kind} credential reference env: is missing a variable name"
             )
     else:
         raise RuntimeError(
-            "Unsupported connector credential reference: "
+            f"Unsupported {credential_kind} credential reference: "
             f"{credential_reference}. Only env:VAR_NAME is wired in this prototype."
         )
 
     value = os.getenv(env_var)
     if not value:
-        raise RuntimeError(f"Missing connector credential environment value: {env_var}")
+        raise RuntimeError(
+            f"Missing {credential_kind} credential environment value: {env_var}"
+        )
 
     return value
 
@@ -149,9 +153,10 @@ def load_runtime_environment(
         raise RuntimeError("Missing runtime environment values: " + ", ".join(missing))
 
     azure_api_key = values["AZURE_OPENAI_API_KEY"] or ""
-    github_pat = resolve_connector_credential(
+    github_pat = resolve_env_credential(
         github_credential_reference,
         default_env_var="GITHUB_PERSONAL_ACCESS_TOKEN",
+        credential_kind="connector",
     )
     github_mcp_read_only = os.getenv("GITHUB_MCP_READ_ONLY", "1").strip()
     if github_mcp_read_only not in {"0", "1"}:
@@ -221,6 +226,7 @@ def _to_runtime_llm_config(
         provider=config.provider,
         model_name=config.model_name,
         endpoint=config.endpoint,
+        credential_reference=config.credential_reference,
         enabled=config.enabled,
     )
 
@@ -257,6 +263,7 @@ def build_chat_model(
     if config is None:
         deployment = environment.azure_deployment
         endpoint = environment.azure_endpoint
+        api_key = environment.azure_api_key
     else:
         provider = config.provider.strip().lower()
         if provider not in SUPPORTED_AZURE_PROVIDERS:
@@ -269,11 +276,16 @@ def build_chat_model(
 
         deployment = config.model_name or environment.azure_deployment
         endpoint = config.endpoint or environment.azure_endpoint
+        api_key = resolve_env_credential(
+            config.credential_reference,
+            default_env_var="AZURE_OPENAI_API_KEY",
+            credential_kind="LLM",
+        )
 
     return AzureChatOpenAI(
         azure_deployment=deployment,
         azure_endpoint=endpoint,
-        api_key=environment.azure_api_key,
+        api_key=api_key,
         api_version=environment.azure_api_version,
         temperature=0,
     )

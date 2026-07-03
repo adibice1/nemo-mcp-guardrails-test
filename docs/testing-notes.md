@@ -84,6 +84,33 @@ Isolated LLM selection check:
 python tests/test_runtime_llm_selection.py
 ```
 
+Management authentication HTTP check:
+
+```powershell
+python scripts/migrate_management_auth.py
+python tests/test_management_auth_http.py
+python scripts/backfill_existing_app_users.py
+python tests/test_management_rbac_http.py
+```
+
+The self-cleaning test proves developer-only signup, scrypt password storage,
+duplicate rejection, valid/wrong-password login, protected `/me` behavior, and
+authenticated name/username persistence.
+
+LLM configuration catalogue API check:
+
+```powershell
+python tests/test_llm_config_api.py
+```
+
+This self-cleaning test proves `GET /llm-configs` returns enabled and disabled
+configuration labels and `POST /llm-configs` creates Azure metadata without
+returning `credential_reference`. It also rejects duplicate names and malformed
+environment-variable references.
+
+`tests/test_runtime_llm_selection.py` also proves a selected LLM configuration
+can resolve its own `env:VARIABLE_NAME` API key.
+
 ## Stage 1: Allowed Read-Only Tests
 
 Expected:

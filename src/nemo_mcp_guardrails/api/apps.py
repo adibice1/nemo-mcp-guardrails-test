@@ -32,14 +32,21 @@ from nemo_mcp_guardrails.database.models import (
     AppConnectorRecord,
     AppPolicyAssignmentRecord,
     AppRecord,
+    AppUserRecord,
     ConnectorRecord,
     GlobalPolicyAssignmentRecord,
     LlmConfigRecord,
     PolicyRecord,
+    UserRecord,
 )
+from nemo_mcp_guardrails.management_permissions import require_app_route_access
 
 
-router = APIRouter(prefix="/apps", tags=["apps"])
+router = APIRouter(
+    prefix="/apps",
+    tags=["apps"],
+    dependencies=[Depends(require_app_route_access)],
+)
 
 
 def _require_app(app_id: int, db: Session) -> AppRecord:
@@ -495,23 +502,44 @@ def _effective_policy_assignments_for_app(
 
 
 @router.get("", response_model=list[AppRead])
-def list_apps(db: Session = Depends(get_db)) -> list[dict[str, object]]:
-    """Return all client apps."""
+def list_apps(
+    user: UserRecord = Depends(require_app_route_access),
+    db: Session = Depends(get_db),
+) -> list[dict[str, object]]:
+    """Return all apps for admins or only the current user's apps."""
 
-    apps = list(db.scalars(select(AppRecord).order_by(AppRecord.id)))
+    query = select(AppRecord).order_by(AppRecord.id)
+    if user.system_role != "admin":
+        query = (
+            query.join(AppUserRecord)
+            .where(AppUserRecord.user_id == user.id)
+            .distinct()
+        )
+    apps = list(db.scalars(query))
     return [serialize_app(app) for app in apps]
 
 
 @router.post("", response_model=AppRead, status_code=status.HTTP_201_CREATED)
-def create_app(payload: AppCreate, db: Session = Depends(get_db)) -> dict[str, object]:
+def create_app(
+    payload: AppCreate,
+    user: UserRecord = Depends(require_app_route_access),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
     """Create one client app while storing only its API-key hash."""
 
     values = payload.model_dump(exclude={"api_key"})
+    if user.system_role != "admin" and values.get("guardrail_llm_config_id") is not None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can select the guardrail LLM",
+        )
     _validate_llm_config_ids(values, db)
     app = AppRecord(**values, api_key_hash=hash_api_key(payload.api_key))
     db.add(app)
 
     try:
+        db.flush()
+        db.add(AppUserRecord(app_id=app.id, user_id=user.id, role="owner"))
         db.commit()
     except IntegrityError as error:
         db.rollback()
@@ -786,12 +814,18 @@ def delete_app_connector(
 def update_app(
     app_id: int,
     payload: AppUpdate,
+    user: UserRecord = Depends(require_app_route_access),
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
     """Update one client app."""
 
     app = _require_app(app_id, db)
     values = payload.model_dump(exclude_unset=True, exclude={"api_key"})
+    if user.system_role != "admin" and "guardrail_llm_config_id" in values:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can select the guardrail LLM",
+        )
     _validate_llm_config_ids(values, db)
 
     for field, value in values.items():

@@ -7,6 +7,7 @@ from nemo_mcp_guardrails.api.policy_schemas import (
     PolicyConnectorOption,
     PolicyResourceOption,
 )
+from nemo_mcp_guardrails.api.management_auth import require_management_user
 from nemo_mcp_guardrails.database.connection import get_db
 from nemo_mcp_guardrails.database.models import (
     ConnectorActionRecord,
@@ -16,7 +17,10 @@ from nemo_mcp_guardrails.database.models import (
 )
 
 
-router = APIRouter(tags=["policy-metadata"])
+router = APIRouter(
+    tags=["policy-metadata"],
+    dependencies=[Depends(require_management_user)],
+)
 
 
 @router.get("/policy-options", response_model=list[PolicyConnectorOption])

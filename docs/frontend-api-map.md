@@ -7,7 +7,8 @@ current backend base URL in local development is:
 http://127.0.0.1:8000
 ```
 
-Management endpoints are not authenticated yet. Runtime endpoints require:
+Management signup/login/current-user and management CRUD endpoints use JWT
+authentication. Runtime requests from client applications separately require:
 
 ```text
 X-App-ID: <client_id>
@@ -99,12 +100,42 @@ offered in the policy form.
 | Shell/status badge | `GET` | `/health` | API liveness |
 | Shell/status badge | `GET` | `/health/db` | DB connectivity |
 
+## Management Authentication
+
+The Login and Signup screens now use real management identities. Signup always
+creates a `developer`; clients cannot submit an administrator role.
+
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| `POST` | `/management-auth/signup` | Create a developer and return a JWT |
+| `POST` | `/management-auth/login` | Authenticate email/password and return a JWT |
+| `GET` | `/management-auth/me` | Restore the current bearer-token identity |
+| `PUT` | `/management-auth/me` | Save the current user's name and username |
+
+The browser stores the prototype token in session storage, or local storage
+when Remember Me is selected. `api-client.ts` automatically attaches it as a
+Bearer token. Settings displays the real read-only email, persists
+name/username, and clears the session on Logout.
+
 ## Apps
 
 These endpoints now power `/apps` and `/apps/[clientId]`. The list supports
 search, pagination, create, delete, connector/policy counts, and row navigation.
 The detail route provides Overview, Connectors, LLM, Policies, and Runtime Test
 tabs.
+
+Developers see only apps linked through `app_users`. Creating an app atomically
+creates one `owner` link for its authenticated creator. App owners and app
+admins can mutate the app; viewers are read-only; system admins can access
+every app. Only system admins can change `guardrail_llm_config_id` or mutate
+global policy assignments. Developers may select their app's main-agent LLM.
+
+The LLM tab loads `GET /llm-configs` and displays configuration name, provider,
+and model name. Disabled configurations remain visible but cannot be newly
+selected; choosing `Environment default` stores a null configuration ID.
+`POST /llm-configs` lets the prototype add Azure deployment metadata. Its
+credential field accepts only an `env:VARIABLE_NAME` reference; API responses
+never return that reference or a secret value.
 
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
@@ -114,6 +145,8 @@ tabs.
 | `GET` | `/apps/by-client-id/{client_id}` | Get app by readable client ID |
 | `PUT` | `/apps/{app_id}` | Update app |
 | `DELETE` | `/apps/{app_id}` | Delete app |
+| `GET` | `/llm-configs` | List readable LLM choices without credentials |
+| `POST` | `/llm-configs` | Create Azure LLM metadata with an env reference |
 
 Create app body:
 
