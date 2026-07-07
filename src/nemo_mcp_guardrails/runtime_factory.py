@@ -18,6 +18,7 @@ from nemo_mcp_guardrails.database.models import (
     LlmConfigRecord,
 )
 from nemo_mcp_guardrails.database.policy_loader import (
+    LoadedInputPolicy,
     load_input_policy_entries,
     load_output_policy_objects,
 )
@@ -94,6 +95,7 @@ class GuardrailsRuntimeParts:
 
     prompt_rule_config: PromptRuleConfig
     input_policy_count: int
+    input_policy_entries: tuple[LoadedInputPolicy, ...]
     blocked_tools: frozenset[str]
     rails: LLMRails
     agent: Any
@@ -377,9 +379,12 @@ async def build_guardrails_runtime_parts(app_id: int) -> GuardrailsRuntimeParts:
         policy.description for policy in load_output_policy_objects(app_id=app_id)
     )
 
+    input_policy_entries = load_input_policy_entries(app_id=app_id)
+
     return GuardrailsRuntimeParts(
         prompt_rule_config=prompt_rule_config,
-        input_policy_count=len(load_input_policy_entries(app_id=app_id)),
+        input_policy_count=len(input_policy_entries),
+        input_policy_entries=input_policy_entries,
         blocked_tools=blocked_tools,
         rails=rails,
         agent=agent,

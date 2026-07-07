@@ -9,7 +9,8 @@ import {
 } from "@/components/apps/app-table";
 import {
   CreateAppModal,
-  type AppDraft
+  type AppDraft,
+  type CreatedAppSecret
 } from "@/components/apps/create-app-modal";
 import { AppTopNav } from "@/components/shared/app-top-nav";
 import {
@@ -20,6 +21,7 @@ import {
   listAppConnectors,
   listApps
 } from "@/lib/api-client";
+import { loadManagementSession } from "@/lib/management-auth";
 
 const PAGE_SIZE = 8;
 
@@ -32,6 +34,7 @@ export default function AppsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const loadApps = useCallback(async () => {
     if (!hasApiBaseUrl()) {
@@ -70,6 +73,7 @@ export default function AppsPage() {
   }, []);
 
   useEffect(() => {
+    setIsAdmin(loadManagementSession()?.user.system_role === "admin");
     void loadApps();
   }, [loadApps]);
 
@@ -91,28 +95,30 @@ export default function AppsPage() {
     safePage * PAGE_SIZE
   );
 
-  async function handleCreate(draft: AppDraft) {
+  async function handleCreate(draft: AppDraft): Promise<CreatedAppSecret | null> {
     try {
       setError("");
       const app = await createApp({
         name: draft.name,
         client_id: draft.clientId,
-        api_key: draft.apiKey,
         authorized: true,
         main_llm_config_id: null,
         guardrail_llm_config_id: null
       });
       await loadApps();
-      setModalOpen(false);
-      setNotice(`${app.name} was created. Store its API key securely.`);
-      return true;
+      setNotice(`${app.name} was created. Copy its API key before closing.`);
+      return {
+        name: app.name,
+        apiKey: app.api_key,
+        notice: app.api_key_notice
+      };
     } catch (createError) {
       setError(
         createError instanceof Error
           ? createError.message
           : "Could not create application."
       );
-      return false;
+      return null;
     }
   }
 
@@ -163,14 +169,16 @@ export default function AppsPage() {
               />
               <Search className="absolute right-5 top-3 h-5 w-5 text-gms-text" />
             </label>
-            <button
-              className="inline-flex h-10 items-center justify-center gap-3 rounded-md bg-gms-blue px-4 text-sm font-medium text-white shadow-button"
-              type="button"
-              onClick={() => setModalOpen(true)}
-            >
-              <Plus className="h-5 w-5" />
-              Create App
-            </button>
+            {isAdmin && (
+              <button
+                className="inline-flex h-10 items-center justify-center gap-3 rounded-md bg-gms-blue px-4 text-sm font-medium text-white shadow-button"
+                type="button"
+                onClick={() => setModalOpen(true)}
+              >
+                <Plus className="h-5 w-5" />
+                Create App
+              </button>
+            )}
           </div>
         </div>
 

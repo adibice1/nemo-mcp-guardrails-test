@@ -1,8 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Eye, EyeOff, KeyRound, Save } from "lucide-react";
-import { type ClientApp, updateApp } from "@/lib/api-client";
+import { Copy, KeyRound, RefreshCcw, Save } from "lucide-react";
+import {
+  regenerateAppApiKey,
+  type AppApiKeyResponse,
+  type ClientApp,
+  updateApp
+} from "@/lib/api-client";
 
 type AppOverviewProps = {
   app: ClientApp;
@@ -12,23 +17,25 @@ type AppOverviewProps = {
 export function AppOverview({ app, onUpdated }: AppOverviewProps) {
   const [name, setName] = useState(app.name);
   const [clientId, setClientId] = useState(app.client_id);
-  const [newApiKey, setNewApiKey] = useState("");
-  const [showKey, setShowKey] = useState(false);
+  const [generatedKey, setGeneratedKey] = useState<AppApiKeyResponse | null>(null);
   const [saving, setSaving] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
+  const [copiedKey, setCopiedKey] = useState(false);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
     setName(app.name);
     setClientId(app.client_id);
+    setGeneratedKey(null);
+    setCopiedKey(false);
   }, [app.client_id, app.name]);
 
   const dirty =
     name.trim() !== app.name ||
-    clientId.trim() !== app.client_id ||
-    newApiKey.length > 0;
+    clientId.trim() !== app.client_id;
 
   async function handleSave() {
-    if (!dirty || (newApiKey.length > 0 && newApiKey.length < 16)) {
+    if (!dirty) {
       return;
     }
     setSaving(true);
@@ -36,17 +43,47 @@ export function AppOverview({ app, onUpdated }: AppOverviewProps) {
     try {
       const updated = await updateApp(app.id, {
         name: name.trim(),
-        client_id: clientId.trim(),
-        ...(newApiKey ? { api_key: newApiKey } : {})
+        client_id: clientId.trim()
       });
       onUpdated(updated);
-      setNewApiKey("");
       setMessage("Application details saved.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not save app.");
     } finally {
       setSaving(false);
     }
+  }
+
+  async function handleRegenerateKey() {
+    const confirmed = window.confirm(
+      "Regenerate this app API key? The existing key will stop working."
+    );
+    if (!confirmed) {
+      return;
+    }
+    setRegenerating(true);
+    setMessage("");
+    try {
+      const result = await regenerateAppApiKey(app.id);
+      setGeneratedKey(result);
+      setCopiedKey(false);
+      setMessage("API key regenerated. Copy it before leaving this page.");
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Could not regenerate API key."
+      );
+    } finally {
+      setRegenerating(false);
+    }
+  }
+
+  async function handleCopyGeneratedKey() {
+    if (!generatedKey) {
+      return;
+    }
+    await navigator.clipboard.writeText(generatedKey.api_key);
+    setCopiedKey(true);
+    window.setTimeout(() => setCopiedKey(false), 1800);
   }
 
   return (
@@ -75,35 +112,57 @@ export function AppOverview({ app, onUpdated }: AppOverviewProps) {
         </DetailField>
       </div>
 
-      <DetailField label="Rotate API Key" className="mt-6">
-        <div className="relative">
-          <KeyRound className="absolute left-3 top-3 h-5 w-5 text-gms-muted" />
-          <input
-            className="detail-input px-10 pr-12"
-            minLength={16}
-            placeholder="Leave blank to keep the current key"
-            type={showKey ? "text" : "password"}
-            value={newApiKey}
-            onChange={(event) => setNewApiKey(event.target.value)}
-          />
+      <div className="mt-8 rounded-xl border border-gms-line bg-[#f7f9ff] p-5 dark:bg-[#20242c]">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <div className="flex items-center gap-3 text-gms-text">
+              <KeyRound className="h-5 w-5 text-gms-blue" />
+              <h3 className="text-sm font-extrabold">App API key</h3>
+            </div>
+            <p className="mt-2 text-xs text-gms-muted">
+              Regenerate a key when the current key is lost or exposed. The new
+              key is shown once and the old key stops working immediately.
+            </p>
+          </div>
           <button
-            aria-label={showKey ? "Hide API key" : "Show API key"}
-            className="absolute right-3 top-3 text-gms-muted hover:text-gms-blue"
+            className="inline-flex h-10 items-center gap-2 rounded-md border border-gms-blue px-4 text-sm font-semibold text-gms-blue hover:bg-gms-blue-soft disabled:opacity-50"
+            disabled={regenerating}
             type="button"
-            onClick={() => setShowKey((current) => !current)}
+            onClick={handleRegenerateKey}
           >
-            {showKey ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+            <RefreshCcw className="h-4 w-4" />
+            {regenerating ? "Regenerating..." : "Regenerate Key"}
           </button>
         </div>
-        <p className="mt-2 text-xs text-gms-muted">
-          A rotated key cannot be recovered after saving. Minimum 16 characters.
-        </p>
-      </DetailField>
+
+        {generatedKey && (
+          <div className="mt-5 rounded-lg border border-[#9bb5ff] bg-white p-4 dark:bg-[#252932]">
+            <p className="text-xs font-semibold text-gms-blue">
+              {generatedKey.api_key_notice}
+            </p>
+            <div className="mt-3 flex gap-2">
+              <input
+                className="h-10 min-w-0 flex-1 rounded border border-gms-blue bg-white px-3 font-mono text-xs text-gms-text outline-none dark:bg-[#20242c]"
+                readOnly
+                value={generatedKey.api_key}
+              />
+              <button
+                className="inline-flex h-10 items-center gap-2 rounded-md bg-gms-blue px-4 text-sm font-semibold text-white shadow-button"
+                type="button"
+                onClick={handleCopyGeneratedKey}
+              >
+                <Copy className="h-4 w-4" />
+                {copiedKey ? "Copied!" : "Copy"}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
       <div className="mt-8 flex items-center gap-4">
         <button
           className="inline-flex h-10 items-center gap-2 rounded-md bg-gms-blue px-5 text-sm font-semibold text-white shadow-button disabled:opacity-50"
-          disabled={!dirty || saving || (newApiKey.length > 0 && newApiKey.length < 16)}
+          disabled={!dirty || saving}
           type="button"
           onClick={handleSave}
         >

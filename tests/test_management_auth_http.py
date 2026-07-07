@@ -12,10 +12,11 @@ from migrate_management_auth import migrate_management_auth_schema
 from nemo_mcp_guardrails.api.main import app
 from nemo_mcp_guardrails.database.connection import SessionLocal
 from nemo_mcp_guardrails.database.models import UserRecord
+from nemo_mcp_guardrails.management_auth import hash_password
 
 
 def main() -> None:
-    """Verify signup, login, JWT identity, and generic rejection behavior."""
+    """Verify login, disabled signup, JWT identity, and rejection behavior."""
 
     os.environ["GMS_JWT_SECRET"] = "test-management-secret-with-at-least-32-characters"
     os.environ["GMS_JWT_EXPIRY_MINUTES"] = "60"
@@ -25,34 +26,27 @@ def main() -> None:
     password = "a-valid-test-password"
 
     try:
+        with SessionLocal() as db:
+            user = UserRecord(
+                email=email,
+                name=email,
+                username=email,
+                password_hash=hash_password(password),
+                system_role="developer",
+                enabled=True,
+            )
+            db.add(user)
+            db.commit()
+
         with TestClient(app) as client:
-            role_injection = client.post(
+            disabled_signup = client.post(
                 "/management-auth/signup",
                 json={
-                    "email": f"admin-{email}",
+                    "email": f"new-{email}",
                     "password": password,
-                    "system_role": "admin",
                 },
             )
-            assert role_injection.status_code == 422, role_injection.text
-
-            signup = client.post(
-                "/management-auth/signup",
-                json={"email": email.upper(), "password": password},
-            )
-            assert signup.status_code == 201, signup.text
-            session = signup.json()
-            assert session["token_type"] == "bearer"
-            assert session["user"]["email"] == email
-            assert session["user"]["name"] == email
-            assert session["user"]["username"] == email
-            assert session["user"]["system_role"] == "developer"
-
-            duplicate = client.post(
-                "/management-auth/signup",
-                json={"email": email, "password": password},
-            )
-            assert duplicate.status_code == 409, duplicate.text
+            assert disabled_signup.status_code == 403, disabled_signup.text
 
             wrong_password = client.post(
                 "/management-auth/login",
@@ -105,10 +99,9 @@ def main() -> None:
                 db.commit()
 
     print("Management authentication HTTP checks passed.")
-    print("- Signup creates developer users with scrypt password hashes.")
+    print("- Public signup is disabled for admin-managed accounts.")
     print("- Login and /me accept only valid bearer tokens.")
     print("- Authenticated users can save name and username profile fields.")
-    print("- Duplicate accounts and role injection are rejected.")
 
 
 if __name__ == "__main__":

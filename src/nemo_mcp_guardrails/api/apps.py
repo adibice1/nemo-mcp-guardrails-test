@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from nemo_mcp_guardrails.app_auth import hash_api_key
+from nemo_mcp_guardrails.app_auth import generate_unique_api_key, hash_api_key
 from nemo_mcp_guardrails.api.assignment_serializers import (
     app_label,
     serialize_app,
@@ -13,10 +13,12 @@ from nemo_mcp_guardrails.api.assignment_serializers import (
     serialize_effective_global_assignment,
 )
 from nemo_mcp_guardrails.api.app_schemas import (
+    AppApiKeyRead,
     AppConnectorCreate,
     AppConnectorRead,
     AppConnectorUpdate,
     AppCreate,
+    AppCreateRead,
     AppPolicyAssignmentRead,
     AppRead,
     AppUpdate,
@@ -39,7 +41,10 @@ from nemo_mcp_guardrails.database.models import (
     PolicyRecord,
     UserRecord,
 )
-from nemo_mcp_guardrails.management_permissions import require_app_route_access
+from nemo_mcp_guardrails.management_permissions import (
+    APP_MANAGE_ROLES,
+    require_app_route_access,
+)
 
 
 router = APIRouter(
@@ -47,6 +52,8 @@ router = APIRouter(
     tags=["apps"],
     dependencies=[Depends(require_app_route_access)],
 )
+
+API_KEY_NOTICE = "Copy this API key now. It will not be shown again."
 
 
 def _require_app(app_id: int, db: Session) -> AppRecord:
@@ -512,14 +519,17 @@ def list_apps(
     if user.system_role != "admin":
         query = (
             query.join(AppUserRecord)
-            .where(AppUserRecord.user_id == user.id)
+            .where(
+                AppUserRecord.user_id == user.id,
+                AppUserRecord.role.in_(APP_MANAGE_ROLES),
+            )
             .distinct()
         )
     apps = list(db.scalars(query))
     return [serialize_app(app) for app in apps]
 
 
-@router.post("", response_model=AppRead, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=AppCreateRead, status_code=status.HTTP_201_CREATED)
 def create_app(
     payload: AppCreate,
     user: UserRecord = Depends(require_app_route_access),
@@ -527,19 +537,21 @@ def create_app(
 ) -> dict[str, object]:
     """Create one client app while storing only its API-key hash."""
 
-    values = payload.model_dump(exclude={"api_key"})
-    if user.system_role != "admin" and values.get("guardrail_llm_config_id") is not None:
+    if user.system_role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only administrators can select the guardrail LLM",
+            detail="Only administrators can create apps",
         )
+
+    values = payload.model_dump()
     _validate_llm_config_ids(values, db)
-    app = AppRecord(**values, api_key_hash=hash_api_key(payload.api_key))
+    api_key = generate_unique_api_key(db)
+    app = AppRecord(**values, api_key_hash=hash_api_key(api_key))
     db.add(app)
 
     try:
         db.flush()
-        db.add(AppUserRecord(app_id=app.id, user_id=user.id, role="owner"))
+        db.add(AppUserRecord(app_id=app.id, user_id=user.id, role="admin"))
         db.commit()
     except IntegrityError as error:
         db.rollback()
@@ -549,7 +561,10 @@ def create_app(
         ) from error
 
     db.refresh(app)
-    return serialize_app(app)
+    response = serialize_app(app)
+    response["api_key"] = api_key
+    response["api_key_notice"] = API_KEY_NOTICE
+    return response
 
 
 @router.get("/by-client-id/{client_id}", response_model=AppRead)
@@ -635,6 +650,20 @@ def delete_app_connector_by_client_id(
 
     app = _require_app_by_client_id(client_id, db)
     _delete_app_connector_link(app.id, connector_ref, db)
+
+
+@router.post(
+    "/by-client-id/{client_id}/api-key",
+    response_model=AppApiKeyRead,
+)
+def regenerate_app_api_key_by_client_id(
+    client_id: str,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    """Regenerate one app API key by client ID and return it once."""
+
+    app = _require_app_by_client_id(client_id, db)
+    return _regenerate_app_api_key(app, db)
 
 
 @router.get(
@@ -820,7 +849,7 @@ def update_app(
     """Update one client app."""
 
     app = _require_app(app_id, db)
-    values = payload.model_dump(exclude_unset=True, exclude={"api_key"})
+    values = payload.model_dump(exclude_unset=True)
     if user.system_role != "admin" and "guardrail_llm_config_id" in values:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -830,9 +859,6 @@ def update_app(
 
     for field, value in values.items():
         setattr(app, field, value)
-
-    if payload.api_key is not None:
-        app.api_key_hash = hash_api_key(payload.api_key)
 
     try:
         db.commit()
@@ -845,6 +871,35 @@ def update_app(
 
     db.refresh(app)
     return serialize_app(app)
+
+
+def _regenerate_app_api_key(app: AppRecord, db: Session) -> dict[str, object]:
+    """Generate, store, and return one replacement API key."""
+
+    api_key = generate_unique_api_key(db)
+    app.api_key_hash = hash_api_key(api_key)
+    db.commit()
+    db.refresh(app)
+    return {
+        "app_id": app.id,
+        "client_id": app.client_id,
+        "api_key": api_key,
+        "api_key_notice": API_KEY_NOTICE,
+    }
+
+
+@router.post(
+    "/{app_id}/api-key",
+    response_model=AppApiKeyRead,
+)
+def regenerate_app_api_key(
+    app_id: int,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    """Regenerate one app API key and return it once."""
+
+    app = _require_app(app_id, db)
+    return _regenerate_app_api_key(app, db)
 
 
 @router.delete("/{app_id}", status_code=status.HTTP_204_NO_CONTENT)

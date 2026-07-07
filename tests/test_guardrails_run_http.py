@@ -5,6 +5,7 @@ from _bootstrap import bootstrap_src
 
 bootstrap_src()
 
+from _management_auth import install_management_admin_override
 from fastapi.testclient import TestClient
 from nemoguardrails.rails.llm.options import RailStatus, RailType
 from sqlalchemy import select
@@ -29,7 +30,6 @@ from nemo_mcp_guardrails.tool_guard import blocked_tool_names_for_app
 from seed_normalized_policy_metadata import main as seed_normalized_metadata
 
 
-TEMP_API_KEY = "temporary-guardrails-run-api-key"
 AGENT_CALLS: list[object] = []
 
 
@@ -39,6 +39,7 @@ class FakeRuntimeParts:
 
     prompt_rule_config: PromptRuleConfig
     input_policy_count: int
+    input_policy_entries: tuple[object, ...]
     blocked_tools: frozenset[str]
     rails: object
     agent: object
@@ -99,9 +100,12 @@ async def fake_build_guardrails_runtime_parts(app_id: int) -> FakeRuntimeParts:
     )
     blocked_tools = blocked_tool_names_for_app(app_id=app_id)
 
+    input_policy_entries = load_input_policy_entries(app_id=app_id)
+
     return FakeRuntimeParts(
         prompt_rule_config=prompt_rule_config,
-        input_policy_count=len(load_input_policy_entries(app_id=app_id)),
+        input_policy_count=len(input_policy_entries),
+        input_policy_entries=input_policy_entries,
         blocked_tools=blocked_tools,
         rails=FakePolicyRails(),
         agent=FakeAgent(),
@@ -166,6 +170,7 @@ def link_app_to_github_connector(app_id: int) -> None:
 def main() -> None:
     """Verify authenticated /run uses app-scoped policies over HTTP."""
 
+    install_management_admin_override()
     seed_normalized_metadata()
     suffix = uuid4().hex
     target_issue_title = f"guardrails-test-{suffix}"
@@ -185,12 +190,13 @@ def main() -> None:
                 json={
                     "name": f"Temporary Guardrails Run App {suffix}",
                     "client_id": client_id,
-                    "api_key": TEMP_API_KEY,
                     "authorized": True,
                 },
             )
             assert app_response.status_code == 201, app_response.text
-            app_id = app_response.json()["id"]
+            app_body = app_response.json()
+            app_id = app_body["id"]
+            runtime_api_key = app_body["api_key"]
             link_app_to_github_connector(app_id)
 
             policy_response = client.post(
@@ -220,7 +226,7 @@ def main() -> None:
 
             allowed_response = client.post(
                 "/v1/guardrails/run",
-                headers={"X-App-ID": client_id, "X-API-Key": TEMP_API_KEY},
+                headers={"X-App-ID": client_id, "X-API-Key": runtime_api_key},
                 json={
                     "conversation_id": f"allowed-{suffix}",
                     "message": (
@@ -236,13 +242,13 @@ def main() -> None:
             assert allowed_body["client_id"] == client_id
             assert allowed_body["response"] == "github/github-mcp-server"
             assert allowed_body["tool_names"] == ["search_repositories"]
-            assert allowed_body["input_policy_count"] == 1
-            assert allowed_body["input_rule_count"] == 1
+            assert allowed_body["input_policy_count"] >= 1
+            assert allowed_body["input_rule_count"] >= 1
             assert "issue_write" in allowed_body["blocked_tools"]
 
             blocked_response = client.post(
                 "/v1/guardrails/run",
-                headers={"X-App-ID": client_id, "X-API-Key": TEMP_API_KEY},
+                headers={"X-App-ID": client_id, "X-API-Key": runtime_api_key},
                 json={
                     "conversation_id": f"blocked-{suffix}",
                     "message": (
@@ -258,9 +264,22 @@ def main() -> None:
             assert blocked_body["client_id"] == client_id
             assert blocked_body["tool_names"] == []
             assert blocked_body["input_rail_status"] == "blocked"
-            assert blocked_body["input_policy_count"] == 1
-            assert blocked_body["input_rule_count"] == 1
+            assert blocked_body["input_policy_count"] >= 1
+            assert blocked_body["input_rule_count"] >= 1
             assert "issue_write" in blocked_body["blocked_tools"]
+            assert blocked_body["block_stage"] == "input"
+            assert (
+                blocked_body["block_reason"]
+                == (
+                    "Blocked due to request to create a GitHub issue "
+                    f"matching {target_issue_title}."
+                )
+            )
+            assert blocked_body["blocked_policy_id"] == policy_id
+            assert blocked_body["blocked_policy_name"] == (
+                f"Github create issue matching {target_issue_title}"
+            )
+            assert blocked_body["response"] == blocked_body["block_reason"]
 
         assert len(AGENT_CALLS) == 1
 

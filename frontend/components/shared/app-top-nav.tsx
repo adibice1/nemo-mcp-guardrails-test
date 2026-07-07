@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { getCurrentManagementUser } from "@/lib/api-client";
@@ -13,16 +13,19 @@ import {
 import { cn } from "@/lib/utils";
 
 type AppTopNavProps = {
-  active?: "apps" | "policies" | "settings";
+  active?: "apps" | "policies" | "user-management" | "settings";
 };
 
 export function AppTopNav({ active }: AppTopNavProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const [isAdmin, setIsAdmin] = useState(false);
   const activeKey =
     active ??
     (pathname.startsWith("/apps")
       ? "apps"
+      : pathname.startsWith("/user-management")
+      ? "user-management"
       : pathname.startsWith("/settings")
       ? "settings"
       : "policies");
@@ -33,9 +36,13 @@ export function AppTopNav({ active }: AppTopNavProps) {
       router.replace("/login");
       return;
     }
+    setIsAdmin(session.user.system_role === "admin");
 
     getCurrentManagementUser(session.access_token)
-      .then(updateStoredManagementUser)
+      .then((user) => {
+        updateStoredManagementUser(user);
+        setIsAdmin(user.system_role === "admin");
+      })
       .catch(() => {
         clearManagementSession();
         router.replace("/login");
@@ -69,6 +76,20 @@ export function AppTopNav({ active }: AppTopNavProps) {
             <span className="absolute bottom-0 left-0 h-[4px] w-full rounded-full bg-gms-blue shadow-[0_4px_8px_rgba(71,117,255,0.55)]" />
           )}
         </Link>
+        {isAdmin && (
+          <Link
+            href="/user-management"
+            className={cn(
+              "relative pb-2 text-[#a8bcfb]",
+              activeKey === "user-management" && "text-gms-blue"
+            )}
+          >
+            User Management
+            {activeKey === "user-management" && (
+              <span className="absolute bottom-0 left-0 h-[4px] w-full rounded-full bg-gms-blue shadow-[0_4px_8px_rgba(71,117,255,0.55)]" />
+            )}
+          </Link>
+        )}
         <Link
           href="/settings"
           className={cn(
@@ -82,11 +103,15 @@ export function AppTopNav({ active }: AppTopNavProps) {
           )}
         </Link>
       </nav>
-      <div className="h-11 w-11 overflow-hidden rounded-[13px] bg-[#ffc2d5]">
+      <Link
+        aria-label="Open settings"
+        className="h-11 w-11 overflow-hidden rounded-[13px] bg-[#ffc2d5] transition hover:scale-105"
+        href="/settings"
+      >
         <div className="flex h-full w-full items-end justify-center text-[30px]">
           <span aria-hidden="true">🙂</span>
         </div>
-      </div>
+      </Link>
     </header>
   );
 }

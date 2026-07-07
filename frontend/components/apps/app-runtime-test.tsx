@@ -1,12 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Eye, EyeOff, Play } from "lucide-react";
-import { runGuardrails, type GuardrailsRunResponse } from "@/lib/api-client";
+import { Play } from "lucide-react";
+import { runGuardrailsViaProxy, type GuardrailsRunResponse } from "@/lib/api-client";
 
 export function AppRuntimeTest({ clientId }: { clientId: string }) {
-  const [apiKey, setApiKey] = useState("");
-  const [showKey, setShowKey] = useState(false);
   const [conversationId, setConversationId] = useState("frontend-demo-1");
   const [message, setMessage] = useState("List recent pull requests.");
   const [result, setResult] = useState<GuardrailsRunResponse | null>(null);
@@ -14,7 +12,7 @@ export function AppRuntimeTest({ clientId }: { clientId: string }) {
   const [running, setRunning] = useState(false);
 
   async function handleRun() {
-    if (!apiKey || !message.trim()) {
+    if (!message.trim()) {
       return;
     }
     setRunning(true);
@@ -22,7 +20,7 @@ export function AppRuntimeTest({ clientId }: { clientId: string }) {
     setResult(null);
     try {
       setResult(
-        await runGuardrails(clientId, apiKey, {
+        await runGuardrailsViaProxy(clientId, {
           message: message.trim(),
           conversation_id: conversationId.trim() || null,
           conversation_history: []
@@ -40,27 +38,9 @@ export function AppRuntimeTest({ clientId }: { clientId: string }) {
       <h2 className="text-2xl font-extrabold text-gms-text">Runtime Test</h2>
       <p className="mt-2 text-sm text-gms-muted">
         Send a real authenticated request through input rails, guarded tools and output rails.
+        The app key is supplied by the local Next.js proxy.
       </p>
       <div className="mt-7 grid gap-5 md:grid-cols-2">
-        <label className="text-sm font-bold text-gms-text">
-          App API Key
-          <div className="relative mt-2">
-            <input
-              className="detail-input pr-12"
-              placeholder="Enter the app API key"
-              type={showKey ? "text" : "password"}
-              value={apiKey}
-              onChange={(event) => setApiKey(event.target.value)}
-            />
-            <button
-              className="absolute right-3 top-3 text-gms-muted"
-              type="button"
-              onClick={() => setShowKey((current) => !current)}
-            >
-              {showKey ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-            </button>
-          </div>
-        </label>
         <label className="text-sm font-bold text-gms-text">
           Conversation ID
           <input
@@ -80,7 +60,7 @@ export function AppRuntimeTest({ clientId }: { clientId: string }) {
       </label>
       <button
         className="mt-5 inline-flex h-10 items-center gap-2 rounded-md bg-gms-blue px-5 text-sm font-semibold text-white shadow-button disabled:opacity-50"
-        disabled={!apiKey || !message.trim() || running}
+        disabled={!message.trim() || running}
         type="button"
         onClick={handleRun}
       >
@@ -98,6 +78,21 @@ export function AppRuntimeTest({ clientId }: { clientId: string }) {
           </div>
           <h3 className="mt-5 text-sm font-bold text-gms-text">Response</h3>
           <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gms-text">{result.response}</p>
+          {result.block_reason && (
+            <div className="mt-4 rounded-md border border-[#ffd8dc] bg-[#fff6f7] p-4 text-sm text-gms-danger dark:border-[#63343a] dark:bg-[#302024]">
+              <p className="font-extrabold">
+                Block reason
+                {result.block_stage ? ` (${result.block_stage})` : ""}
+              </p>
+              <p className="mt-1 leading-6">{result.block_reason}</p>
+              {result.blocked_policy_name && (
+                <p className="mt-1 text-xs text-gms-muted">
+                  Policy: {result.blocked_policy_name}
+                  {result.blocked_policy_id ? ` #${result.blocked_policy_id}` : ""}
+                </p>
+              )}
+            </div>
+          )}
           <dl className="mt-5 grid gap-3 text-xs text-gms-muted md:grid-cols-4">
             <div><dt>Input policies</dt><dd className="mt-1 text-lg font-bold text-gms-text">{result.input_policy_count}</dd></div>
             <div><dt>Output policies</dt><dd className="mt-1 text-lg font-bold text-gms-text">{result.output_rule_count}</dd></div>

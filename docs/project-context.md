@@ -145,7 +145,8 @@ The system successfully:
 - Uses `src/nemo_mcp_guardrails/guarded_execution.py` for reusable
   single-request input-rail, agent/guarded-tool, and output-rail coordination.
 - Provides a Next.js 13 frontend scaffold under `frontend/` for `/login`,
-  `/signup`, `/policies`, and `/settings`.
+  `/signup` admin-managed notice, `/apps`, `/apps/[clientId]`, `/policies`,
+  `/user-management`, and `/settings`.
 - Keeps the frontend in mock mode when `NEXT_PUBLIC_API_BASE_URL` is absent,
   and switches `/policies` to read real apps/global assignments/effective app
   assignments from FastAPI when `frontend/.env.local` sets
@@ -433,11 +434,11 @@ foundation now exists. The credential output policy is globally assigned;
 GitHub write policies are currently unassigned.
 
 Management CRUD now requires JWT authentication. Developers see only apps
-linked through `app_users`; new apps link only their creator as owner. App
-owner/admin links can mutate, viewers are read-only, and system admins can
-access every app. Global policy mutation and guardrail-LLM selection are
-system-admin-only. The existing pre-RBAC demo users/apps are linked by the
-idempotent `scripts/backfill_existing_app_users.py` script.
+linked through active app-developer `app_users` links. App creation is
+system-admin-only; linked app developers can mutate their assigned apps, and
+system admins can access every app. Global policy mutation and guardrail-LLM
+selection are system-admin-only. The existing pre-RBAC demo users/apps are
+linked by the idempotent `scripts/backfill_existing_app_users.py` script.
 
 Assignment management APIs exist. `policy_loader.py`, `prompt_rule_loader.py`,
 and `build_rails_config_with_prompt_rules()` now accept an optional app ID.

@@ -7,10 +7,10 @@ Next.js 13 frontend prototype for the Guardrails Management System.
 This first UI slice recreates the uploaded Figma screens:
 
 - `/login`
-- `/signup`
 - `/apps`
 - `/apps/[clientId]`
 - `/policies`
+- `/user-management`
 - `/settings`
 
 The policy creation page includes the Figma interaction flow:
@@ -23,12 +23,12 @@ choose connector
 -> create policy at the top of the list
 ```
 
-`/login` and `/signup` now call the real management-authentication endpoints.
-Passwords are hashed with scrypt in the backend, and the frontend restores the
-signed JWT identity through `/management-auth/me`. Management CRUD authorization
-is the next slice; the current token does not yet restrict app/policy routes.
-Settings loads that identity, keeps email read-only, saves name/username to
-Postgres, and clears the stored session before Logout redirects to `/login`.
+`/login` now calls the real management-authentication endpoint. Public signup is
+disabled; `/signup` shows an admin-managed account notice and returns users to
+Login. Passwords are hashed with scrypt in the backend, and the frontend
+restores the signed JWT identity through `/management-auth/me`. Settings loads
+that identity, keeps email read-only, saves name/username to Postgres, and
+clears the stored session before Logout redirects to `/login`.
 
 Current frontend behavior:
 
@@ -86,14 +86,19 @@ and status. Edit/Delete controls stop row-click propagation and retain their
 existing actions.
 
 The `/apps` page lists real database applications, connector/policy counts,
-creates apps with one-way API-key hashing, deletes apps, and opens a dedicated
-`/apps/[clientId]` management page. App details provide functional Overview,
-Connectors, LLM, Policies, and Runtime Test tabs. GitHub connector management is
-active; SharePoint is visibly deferred until backend/runtime support exists.
+hides app creation from non-admin users, and opens a dedicated `/apps/[clientId]`
+management page. App details provide functional Overview, Connectors, LLM,
+Policies, and Runtime Test tabs. GitHub connector management is active;
+SharePoint is visibly deferred until backend/runtime support exists.
 The LLM tab loads `GET /llm-configs` and presents named main-agent and guardrail
 selectors without exposing connector or model credential references. It can
 also create Azure deployment metadata using an optional backend environment
 variable name; the browser never receives or submits the API key itself.
+
+The `/user-management` page is visible only to system admins. It lists users,
+creates admin-managed accounts with a one-time temporary password, resets lost
+passwords, blocks/enables accounts, changes system role, and links users to
+apps as app developers.
 
 Optional custom-resource text is stored as `conditions.custom_resource`, but
 the current backend compiler does not enforce that condition yet.

@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AuthIllustration } from "@/components/shared/auth-illustration";
@@ -121,11 +120,8 @@ export default function LoginPage() {
               {submitting ? "Logging in..." : "Login"}
             </button>
 
-            <p className="text-center text-xs font-semibold">
-              Don&apos;t have an account?{" "}
-              <Link className="text-[#138cf5]" href="/signup">
-                Register Now!
-              </Link>
+            <p className="text-center text-xs font-semibold text-gms-muted">
+              Need access? Ask your GMS administrator to create your account.
             </p>
           </form>
         </div>

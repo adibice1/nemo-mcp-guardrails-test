@@ -53,6 +53,10 @@ class GuardrailsRunResponse(BaseModel):
     output_rail_categories: list[str] = Field(default_factory=list)
     tool_guard_status: str
     tool_guard_source: str | None
+    block_stage: str | None = None
+    block_reason: str | None = None
+    blocked_policy_id: int | None = None
+    blocked_policy_name: str | None = None
     tool_names: list[str]
     input_policy_count: int
     input_rule_count: int

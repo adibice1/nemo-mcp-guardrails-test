@@ -28,10 +28,20 @@ Local backend mode is enabled by creating `frontend/.env.local`:
 
 ```env
 NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
+GMS_DEMO_RUNTIME_API_KEY=
+GMS_DEMO_RUNTIME_API_KEYS=
 ```
 
 If this env var is absent, the frontend remains in mock mode. This keeps the
 Vercel/design preview working without a backend.
+
+Runtime Test no longer asks users to type the app API key into the browser.
+The page calls the local Next.js route `POST /api/guardrails/run`, and that
+route forwards the request to backend `POST /v1/guardrails/run` with
+`X-App-ID` plus an API key from `frontend/.env.local`. Use
+`GMS_DEMO_RUNTIME_API_KEY` for one local demo key, or
+`GMS_DEMO_RUNTIME_API_KEYS` as semicolon-separated `client-id=api-key` pairs
+when testing multiple apps.
 
 The current `/policies` page reads:
 
@@ -102,12 +112,13 @@ offered in the policy form.
 
 ## Management Authentication
 
-The Login and Signup screens now use real management identities. Signup always
-creates a `developer`; clients cannot submit an administrator role.
+The Login screen uses real management identities. Public signup is disabled:
+GMS administrators create user accounts from the admin-only User Management
+screen, then issue a one-time temporary password.
 
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
-| `POST` | `/management-auth/signup` | Create a developer and return a JWT |
+| `POST` | `/management-auth/signup` | Reject public signup with `403` |
 | `POST` | `/management-auth/login` | Authenticate email/password and return a JWT |
 | `GET` | `/management-auth/me` | Restore the current bearer-token identity |
 | `PUT` | `/management-auth/me` | Save the current user's name and username |
@@ -117,25 +128,38 @@ when Remember Me is selected. `api-client.ts` automatically attaches it as a
 Bearer token. Settings displays the real read-only email, persists
 name/username, and clears the session on Logout.
 
+## User Management
+
+These endpoints power `/user-management`. The shared top nav shows that tab only
+for management users with `system_role = admin`.
+
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| `GET` | `/management-users` | Admin list of all GMS users |
+| `POST` | `/management-users` | Admin-created user with one-time temporary password |
+| `PUT` | `/management-users/{user_id}` | Update system role or enabled/blocked state |
+| `POST` | `/management-users/{user_id}/password` | Generate a replacement temporary password |
+| `GET` | `/management-users/{user_id}/apps` | List app-role links for one user |
+| `POST` | `/management-users/{user_id}/apps` | Link or relink a user to an app as an app developer |
+| `DELETE` | `/management-users/{user_id}/apps/{app_id}` | Remove one app-role link |
+
+Temporary passwords are returned only in the create/reset responses. Admins
+must copy them before closing the notice.
+
 ## Apps
 
 These endpoints now power `/apps` and `/apps/[clientId]`. The list supports
-search, pagination, create, delete, connector/policy counts, and row navigation.
-The detail route provides Overview, Connectors, LLM, Policies, and Runtime Test
+search, pagination, admin-only create, delete, connector/policy counts, and row navigation.
+The detail route provides Overview, Connectors, Policies, and Runtime Test
 tabs.
 
-Developers see only apps linked through `app_users`. Creating an app atomically
-creates one `owner` link for its authenticated creator. App owners and app
-admins can mutate the app; viewers are read-only; system admins can access
-every app. Only system admins can change `guardrail_llm_config_id` or mutate
-global policy assignments. Developers may select their app's main-agent LLM.
-
-The LLM tab loads `GET /llm-configs` and displays configuration name, provider,
-and model name. Disabled configurations remain visible but cannot be newly
-selected; choosing `Environment default` stores a null configuration ID.
-`POST /llm-configs` lets the prototype add Azure deployment metadata. Its
-credential field accepts only an `env:VARIABLE_NAME` reference; API responses
-never return that reference or a secret value.
+Developers see only apps linked through `app_users` with the active app
+developer role. App creation is system-admin-only. Linked app developers can
+mutate their assigned apps; system admins can access every app. Only system
+admins can change `guardrail_llm_config_id` or mutate global policy
+assignments. Normal developer-facing app detail screens currently hide direct
+LLM editing; app LLM metadata remains a backend/admin concern until the
+workflow is confirmed.
 
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
@@ -144,6 +168,8 @@ never return that reference or a secret value.
 | `GET` | `/apps/{app_id}` | Get app by numeric ID |
 | `GET` | `/apps/by-client-id/{client_id}` | Get app by readable client ID |
 | `PUT` | `/apps/{app_id}` | Update app |
+| `POST` | `/apps/{app_id}/api-key` | Regenerate and display one app API key once |
+| `POST` | `/apps/by-client-id/{client_id}/api-key` | Regenerate by readable client ID |
 | `DELETE` | `/apps/{app_id}` | Delete app |
 | `GET` | `/llm-configs` | List readable LLM choices without credentials |
 | `POST` | `/llm-configs` | Create Azure LLM metadata with an env reference |
@@ -154,7 +180,6 @@ Create app body:
 {
   "name": "Finance Bot",
   "client_id": "finance-bot",
-  "api_key": "replace-with-strong-api-key",
   "authorized": true,
   "main_llm_config_id": null,
   "guardrail_llm_config_id": null
@@ -163,9 +188,13 @@ Create app body:
 
 Important frontend behavior:
 
-- The API key is only accepted on create/update; the backend never returns it.
-- Store the plaintext API key only in local demo state or ask the user to paste
-  it again for runtime testing.
+- The backend generates app API keys. Users do not type their own keys.
+- Create and regenerate responses return the plaintext API key once with a
+  notice to copy it before closing the UI.
+- GMS stores only the SHA-256 key hash. Lost keys cannot be recovered; users
+  must regenerate them, which invalidates the previous key.
+- Store the plaintext API key in the consuming app backend `.env`; never expose
+  it to end users or commit it.
 - Prefer `client_id` routes in the UI because they are easier for developers to
   recognize than numeric IDs.
 
@@ -213,7 +242,7 @@ Use these for the policy library screen.
 | `POST` | `/policies` | Create a reusable policy and auto-compile it |
 | `GET` | `/policies/{policy_id}` | Get one policy |
 | `PUT` | `/policies/{policy_id}` | Update policy and auto-refresh compiled rules |
-| `DELETE` | `/policies/{policy_id}` | Delete policy and cascaded compiled rules |
+| `DELETE` | `/policies/{policy_id}` | Admin-only delete of an unassigned reusable policy definition |
 | `POST` | `/policies/compile-preview` | Preview compiler output |
 | `GET` | `/policies/compiled-rules` | Inspect active compiled rules |
 | `POST` | `/policies/compile-rules` | Manual full compiled-rule resync |
@@ -247,6 +276,12 @@ Credential output block example:
   "enabled": true
 }
 ```
+
+`DELETE /policies/{policy_id}` returns `409` with
+`code: policy_still_assigned` when the policy is still referenced by any
+global or app assignment. Developers should normally delete assignments, not
+the reusable policy definition. A future admin force-delete flow can remove
+assignment references first if the organization wants that behavior.
 
 ## App Policy Assignments
 
@@ -361,6 +396,10 @@ Run response fields to display:
 - `output_rail_categories`
 - `tool_guard_status`
 - `tool_guard_source`
+- `block_stage`
+- `block_reason`
+- `blocked_policy_id`
+- `blocked_policy_name`
 - `tool_names`
 - `input_policy_count`
 - `input_rule_count`
@@ -371,6 +410,9 @@ Run response fields to display:
 Runtime Test formats confirmed provider filtering as
 `blocked (Azure: category)` and NeMo/deterministic enforcement as
 `blocked (GMS)`. If Azure does not report a category, show `blocked (Azure)`.
+When `block_reason` is present, show it near the guarded response so developers
+can see why the request or output was stopped, for example "Blocked due to
+request to merge a GitHub pull request."
 
 ## Allowed Test Cases
 

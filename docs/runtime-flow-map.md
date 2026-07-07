@@ -159,6 +159,22 @@ app conversation. If no stored turns exist, it bootstraps from client-supplied
 `NEMO_MAX_RUNTIME_CONTEXT_CHARS` so the latest message plus recent history fits
 before Azure OpenAI is called.
 
+Blocked runtime responses include structured explanation fields:
+
+```text
+block_stage
+block_reason
+blocked_policy_id
+blocked_policy_name
+```
+
+When a request is stopped, the returned `response` is also replaced with the
+readable `block_reason`. Input blocks are matched back to the app's loaded input
+policy objects on a best-effort basis, so common GitHub cases can say things
+like `Blocked due to request to merge a GitHub pull request.` Tool guard,
+output rail, deterministic phrase, and Azure content-filter blocks also return
+stage-specific reasons.
+
 `tests/test_guardrails_run_http.py` is the focused HTTP integration proof for
 this endpoint. It uses fake rails/agent to avoid Docker and Azure, while still
 using real temporary DB app rows, policy rows, app assignments,

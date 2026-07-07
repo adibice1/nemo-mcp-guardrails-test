@@ -152,6 +152,13 @@ output rail as `not run`; connector failures remain the separate `tool_error`
 path. `Guarded tool types` is a policy-coverage count, not a count of calls made
 by the current request.
 
+The frontend Runtime Test no longer exposes an app API key text box. It calls
+`frontend/app/api/guardrails/run/route.ts`, which forwards to
+`POST /v1/guardrails/run` with the app key read from `frontend/.env.local`.
+Set `GMS_DEMO_RUNTIME_API_KEY` for one local demo app, or
+`GMS_DEMO_RUNTIME_API_KEYS` with semicolon-separated `client-id=api-key` pairs
+for multiple apps.
+
 `tests/test_nemo_mcp.py` calls this reusable function and still prints the
 same detailed terminal workflow. The full read-only NeMo + GitHub MCP run
 passed after the extraction.
@@ -428,9 +435,9 @@ Recommended incremental slice:
 3. Read docs/frontend-demo-flow.md.
 4. Add admin-only reusable-definition deletion safeguards.
 5. Add a readable LLM-config catalogue endpoint and named selectors.
-6. Completed: management JWT authentication, ownership filtering, and
+6. Completed: management JWT authentication, app-developer filtering, and
    role-aware policy/LLM controls.
-7. Keep User Management and Logs as admin-only post-presentation slices.
+7. Keep Logs as an admin-only post-presentation slice.
 ```
 
 Keep `GITHUB_MCP_READ_ONLY=1` for scripted tests. Do not add write-capable

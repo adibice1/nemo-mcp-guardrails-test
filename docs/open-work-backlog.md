@@ -8,9 +8,9 @@ across machines or Codex sessions.
 The GMS backend prototype now has these core runtime pieces:
 
 - App authentication for runtime endpoints with `X-App-ID` and `X-API-Key`.
-- Management signup/login and `/management-auth/me` now use scrypt password
-  hashes and signed JWT bearer tokens. New accounts always receive the
-  system-wide `developer` role.
+- Management login and `/management-auth/me` now use scrypt password hashes and
+  signed JWT bearer tokens. Public signup is disabled; system admins create
+  users from `/management-users` and issue one-time temporary passwords.
 - Existing users receive `name` and unique `username` values backfilled from
   email. Settings loads the authenticated profile, saves those fields through
   `PUT /management-auth/me`, and Logout returns to the real Login page.
@@ -58,11 +58,20 @@ The GMS backend prototype now has these core runtime pieces:
   `frontend-api-map.md`, `frontend-screen-plan.md`, and
   `frontend-demo-flow.md`.
 - The first Next.js 13 frontend scaffold now exists under `frontend/`. It
-  implements the uploaded Figma screens:
-  `/login`, `/signup`, `/policies`, and `/settings`.
-- The normal-developer Apps workflow is implemented: `/apps` lists, creates,
-  opens, and deletes client applications; `/apps/[clientId]` provides Overview,
-  Connectors, LLM, Policies, and Runtime Test tabs backed by FastAPI.
+  implements the uploaded Figma screens and current management pages:
+  `/login`, `/signup` admin-managed notice, `/apps`, `/apps/[clientId]`,
+  `/policies`, `/user-management`, and `/settings`.
+- The normal-developer Apps workflow is implemented: `/apps` lists and opens
+  assigned client applications; `/apps/[clientId]` provides Overview,
+  Connectors, LLM, Policies, and Runtime Test tabs backed by FastAPI. App
+  creation is system-admin-only.
+- The admin-only User Management workflow is implemented: `/user-management`
+  lists users, creates accounts with one-time temporary passwords, resets
+  passwords, blocks/enables users, changes system role, and links users to apps
+  as app developers.
+- App API keys are now backend-generated. Create and regenerate responses show
+  the plaintext key once, GMS stores only the hash, and regeneration invalidates
+  the previous key.
 - Settings now provides a class-based app-wide dark theme. It previews
   immediately, saves the selected theme in browser `localStorage`, and restores
   it before rendering on later visits.
@@ -96,6 +105,9 @@ The GMS backend prototype now has these core runtime pieces:
   redundant assignment when the same policy is already active globally.
 - Frontend Delete now removes only the selected app/global assignment. The
   reusable policy definition remains available for other apps.
+- Direct reusable policy-definition deletion is admin-only and now refuses to
+  delete policies that are still assigned globally or to any app. Assigned
+  deletes return `409` with assignment references.
 - Frontend Edit is assignment-safe. It resolves the edited behavior, switches
   only that app/global assignment to an existing or newly created reusable
   policy, and leaves other apps on their previous policy.
@@ -273,9 +285,11 @@ Needed:
 Current state:
 
 - Completed. Management CRUD requires JWT authentication.
-- App reads/writes are filtered through `app_users`; owner/admin links can
-  mutate, viewers are read-only, and system admins bypass app membership.
-- New apps atomically link only their authenticated creator as owner.
+- App reads/writes are filtered through active app-developer `app_users` links;
+  legacy `owner` links are still accepted for compatibility, viewer links no
+  longer grant app access, and system admins bypass app membership.
+- App creation is system-admin-only and new apps atomically link the admin
+  creator as an app developer.
 - Global assignments, direct policy mutation/compilation, and allowed-test
   mutation are restricted to system admins.
 - The frontend automatically sends its saved JWT and hides or disables
@@ -283,7 +297,7 @@ Current state:
 
 Follow-up:
 
-- Add user/admin management screens for changing system and app roles.
+- Add richer admin audit/logging screens after supervisor confirmation.
 
 ## Later Backend Work
 
@@ -350,8 +364,8 @@ Current prep:
 
 Next implementation slice:
 
-- Add protected admin-only policy-definition deletion with assigned-policy
-  checks and explicit force-delete behavior.
+- Add optional admin force-delete behavior only if supervisors want policy
+  definition deletion to also remove assignment references.
 - Add LLM configuration update/delete and ownership controls after the
   organization confirms its provider-administration workflow.
 - Add user/admin management screens for assigning app roles.

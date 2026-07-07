@@ -199,8 +199,8 @@ class AppUserRecord(Base):
     )
     role: Mapped[str] = mapped_column(
         String(20),
-        default="viewer",
-        server_default="viewer",
+        default="admin",
+        server_default="admin",
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

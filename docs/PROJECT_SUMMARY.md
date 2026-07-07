@@ -110,9 +110,9 @@ Current backend/API state:
   wrapper raises `ToolGuardViolation`, `execute_guarded_message()` returns a
   controlled blocked result without running output rails, and `/run` exposes
   tool-guard status/source for Runtime Test.
-- The Next.js 13 frontend exists under `frontend/` with `/login`, `/signup`,
-  `/apps`, `/apps/[clientId]`, `/policies`, and `/settings`. The `/policies`
-  page loads and mutates real
+- The Next.js 13 frontend exists under `frontend/` with `/login`, `/signup`
+  admin-managed notice, `/apps`, `/apps/[clientId]`, `/policies`,
+  `/user-management`, and `/settings`. The `/policies` page loads and mutates real
   FastAPI data, including duplicate-aware Create, assignment-safe Edit, and
   assignment-only Delete. It loads `GET /apps`,
   `GET /global-policy-assignments`, and

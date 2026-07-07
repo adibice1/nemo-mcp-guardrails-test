@@ -13,7 +13,6 @@ class AppCreate(BaseModel):
             "example": {
                 "name": "Test App",
                 "client_id": "test-app",
-                "api_key": "replace-with-strong-api-key",
                 "authorized": True,
                 "main_llm_config_id": None,
                 "guardrail_llm_config_id": None,
@@ -23,7 +22,6 @@ class AppCreate(BaseModel):
 
     name: str
     client_id: str
-    api_key: str = Field(min_length=16)
     authorized: bool = True
     main_llm_config_id: int | None = None
     guardrail_llm_config_id: int | None = None
@@ -45,7 +43,6 @@ class AppUpdate(BaseModel):
 
     name: str | None = None
     client_id: str | None = None
-    api_key: str | None = Field(default=None, min_length=16)
     authorized: bool | None = None
     main_llm_config_id: int | None = None
     guardrail_llm_config_id: int | None = None
@@ -65,6 +62,22 @@ class AppRead(BaseModel):
     guardrail_llm_config_id: int | None
     created_at: datetime
     updated_at: datetime
+
+
+class AppCreateRead(AppRead):
+    """Response body for app creation with one-time API key display."""
+
+    api_key: str
+    api_key_notice: str
+
+
+class AppApiKeyRead(BaseModel):
+    """Response body for one generated app API key."""
+
+    app_id: int
+    client_id: str
+    api_key: str
+    api_key_notice: str
 
 
 class LlmConfigRead(BaseModel):

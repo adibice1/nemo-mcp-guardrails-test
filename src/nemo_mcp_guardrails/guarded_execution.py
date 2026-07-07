@@ -67,6 +67,7 @@ class GuardedExecutionResult:
     output_rail_categories: tuple[str, ...] = ()
     tool_guard_status: str = "not run"
     tool_guard_source: str | None = None
+    blocked_output_phrase: str | None = None
 
 
 def build_agent_messages(
@@ -490,4 +491,5 @@ async def execute_guarded_message(
         input_rail_categories=get_rail_categories(input_result),
         output_rail_categories=get_rail_categories(output_result),
         tool_guard_status="passed",
+        blocked_output_phrase=blocked_phrase,
     )

@@ -23,8 +23,8 @@ Completed pieces:
 - The connector terminology migration has renamed the former connector-shaped
   `apps` metadata to `connectors`, including related actions, resources, tool
   mappings, policy fields, and allowed-test joins.
-- `app_users` and `app_connectors` now model user ownership/roles and
-  app-specific connector access.
+- `app_users` now models admin-controlled app-developer access, and
+  `app_connectors` models app-specific connector access.
 - Runtime construction checks `app_connectors` before GitHub MCP tools are
   built.
 - `app_policy_assignments` and `global_policy_assignments` now reference the
@@ -181,13 +181,13 @@ Recommended frontend slice from the current state:
 Current frontend status:
 
 ```text
-frontend/ implements /login, /signup, /policies, and /settings
-/policies uses mock data by default
+frontend/ implements /login, /signup admin-managed notice, /apps,
+/apps/[clientId], /policies, /user-management, and /settings
 /policies reads GET /apps, GET /global-policy-assignments, and
 GET /apps/by-client-id/{client_id}/effective-policy-assignments when
 NEXT_PUBLIC_API_BASE_URL is configured
-create and assignment-only delete are backend-wired
-assignment-safe edit is not backend-wired yet
+create, assignment-safe edit, and assignment-only delete are backend-wired
+/user-management is admin-only and manages users, temporary passwords, and app links
 ```
 
 The app connector management API slice is complete. Developers can now link

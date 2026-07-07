@@ -29,17 +29,17 @@ def main() -> None:
                         AppUserRecord(
                             user_id=user.id,
                             app_id=app.id,
-                            role="owner",
+                            role="admin",
                         )
                     )
                     created += 1
 
         db.commit()
 
-    print("Existing app ownership backfill complete.")
+    print("Existing app developer-link backfill complete.")
     print(f"- users inspected: {len(users)}")
     print(f"- apps inspected: {len(apps)}")
-    print(f"- owner links created: {created}")
+    print(f"- app developer links created: {created}")
 
 
 if __name__ == "__main__":

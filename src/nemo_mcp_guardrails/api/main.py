@@ -14,6 +14,7 @@ from nemo_mcp_guardrails.api.global_policy_assignments import (
 )
 from nemo_mcp_guardrails.api.llm_configs import router as llm_configs_router
 from nemo_mcp_guardrails.api.management_auth import router as management_auth_router
+from nemo_mcp_guardrails.api.management_users import router as management_users_router
 from nemo_mcp_guardrails.api.policies import router as policies_router
 from nemo_mcp_guardrails.api.policy_metadata import router as policy_metadata_router
 from nemo_mcp_guardrails.api.policy_assignment_resolution import (
@@ -59,6 +60,7 @@ app.include_router(apps_router)
 app.include_router(global_policy_assignments_router)
 app.include_router(llm_configs_router)
 app.include_router(management_auth_router)
+app.include_router(management_users_router)
 app.include_router(policies_router)
 app.include_router(policy_metadata_router)
 app.include_router(policy_assignment_resolution_router)

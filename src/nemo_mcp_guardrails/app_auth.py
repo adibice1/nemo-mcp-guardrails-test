@@ -13,6 +13,26 @@ def hash_api_key(api_key: str) -> str:
     return hashlib.sha256(api_key.encode("utf-8")).hexdigest()
 
 
+def generate_api_key() -> str:
+    """Generate one high-entropy client-app API key."""
+
+    return f"gms_{secrets.token_urlsafe(32)}"
+
+
+def generate_unique_api_key(db: Session) -> str:
+    """Generate an API key whose hash is not already stored."""
+
+    for _ in range(10):
+        api_key = generate_api_key()
+        existing = db.scalar(
+            select(AppRecord).where(AppRecord.api_key_hash == hash_api_key(api_key))
+        )
+        if existing is None:
+            return api_key
+
+    raise RuntimeError("Could not generate a unique API key")
+
+
 def verify_api_key(api_key: str, expected_hash: str) -> bool:
     """Compare an API key with its stored hash using constant-time comparison."""
 

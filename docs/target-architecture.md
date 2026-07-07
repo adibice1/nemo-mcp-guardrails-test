@@ -227,22 +227,22 @@ app_id
 role
 ```
 
-Suggested future roles:
+Active app-link role:
 
 ```text
-owner
 admin
-viewer
 ```
 
-Current implementation status: active. New apps create an `owner` link for
-their authenticated creator in the same transaction. App owners/admins may
-mutate, viewers are read-only, and system admins bypass app membership.
-Role-management endpoints are still future work.
+Current implementation status: active. App creation is system-admin-only.
+Linked developers use the internal `admin` app role and can manage their
+assigned apps; system admins bypass app membership. Legacy `owner` links are
+still treated as app-developer links for compatibility, but new UI/API flows do
+not create owner or viewer links.
 
 Management identities now also have a system-wide `developer` or `admin` role.
-Signup always creates a developer; administrator promotion remains an explicit
-database/administrative operation until user-management APIs are added.
+Public signup is disabled. System admins create users, issue one-time
+temporary passwords, reset passwords, block/enable users, and link users to
+apps through `/management-users` and the frontend `/user-management` tab.
 
 ### connectors
 
@@ -404,7 +404,7 @@ policy_id
 enabled
 ```
 
-Global rules cannot be overridden by app owners.
+Global rules cannot be overridden by linked app developers.
 
 Current implementation status: created. The existing connector-independent
 credential output policy is globally assigned. Existing GitHub write policies

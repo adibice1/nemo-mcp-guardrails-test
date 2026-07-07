@@ -30,7 +30,7 @@ excluded.
 - `src/nemo_mcp_guardrails/__init__.py` - Marks `nemo_mcp_guardrails` as an importable Python package.
 - `src/nemo_mcp_guardrails/app_auth.py` - Hashes app API keys and authenticates authorized client-ID/API-key pairs.
 - `src/nemo_mcp_guardrails/management_auth.py` - Hashes management passwords and creates/verifies signed JWT access tokens.
-- `src/nemo_mcp_guardrails/management_permissions.py` - Enforces system-admin roles and app membership/write roles across management routes.
+- `src/nemo_mcp_guardrails/management_permissions.py` - Enforces system-admin roles and active app-developer links across management routes.
 - `src/nemo_mcp_guardrails/guarded_execution.py` - Runs input rails, the agent and guarded tools, output rails, and structured Azure/GMS status handling.
 - `src/nemo_mcp_guardrails/output_guard.py` - Applies deterministic checks for explicit restricted phrases in generated output.
 - `src/nemo_mcp_guardrails/policy_compiler.py` - Converts structured input/output policy objects into NeMo rules, tool restrictions, and generated tests.
@@ -78,15 +78,16 @@ excluded.
 - `frontend/app/globals.css` - Contains the shared Tailwind layers and nearly all custom GMS visual styling.
 - `frontend/app/page.tsx` - Redirects the frontend root route to `/policies`.
 - `frontend/app/login/page.tsx` - Renders the login design and its client-side form interactions.
-- `frontend/app/signup/page.tsx` - Renders the registration design and its client-side form interactions.
+- `frontend/app/signup/page.tsx` - Displays the admin-managed account creation notice and links back to Login.
 - `frontend/app/policies/page.tsx` - Orchestrates policy loading, filtering, sorting, pagination, creation, editing, deletion, and notices.
 - `frontend/app/apps/page.tsx` - Loads, creates, deletes, sorts, and paginates the user's client applications.
 - `frontend/app/apps/[clientId]/page.tsx` - Loads one app and coordinates its overview, connectors, LLM, policies, and runtime tabs.
+- `frontend/app/user-management/page.tsx` - Lets system admins create users, reset temporary passwords, and link users to apps.
 - `frontend/app/settings/page.tsx` - Wraps the account settings form in the shared GMS navigation/layout.
 
 ## Frontend Components
 
-- `frontend/components/shared/app-top-nav.tsx` - Renders the shared Policies, Apps, and Settings navigation.
+- `frontend/components/shared/app-top-nav.tsx` - Renders the shared Apps, Policies, admin-only User Management, and Settings navigation.
 - `frontend/components/shared/auth-illustration.tsx` - Renders the decorative login/signup illustration.
 - `frontend/components/shared/form-field.tsx` - Provides the reusable labeled authentication form field.
 - `frontend/components/policies/create-policy-modal.tsx` - Implements the input/output policy builder and cascading dropdown UI.
@@ -127,13 +128,13 @@ excluded.
 - `docker-compose.yml` - Starts the local Postgres and pgAdmin services.
 - `scripts/run_api.py` - Starts the FastAPI/Uvicorn development server.
 - `scripts/migrate_management_auth.py` - Adds the system-wide developer/admin role to existing user tables.
-- `scripts/backfill_existing_app_users.py` - Idempotently links every existing demo user to every pre-RBAC app as an owner.
+- `scripts/backfill_existing_app_users.py` - Idempotently links existing demo users to pre-RBAC apps.
 - `AGENTS.md` - Stores project terminology, current architecture, safety rules, and agent handoff instructions.
 
 ## Tests, Scripts, And Deeper Explanations
 
 - Use `docs/testing-notes.md` for test/debug scripts and their commands.
-- `tests/test_management_rbac_http.py` proves creator ownership, developer isolation, and system-admin overrides.
+- `tests/test_management_rbac_http.py` proves admin-created apps, developer isolation, app-developer links, and system-admin overrides.
 - Use `docs/policy-schema-design.md` for schema and migration details.
 - Use `docs/runtime-flow-map.md` when one-line descriptions are not enough and function-level execution order is needed.
 - Use `docs/troubleshooting.md` for known local setup, Postgres, DBeaver, NeMo, and GitHub MCP failures.

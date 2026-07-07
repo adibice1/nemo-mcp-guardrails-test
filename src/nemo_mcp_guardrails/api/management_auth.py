@@ -1,5 +1,3 @@
-import re
-
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -19,7 +17,6 @@ from nemo_mcp_guardrails.database.models import UserRecord
 from nemo_mcp_guardrails.management_auth import (
     create_access_token,
     decode_access_token,
-    hash_password,
     normalize_email,
     verify_password,
 )
@@ -27,7 +24,6 @@ from nemo_mcp_guardrails.management_auth import (
 
 router = APIRouter(prefix="/management-auth", tags=["management-auth"])
 bearer_scheme = HTTPBearer(auto_error=False)
-EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 INVALID_CREDENTIALS = "Invalid email or password"
 
 
@@ -75,43 +71,16 @@ def require_management_user(
 @router.post(
     "/signup",
     response_model=ManagementTokenResponse,
-    status_code=status.HTTP_201_CREATED,
 )
 def signup(
     payload: ManagementSignupRequest,
     db: Session = Depends(get_db),
 ) -> ManagementTokenResponse:
-    """Create a developer account and return its first access token."""
+    """Reject public signup; administrators create users now."""
 
-    email = normalize_email(payload.email)
-    if not EMAIL_PATTERN.fullmatch(email):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="A valid email address is required",
-        )
-
-    user = UserRecord(
-        email=email,
-        name=email,
-        username=email,
-        password_hash=hash_password(payload.password),
-        system_role="developer",
-        enabled=True,
-    )
-    db.add(user)
-    try:
-        db.commit()
-    except IntegrityError as error:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="An account with this email already exists",
-        ) from error
-
-    db.refresh(user)
-    return ManagementTokenResponse(
-        access_token=create_access_token(user),
-        user=_user_response(user),
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Public signup is disabled. Ask a GMS administrator to create your account.",
     )
 
 

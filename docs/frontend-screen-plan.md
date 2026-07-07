@@ -60,8 +60,9 @@ Components:
 
 Notes:
 
-- Runtime app auth is separate. Runtime tester still needs `X-App-ID` and
-  `X-API-Key`.
+- Runtime app auth is separate. The app backend still needs `X-App-ID` and
+  `X-API-Key`; the local frontend Runtime Test proxies through a Next.js route
+  so the browser does not show the key field.
 - Keep labels honest: "Demo login" or "Local management session".
 
 ## Screen 2: Dashboard
@@ -175,7 +176,7 @@ Header:
 Tabs:
 
 ```text
-Overview | Connectors | Policies | Runtime Tester
+Overview | Connectors | Policies | Runtime Test
 ```
 
 ### Overview Tab
@@ -460,14 +461,17 @@ components/
 ## Frontend Implementation Order
 
 1. Figma-matched static shell and pages. Done in `frontend/` for `/login`,
-   `/signup`, `/policies`, and `/settings`.
-2. API client and typed fetch wrappers. First read-only `/policies` adapter is
-   done in `frontend/lib/api-client.ts`.
-3. Policy creation and assignment-only Delete are backend-wired. Next,
-   implement assignment-safe Edit through resolve-and-swap behavior.
-4. Apps list and create/edit forms.
-5. App detail with connector tab.
-6. App policy assignment tab.
+   `/signup` admin-managed notice, `/apps`, `/apps/[clientId]`, `/policies`,
+   `/user-management`, and `/settings`.
+2. API client and typed fetch wrappers. Backend-backed Apps, Policies,
+   Settings, Runtime Test, and User Management adapters are active.
+3. Policy creation, assignment-safe Edit, and assignment-only Delete are
+   backend-wired through duplicate-aware resolve endpoints.
+4. Apps list/detail, connector management, effective policy list, and runtime
+   test are backend-wired. LLM metadata editing is hidden from normal
+   developer-facing app detail screens for now.
+5. Admin-only User Management now creates users, resets temporary passwords,
+   blocks/enables users, changes roles, and links users to apps.
 7. Runtime tester.
 8. Policy library create/edit polish.
 9. Dashboard polish.

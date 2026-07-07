@@ -103,6 +103,7 @@ Blocked actions:
 - `app_policy_assignments` and `global_policy_assignments` reference the existing reusable definitions in `policies`. The connector-independent credential output policy is globally assigned; GitHub write policies remain unassigned.
 - FastAPI client-app CRUD lives under `/apps`; nested app-policy-assignment CRUD lives under `/apps/{app_id}/policy-assignments`; global assignment CRUD lives under `/global-policy-assignments`.
 - App/global assignment POST bodies use `policy_ids`, so the same endpoints handle single and bulk assignment. Assignment responses include readable app and policy labels beside numeric IDs for Swagger/frontend use.
+- Direct reusable policy-definition deletion through `DELETE /policies/{policy_id}` is system-admin-only and is blocked with `409 policy_still_assigned` while the policy is still assigned globally or to any app. Normal frontend delete actions should remove assignments, not shared definitions.
 - `GET /policy-options` returns enabled connector/action/resource combinations
   from normalized `connector_tool_mappings`; the frontend uses it for cascading
   policy-builder dropdowns and does not offer unmapped combinations.
@@ -119,11 +120,11 @@ Blocked actions:
 - Developer-friendly client-ID aliases exist under `/apps/by-client-id/{client_id}` and `/apps/by-client-id/{client_id}/policy-assignments`; they resolve to the same internal app rows and full assignment CRUD logic.
 - App connector CRUD exists under `/apps/{app_id}/connectors` and `/apps/by-client-id/{client_id}/connectors`; connector references can use a numeric connector ID or connector name such as `github`.
 - Effective policy assignment summaries exist under `/apps/{app_id}/effective-policy-assignments` and `/apps/by-client-id/{client_id}/effective-policy-assignments`; they return global plus app-specific assignments with policy IDs, assignment IDs, labels, and enabled flags.
-- App create/update accepts an API key, stores only its SHA-256 hash, and never returns the plaintext key or hash. `src/nemo_mcp_guardrails/app_auth.py` centralizes hashing and constant-time verification; `authenticate_app()` accepts only matching, authorized client ID/API-key pairs.
+- App create/regenerate generates a high-entropy API key server-side, returns it once, and stores only its SHA-256 hash. App update no longer accepts a user-supplied key. `src/nemo_mcp_guardrails/app_auth.py` centralizes generation, hashing, and constant-time verification; `authenticate_app()` accepts only matching, authorized client ID/API-key pairs.
 - `tests/test_app_auth.py` is a self-cleaning Postgres authentication diagnostic covering valid, wrong-key, unknown-client, and unauthorized-app cases.
 - `src/nemo_mcp_guardrails/api/auth.py` provides the reusable FastAPI `require_authenticated_app` dependency. It reads `X-App-ID` and `X-API-Key`, authenticates before runtime work begins, and returns the same generic `401` response for every invalid case.
 - `GET /v1/guardrails/auth-check` is the first protected runtime proof endpoint. It verifies credentials and returns only the authenticated app identity; it does not load policies, NeMo, Docker, or MCP tools.
-- `POST /v1/guardrails/run` is now the authenticated guarded runtime endpoint. It validates app credentials, loads stored `conversation_messages` for the app conversation, bootstraps from client-supplied `conversation_history` when needed, trims older turns by `NEMO_MAX_RUNTIME_CONTEXT_CHARS`, builds app-scoped NeMo rails and guarded GitHub MCP tools, calls `execute_guarded_message()`, stores the latest user/assistant turn when `conversation_id` is present, and returns a JSON execution response with history metadata.
+- `POST /v1/guardrails/run` is now the authenticated guarded runtime endpoint. It validates app credentials, loads stored `conversation_messages` for the app conversation, bootstraps from client-supplied `conversation_history` when needed, trims older turns by `NEMO_MAX_RUNTIME_CONTEXT_CHARS`, builds app-scoped NeMo rails and guarded GitHub MCP tools, calls `execute_guarded_message()`, stores the latest user/assistant turn when `conversation_id` is present, and returns a JSON execution response with history metadata. Blocked responses also include `block_stage`, `block_reason`, `blocked_policy_id`, and `blocked_policy_name` where available; the returned response text is replaced with the readable reason.
 - `src/nemo_mcp_guardrails/runtime_factory.py` respects separate `main_llm_config_id` and `guardrail_llm_config_id` values on the authenticated app. The guardrail config is injected into NeMo rails, and the main config is used by the LangChain agent. Missing config IDs fall back to `.env` Azure OpenAI settings. Only Azure OpenAI-compatible provider rows are executable for now; other providers return a clear unsupported-provider error.
 - `src/nemo_mcp_guardrails/guarded_execution.py` now owns the reusable single-request sequence: input rail, early block, agent/guarded tools with optional trimmed history, controlled `tool_error` responses for connector `ToolException` failures, output rail, controlled blocked responses for Azure output `content_filter` failures, and structured result. `tests/test_nemo_mcp.py` still chooses test prompts and prints the familiar workflow sections.
 - `tests/test_app_auth_http.py` is a self-cleaning HTTP authentication diagnostic covering missing headers, wrong keys, unknown clients, unauthorized apps, and valid credentials.
@@ -132,21 +133,28 @@ Blocked actions:
 - `tests/test_app_connector_api.py` proves app connector CRUD, connector lookup by name or ID, upsert behavior, and missing-link errors.
 - `tests/test_runtime_connector_credentials.py` proves default PAT fallback, app-specific `env:VAR_NAME` credential references, missing env vars, and unsupported reference schemes.
 - Management CRUD now requires the management JWT. `/apps` is filtered through
-  `app_users`; app owners/app admins can mutate their linked apps, viewers are
-  read-only, and system admins can access every app. Global assignments, direct
-  policy mutations/compilation, and allowed-test mutations are system-admin-only.
-- Management identity endpoints now exist at `/management-auth/signup`,
-  `/management-auth/login`, and `/management-auth/me`. Passwords use salted
-  scrypt hashes and JWTs require `GMS_JWT_SECRET`; signup can create developers
-  only. `require_management_user` authenticates management CRUD and
+  active `app_users` developer links; linked app developers can mutate their
+  assigned apps, and system admins can access every app. Global assignments,
+  direct policy mutations/compilation, and allowed-test mutations are
+  system-admin-only.
+- Management identity endpoints now exist at `/management-auth/login` and
+  `/management-auth/me`. Passwords use salted scrypt hashes and JWTs require
+  `GMS_JWT_SECRET`; public signup is disabled because accounts are now
+  admin-managed. `require_management_user` authenticates management CRUD and
   `management_permissions.py` enforces app membership and administrator roles.
+- Admin-only user management exists under `/management-users`. System admins
+  can create users, receive one-time temporary passwords, reset passwords,
+  block/enable users, change system roles, and link users to apps as app
+  developers. The frontend exposes this as the admin-only
+  `/user-management` tab.
 - `users.name` and unique `users.username` are added by
   `scripts/migrate_management_auth.py` and backfilled from email. Authenticated
   Settings updates them through `PUT /management-auth/me`; email remains
   read-only and Logout clears the frontend session.
-- New apps create their creator's `app_users` owner link in the same
-  transaction. `scripts/backfill_existing_app_users.py` idempotently links the
-  current pre-RBAC demo users and apps.
+- App creation is system-admin-only. New apps create the admin creator's
+  internal app-developer link in the same transaction.
+  `scripts/backfill_existing_app_users.py` idempotently links the current
+  pre-RBAC demo users and apps.
 - Normal full-run GitHub MCP tests should keep `GITHUB_MCP_READ_ONLY=1`. Manual local write testing can set `GITHUB_MCP_READ_ONLY=0` in `.env` and restart the API. Future write-capable scripted testing should be a separate opt-in harness with a throwaway repo and limited token.
 - Do not add a custom `config/policies.yml` yet unless explicitly choosing to prototype the future admin/backend policy store. It is not a standard NeMo Guardrails file.
 
@@ -205,7 +213,7 @@ policy CRUD auto-refreshes compiled_policy_rules
 frontend-api-map.md maps backend endpoints to UI screens
 frontend-screen-plan.md defines the first Next.js 13 screens/components
 frontend-demo-flow.md defines the presentation GitHub MCP demo path
-frontend/ contains Next.js 13 pages: /login, /signup, /apps, /apps/[clientId], /policies, /settings
+frontend/ contains Next.js 13 pages: /login, /signup admin-managed notice, /apps, /apps/[clientId], /policies, /user-management, /settings
 /policies supports backend-backed duplicate-aware Create, assignment-safe Edit, and assignment-only Delete
 Apps list/detail and GitHub connector/runtime management are backend-backed
 -> add a readable LLM-config catalogue and named selectors next

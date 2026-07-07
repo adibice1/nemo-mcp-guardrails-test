@@ -154,7 +154,7 @@ export function CreatePolicyModal({
           <div className="mt-6 grid grid-cols-1 gap-8 md:grid-cols-[240px_1fr]">
             <FormField label="Name Policy:" required>
               <input
-                className="h-14 w-full rounded border border-gms-blue bg-white px-3 text-sm text-gms-text outline-none placeholder:text-[#a9bdff] disabled:bg-[#f2f2f2] dark:bg-[#252932] dark:disabled:bg-[#363b45]"
+                className="h-7 w-full rounded border border-gms-blue bg-white px-3 text-sm text-gms-text outline-none placeholder:text-[#a9bdff] disabled:bg-[#f2f2f2] dark:bg-[#252932] dark:disabled:bg-[#363b45]"
                 placeholder="Type your Policy Name"
                 value={policyName}
                 onChange={(event) => setPolicyName(event.target.value)}

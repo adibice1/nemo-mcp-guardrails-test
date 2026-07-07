@@ -14,7 +14,10 @@ from nemo_mcp_guardrails.api.policy_schemas import (
 from nemo_mcp_guardrails.api.management_auth import require_management_user
 from nemo_mcp_guardrails.database.connection import get_db
 from nemo_mcp_guardrails.database.models import (
+    AppPolicyAssignmentRecord,
+    AppRecord,
     CompiledPolicyRuleRecord,
+    GlobalPolicyAssignmentRecord,
     PolicyRecord,
 )
 from nemo_mcp_guardrails.policy_compiler import (
@@ -246,6 +249,47 @@ def update_policy(
     return policy
 
 
+def _policy_assignment_blockers(
+    policy_id: int,
+    db: Session,
+) -> dict[str, object] | None:
+    """Return assignment references that prevent policy definition deletion."""
+
+    global_assignments = list(
+        db.scalars(
+            select(GlobalPolicyAssignmentRecord).where(
+                GlobalPolicyAssignmentRecord.policy_id == policy_id
+            )
+        )
+    )
+    app_assignment_rows = list(
+        db.execute(
+            select(AppPolicyAssignmentRecord, AppRecord)
+            .join(AppRecord, AppRecord.id == AppPolicyAssignmentRecord.app_id)
+            .where(AppPolicyAssignmentRecord.policy_id == policy_id)
+        )
+    )
+    if not global_assignments and not app_assignment_rows:
+        return None
+
+    return {
+        "code": "policy_still_assigned",
+        "policy_id": policy_id,
+        "global_assignment_ids": [
+            assignment.id for assignment in global_assignments
+        ],
+        "app_assignments": [
+            {
+                "assignment_id": assignment.id,
+                "app_id": app.id,
+                "client_id": app.client_id,
+                "app_name": app.name,
+            }
+            for assignment, app in app_assignment_rows
+        ],
+    }
+
+
 @router.delete(
     "/{policy_id}",
     status_code=status.HTTP_204_NO_CONTENT,
@@ -259,6 +303,13 @@ def delete_policy(policy_id: int, db: Session = Depends(get_db)) -> None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Policy not found",
+        )
+
+    blockers = _policy_assignment_blockers(policy_id, db)
+    if blockers is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=blockers,
         )
 
     db.delete(policy)

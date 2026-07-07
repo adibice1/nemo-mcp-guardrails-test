@@ -61,6 +61,7 @@ export default function PoliciesPage() {
   const [apiStatus, setApiStatus] = useState<ApiStatus>(
     hasApiBaseUrl() ? "loading" : "mock"
   );
+  const [backendLoaded, setBackendLoaded] = useState(!hasApiBaseUrl());
   const [apiError, setApiError] = useState("");
   const [notice, setNotice] = useState<Notice | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -104,14 +105,23 @@ export default function PoliciesPage() {
         setGlobalAssignments(nextGlobalAssignments);
         setPolicyDefinitions(nextPolicyDefinitions);
         setPolicyOptions(nextPolicyOptions);
+        if (
+          selectedApp &&
+          !nextApps.some((app) => app.display_label === selectedApp)
+        ) {
+          setSelectedApp("");
+          window.localStorage.setItem(SELECTED_APP_STORAGE_KEY, "");
+        }
         setPolicies(
           nextGlobalAssignments.map((assignment) =>
             mapGlobalAssignmentToPolicyRow(assignment, nextPolicyDefinitions)
           )
         );
         setApiStatus("ready");
+        setBackendLoaded(true);
       } catch (error) {
         setApiStatus("error");
+        setBackendLoaded(true);
         setApiError(
           error instanceof Error ? error.message : "Could not load backend data."
         );
@@ -140,6 +150,11 @@ export default function PoliciesPage() {
       (app) => app.display_label === selectedApp
     );
     if (!selectedAppRecord) {
+      if (!backendLoaded) {
+        return;
+      }
+      setSelectedApp("");
+      window.localStorage.setItem(SELECTED_APP_STORAGE_KEY, "");
       return;
     }
 
@@ -147,6 +162,7 @@ export default function PoliciesPage() {
       try {
         setApiStatus("loading");
         setApiError("");
+        setPolicies([]);
         const effective = await getEffectivePolicyAssignments(app.client_id);
         setPolicies([
           ...effective.global_assignments.map((assignment) =>
@@ -173,7 +189,7 @@ export default function PoliciesPage() {
     }
 
     void loadAppPolicies(selectedAppRecord);
-  }, [apps, globalAssignments, policyDefinitions, selectedApp]);
+  }, [apps, backendLoaded, globalAssignments, policyDefinitions, selectedApp]);
 
   async function reloadPolicyData() {
     const [nextApps, nextGlobalAssignments, nextPolicyDefinitions] =
@@ -419,6 +435,7 @@ export default function PoliciesPage() {
 
   function handleSelectedAppChange(value: string) {
     setSelectedApp(value);
+    setPolicies([]);
     setPage(1);
     window.localStorage.setItem(SELECTED_APP_STORAGE_KEY, value);
   }
@@ -467,7 +484,7 @@ export default function PoliciesPage() {
   const totalPages = Math.max(1, Math.ceil(visiblePolicies.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const appSelectOptions =
-    apps.length > 0 ? apps.map((app) => app.display_label) : appOptions;
+    hasApiBaseUrl() ? apps.map((app) => app.display_label) : appOptions;
   const paginatedPolicies = visiblePolicies.slice(
     (safePage - 1) * PAGE_SIZE,
     safePage * PAGE_SIZE

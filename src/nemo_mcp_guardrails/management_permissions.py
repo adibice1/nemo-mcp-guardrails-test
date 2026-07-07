@@ -11,8 +11,7 @@ from nemo_mcp_guardrails.database.models import (
 )
 
 
-APP_WRITE_ROLES = {"owner", "admin"}
-SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+APP_MANAGE_ROLES = {"admin", "owner"}
 
 
 def require_system_admin(
@@ -33,7 +32,7 @@ def require_app_route_access(
     user: UserRecord = Depends(require_management_user),
     db: Session = Depends(get_db),
 ) -> UserRecord:
-    """Require membership for app routes and a write role for mutations."""
+    """Require an app developer link for app routes."""
 
     app_id = request.path_params.get("app_id")
     client_id = request.path_params.get("client_id")
@@ -59,14 +58,9 @@ def require_app_route_access(
             AppUserRecord.user_id == user.id,
         )
     )
-    if link is None:
+    if link is None or link.role not in APP_MANAGE_ROLES:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have access to this app",
-        )
-    if request.method not in SAFE_METHODS and link.role not in APP_WRITE_ROLES:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="App owner or administrator access required",
         )
     return user

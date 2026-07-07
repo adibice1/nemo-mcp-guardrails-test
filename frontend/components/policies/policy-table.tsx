@@ -42,45 +42,49 @@ export function PolicyTable({
 
   return (
     <div className="mt-6">
-      <div className="grid grid-cols-[46px_66px_180px_1fr_180px_150px_90px_94px_34px] items-center px-1 text-sm text-gms-muted">
-        <span />
-        <span />
-        <span>Policy Connector</span>
-        <span>Policy Name</span>
-        <SortableHeader
-          active={sort.key === "created"}
-          direction={sort.direction}
-          label="Created"
-          onClick={() => onSort("created")}
-        />
-        <SortableHeader
-          active={sort.key === "global"}
-          direction={sort.direction}
-          label="Global"
-          onClick={() => onSort("global")}
-        />
-        <span>Edit</span>
-        <span>Delete</span>
-        <span />
-      </div>
-
-      <div className="mt-3 space-y-3">
-        {policies.length > 0 ? (
-          policies.map((policy, index) => (
-            <PolicyRowItem
-              key={policy.id}
-              index={(page - 1) * pageSize + index + 1}
-              policy={policy}
-              onDelete={onDelete}
-              onEdit={onEdit}
-              onOpen={onOpen}
+      <div className="overflow-x-auto pb-2">
+        <div className="min-w-[980px]">
+          <div className="grid grid-cols-[46px_66px_180px_minmax(180px,1fr)_180px_150px_90px_94px_34px] items-center px-1 text-sm text-gms-muted">
+            <span />
+            <span />
+            <span>Policy Connector</span>
+            <span>Policy Name</span>
+            <SortableHeader
+              active={sort.key === "created"}
+              direction={sort.direction}
+              label="Created"
+              onClick={() => onSort("created")}
             />
-          ))
-        ) : (
-          <div className="rounded-md border border-dashed border-gms-line bg-white py-12 text-center text-sm text-gms-muted dark:bg-[#20242c]">
-            No policies found for this view.
+            <SortableHeader
+              active={sort.key === "global"}
+              direction={sort.direction}
+              label="Global"
+              onClick={() => onSort("global")}
+            />
+            <span>Edit</span>
+            <span>Delete</span>
+            <span />
           </div>
-        )}
+
+          <div className="mt-3 space-y-3">
+            {policies.length > 0 ? (
+              policies.map((policy, index) => (
+                <PolicyRowItem
+                  key={policy.id}
+                  index={(page - 1) * pageSize + index + 1}
+                  policy={policy}
+                  onDelete={onDelete}
+                  onEdit={onEdit}
+                  onOpen={onOpen}
+                />
+              ))
+            ) : (
+              <div className="rounded-md border border-dashed border-gms-line bg-white py-12 text-center text-sm text-gms-muted dark:bg-[#20242c]">
+                No policies found for this view.
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="mt-4 flex items-center justify-center gap-4 text-sm text-gms-text">
@@ -172,7 +176,7 @@ function PolicyRowItem({
 }) {
   return (
     <div
-      className="group grid min-h-[56px] cursor-pointer grid-cols-[46px_66px_180px_1fr_180px_150px_90px_94px_34px] items-center rounded-md border border-gms-line bg-white px-1 text-sm text-gms-text shadow-[0_1px_2px_rgba(55,70,110,0.04)] transition hover:border-gms-blue hover:bg-gms-blue hover:text-white dark:bg-[#20242c]"
+      className="group grid min-h-[56px] cursor-pointer grid-cols-[46px_66px_180px_minmax(180px,1fr)_180px_150px_90px_94px_34px] items-center rounded-md border border-gms-line bg-white px-1 text-sm text-gms-text shadow-[0_1px_2px_rgba(55,70,110,0.04)] transition hover:border-gms-blue hover:bg-gms-blue hover:text-white dark:bg-[#20242c]"
       role="button"
       tabIndex={0}
       onClick={() => onOpen(policy)}

@@ -187,13 +187,6 @@ export function SettingsForm() {
             value={profile.email}
           />
 
-          <div className="-mt-6 grid grid-cols-[160px_1fr] items-center gap-10">
-            <span />
-            <p className="whitespace-nowrap text-sm text-gms-muted">
-              Email changes and verification are not available yet.
-            </p>
-          </div>
-
           {error && (
             <div className="grid grid-cols-[160px_1fr] gap-10">
               <span />
@@ -229,12 +222,6 @@ export function SettingsForm() {
               onClick={handleLogout}
             >
               Logout
-            </button>
-            <button className="block text-[#b8b8b8]" type="button">
-              Export My Data
-            </button>
-            <button className="block text-[#ff4141]" type="button">
-              Delete My Account
             </button>
           </div>
         </div>

@@ -1,19 +1,24 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Copy, Eye, EyeOff, KeyRound, Plus, X } from "lucide-react";
+import { Copy, KeyRound, Plus, X } from "lucide-react";
 import { FormField } from "@/components/shared/form-field";
 
 export type AppDraft = {
   name: string;
   clientId: string;
+};
+
+export type CreatedAppSecret = {
+  name: string;
   apiKey: string;
+  notice: string;
 };
 
 type CreateAppModalProps = {
   open: boolean;
   onClose: () => void;
-  onSubmit: (draft: AppDraft) => Promise<boolean>;
+  onSubmit: (draft: AppDraft) => Promise<CreatedAppSecret | null>;
 };
 
 export function CreateAppModal({
@@ -23,32 +28,26 @@ export function CreateAppModal({
 }: CreateAppModalProps) {
   const [name, setName] = useState("");
   const [clientId, setClientId] = useState("");
-  const [apiKey, setApiKey] = useState("");
-  const [showKey, setShowKey] = useState(false);
+  const [createdSecret, setCreatedSecret] = useState<CreatedAppSecret | null>(null);
+  const [copied, setCopied] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (!open) {
       setName("");
       setClientId("");
-      setApiKey("");
-      setShowKey(false);
+      setCreatedSecret(null);
+      setCopied(false);
     }
   }, [open]);
 
   const canCreate = useMemo(
-    () => name.trim() && clientId.trim() && apiKey.length >= 16,
-    [apiKey.length, clientId, name]
+    () => name.trim() && clientId.trim() && !createdSecret,
+    [clientId, createdSecret, name]
   );
 
   if (!open) {
     return null;
-  }
-
-  function generateApiKey() {
-    const value = `gms_${crypto.randomUUID().replace(/-/g, "")}`;
-    setApiKey(value);
-    setShowKey(true);
   }
 
   async function handleSubmit() {
@@ -56,12 +55,23 @@ export function CreateAppModal({
       return;
     }
     setSubmitting(true);
-    await onSubmit({
+    const result = await onSubmit({
       name: name.trim(),
-      clientId: clientId.trim(),
-      apiKey
+      clientId: clientId.trim()
     });
+    if (result) {
+      setCreatedSecret(result);
+    }
     setSubmitting(false);
+  }
+
+  async function handleCopyApiKey() {
+    if (!createdSecret) {
+      return;
+    }
+    await navigator.clipboard.writeText(createdSecret.apiKey);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1800);
   }
 
   return (
@@ -87,6 +97,7 @@ export function CreateAppModal({
           <FormField label="Application Name:" required>
             <input
               className="h-11 w-full rounded border border-gms-blue bg-white px-3 text-sm text-gms-text outline-none placeholder:text-[#a9bdff] dark:bg-[#252932]"
+              disabled={Boolean(createdSecret)}
               placeholder="Finance Bot"
               value={name}
               onChange={(event) => setName(event.target.value)}
@@ -95,6 +106,7 @@ export function CreateAppModal({
           <FormField label="Client ID:" required>
             <input
               className="h-11 w-full rounded border border-gms-blue bg-white px-3 text-sm text-gms-text outline-none placeholder:text-[#a9bdff] dark:bg-[#252932]"
+              disabled={Boolean(createdSecret)}
               placeholder="finance-bot"
               value={clientId}
               onChange={(event) => setClientId(event.target.value)}
@@ -102,53 +114,36 @@ export function CreateAppModal({
           </FormField>
         </div>
 
-        <FormField label="API Key:" required className="mt-5">
-          <div className="flex gap-2">
-            <div className="relative min-w-0 flex-1">
-              <KeyRound className="absolute left-3 top-3 h-5 w-5 text-gms-muted" />
+        {createdSecret ? (
+          <div className="mt-6 rounded-xl border border-[#9bb5ff] bg-[#f4f7ff] p-5 dark:border-[#4d66a8] dark:bg-[#202b45]">
+            <div className="flex items-center gap-3 text-gms-blue">
+              <KeyRound className="h-5 w-5" />
+              <p className="text-sm font-extrabold">API key generated</p>
+            </div>
+            <p className="mt-2 text-xs text-gms-muted">{createdSecret.notice}</p>
+            <div className="mt-4 flex gap-2">
               <input
-                className="h-11 w-full rounded border border-gms-blue bg-white px-10 pr-12 text-sm text-gms-text outline-none placeholder:text-[#a9bdff] dark:bg-[#252932]"
-                minLength={16}
-                placeholder="Minimum 16 characters"
-                type={showKey ? "text" : "password"}
-                value={apiKey}
-                onChange={(event) => setApiKey(event.target.value)}
+                className="h-11 min-w-0 flex-1 rounded border border-gms-blue bg-white px-3 font-mono text-xs text-gms-text outline-none dark:bg-[#252932]"
+                readOnly
+                value={createdSecret.apiKey}
               />
               <button
-                aria-label={showKey ? "Hide API key" : "Show API key"}
-                className="absolute right-3 top-3 text-gms-muted hover:text-gms-blue"
+                aria-label="Copy generated API key"
+                className="inline-flex h-11 min-w-[96px] items-center justify-center gap-2 rounded-md bg-gms-blue px-4 text-sm font-semibold text-white shadow-button"
                 type="button"
-                onClick={() => setShowKey((current) => !current)}
+                onClick={handleCopyApiKey}
               >
-                {showKey ? (
-                  <EyeOff className="h-5 w-5" />
-                ) : (
-                  <Eye className="h-5 w-5" />
-                )}
+                <Copy className="h-4 w-4" />
+                {copied ? "Copied!" : "Copy"}
               </button>
             </div>
-            <button
-              className="rounded-md border border-gms-blue px-4 text-sm font-semibold text-gms-blue hover:bg-gms-blue-soft"
-              type="button"
-              onClick={generateApiKey}
-            >
-              Generate
-            </button>
-            <button
-              aria-label="Copy API key"
-              className="flex h-11 w-11 items-center justify-center rounded-md border border-gms-line text-gms-muted hover:text-gms-blue"
-              disabled={!apiKey}
-              type="button"
-              onClick={() => navigator.clipboard.writeText(apiKey)}
-            >
-              <Copy className="h-4 w-4" />
-            </button>
           </div>
-          <p className="mt-2 text-xs font-normal text-gms-muted">
-            Store this key securely. GMS saves only its hash and cannot display
-            it again.
+        ) : (
+          <p className="mt-6 rounded-xl border border-gms-line bg-[#f7f9ff] p-4 text-sm text-gms-muted dark:bg-[#20242c]">
+            GMS will generate a secure API key after creation. Copy it before
+            closing this dialog because it will not be shown again.
           </p>
-        </FormField>
+        )}
 
         <div className="mt-8 flex justify-end">
           <button

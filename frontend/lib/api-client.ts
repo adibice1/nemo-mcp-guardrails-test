@@ -20,6 +20,57 @@ export type ManagementUser = {
   system_role: "developer" | "admin";
 };
 
+export type ManagedUser = ManagementUser & {
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ManagedUserCreatePayload = {
+  email: string;
+  name?: string | null;
+  username?: string | null;
+  system_role: "developer" | "admin";
+  enabled: boolean;
+};
+
+export type ManagedUserCreateResponse = ManagedUser & {
+  temporary_password: string;
+  temporary_password_notice: string;
+};
+
+export type ManagedUserUpdatePayload = {
+  name?: string;
+  username?: string;
+  system_role?: "developer" | "admin";
+  enabled?: boolean;
+};
+
+export type ManagedUserPasswordResetResponse = {
+  user_id: number;
+  email: string;
+  temporary_password: string;
+  temporary_password_notice: string;
+};
+
+export type UserAppLink = {
+  id: number;
+  user_id: number;
+  user_email: string;
+  app_id: number;
+  app_name: string;
+  client_id: string;
+  role: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type UserAppLinkCreatePayload = {
+  app_id?: number;
+  client_id?: string;
+  role?: "admin";
+};
+
 export type ManagementSession = {
   access_token: string;
   token_type: "bearer";
@@ -41,13 +92,26 @@ export type ClientApp = {
 export type AppCreatePayload = {
   name: string;
   client_id: string;
-  api_key: string;
   authorized: boolean;
   main_llm_config_id: number | null;
   guardrail_llm_config_id: number | null;
 };
 
-export type AppUpdatePayload = Partial<AppCreatePayload>;
+export type AppCreateResponse = ClientApp & {
+  api_key: string;
+  api_key_notice: string;
+};
+
+export type AppUpdatePayload = Partial<Omit<AppCreatePayload, "authorized">> & {
+  authorized?: boolean;
+};
+
+export type AppApiKeyResponse = {
+  app_id: number;
+  client_id: string;
+  api_key: string;
+  api_key_notice: string;
+};
 
 export type LlmConfig = {
   id: number;
@@ -95,6 +159,10 @@ export type GuardrailsRunResponse = {
   output_rail_categories: string[];
   tool_guard_status: string;
   tool_guard_source: string | null;
+  block_stage: string | null;
+  block_reason: string | null;
+  blocked_policy_id: number | null;
+  blocked_policy_name: string | null;
   tool_names: string[];
   input_policy_count: number;
   input_rule_count: number;
@@ -270,12 +338,60 @@ export function updateCurrentManagementUser(
   });
 }
 
+export function listManagedUsers() {
+  return apiRequest<ManagedUser[]>("/management-users");
+}
+
+export function createManagedUser(payload: ManagedUserCreatePayload) {
+  return apiRequest<ManagedUserCreateResponse>("/management-users", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function updateManagedUser(
+  userId: number,
+  payload: ManagedUserUpdatePayload
+) {
+  return apiRequest<ManagedUser>(`/management-users/${userId}`, {
+    method: "PUT",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function resetManagedUserPassword(userId: number) {
+  return apiRequest<ManagedUserPasswordResetResponse>(
+    `/management-users/${userId}/password`,
+    { method: "POST" }
+  );
+}
+
+export function listManagedUserApps(userId: number) {
+  return apiRequest<UserAppLink[]>(`/management-users/${userId}/apps`);
+}
+
+export function linkManagedUserApp(
+  userId: number,
+  payload: UserAppLinkCreatePayload
+) {
+  return apiRequest<UserAppLink>(`/management-users/${userId}/apps`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function unlinkManagedUserApp(userId: number, appId: number) {
+  return apiRequest<void>(`/management-users/${userId}/apps/${appId}`, {
+    method: "DELETE"
+  });
+}
+
 export function listApps() {
   return apiRequest<ClientApp[]>("/apps");
 }
 
 export function createApp(payload: AppCreatePayload) {
-  return apiRequest<ClientApp>("/apps", {
+  return apiRequest<AppCreateResponse>("/apps", {
     method: "POST",
     body: JSON.stringify(payload)
   });
@@ -291,6 +407,12 @@ export function updateApp(appId: number, payload: AppUpdatePayload) {
   return apiRequest<ClientApp>(`/apps/${appId}`, {
     method: "PUT",
     body: JSON.stringify(payload)
+  });
+}
+
+export function regenerateAppApiKey(appId: number) {
+  return apiRequest<AppApiKeyResponse>(`/apps/${appId}/api-key`, {
+    method: "POST"
   });
 }
 
@@ -380,6 +502,37 @@ export function runGuardrails(
     },
     body: JSON.stringify(payload)
   });
+}
+
+export async function runGuardrailsViaProxy(
+  clientId: string,
+  payload: {
+    message: string;
+    conversation_id?: string | null;
+    conversation_history?: Array<{
+      role: "user" | "assistant";
+      content: string;
+    }>;
+  }
+) {
+  const response = await fetch("/api/guardrails/run", {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ client_id: clientId, ...payload }),
+    cache: "no-store"
+  });
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as {
+      detail?: string;
+    } | null;
+    throw new Error(body?.detail ?? `Runtime request failed: ${response.status}`);
+  }
+
+  return (await response.json()) as GuardrailsRunResponse;
 }
 
 export function listGlobalPolicyAssignments() {
