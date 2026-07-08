@@ -100,7 +100,6 @@ export default function AppsPage() {
       setError("");
       const app = await createApp({
         name: draft.name,
-        client_id: draft.clientId,
         authorized: true,
         main_llm_config_id: null,
         guardrail_llm_config_id: null

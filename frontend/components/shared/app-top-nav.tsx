@@ -53,6 +53,13 @@ export function AppTopNav({ active }: AppTopNavProps) {
     <header className="mx-auto flex max-w-[1480px] items-center justify-between">
       <nav className="flex items-center gap-8 text-[21px] font-extrabold">
         <Link
+          aria-label="Go to apps"
+          className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#1187f6] text-3xl font-black text-[#1f3b9d] shadow-[0_8px_18px_rgba(17,135,246,0.22)]"
+          href="/apps"
+        >
+          G
+        </Link>
+        <Link
           href="/apps"
           className={cn(
             "relative pb-2 text-[#a8bcfb]",

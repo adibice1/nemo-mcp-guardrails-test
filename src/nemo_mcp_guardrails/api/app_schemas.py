@@ -1,4 +1,5 @@
 from datetime import datetime
+from uuid import uuid4
 
 from typing import Literal
 
@@ -12,7 +13,6 @@ class AppCreate(BaseModel):
         json_schema_extra={
             "example": {
                 "name": "Test App",
-                "client_id": "test-app",
                 "authorized": True,
                 "main_llm_config_id": None,
                 "guardrail_llm_config_id": None,
@@ -21,7 +21,7 @@ class AppCreate(BaseModel):
     )
 
     name: str
-    client_id: str
+    client_id: str = Field(default_factory=lambda: str(uuid4()))
     authorized: bool = True
     main_llm_config_id: int | None = None
     guardrail_llm_config_id: int | None = None

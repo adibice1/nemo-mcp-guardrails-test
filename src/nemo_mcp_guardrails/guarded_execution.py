@@ -68,6 +68,19 @@ class GuardedExecutionResult:
     tool_guard_status: str = "not run"
     tool_guard_source: str | None = None
     blocked_output_phrase: str | None = None
+    tool_trace: tuple[dict[str, Any], ...] = ()
+
+
+MAX_TOOL_TRACE_CONTENT_CHARS = 1200
+SENSITIVE_TOOL_TRACE_KEYS = {
+    "authorization",
+    "api_key",
+    "apikey",
+    "key",
+    "password",
+    "secret",
+    "token",
+}
 
 
 def build_agent_messages(
@@ -88,6 +101,68 @@ def build_agent_messages(
 
     messages.append({"role": "user", "content": message})
     return messages
+
+
+def sanitize_tool_trace_value(value: Any) -> Any:
+    """Return a JSON-safe tool trace value with obvious secrets redacted."""
+
+    if isinstance(value, Mapping):
+        return {
+            str(key): (
+                "[redacted]"
+                if str(key).casefold() in SENSITIVE_TOOL_TRACE_KEYS
+                else sanitize_tool_trace_value(nested_value)
+            )
+            for key, nested_value in value.items()
+        }
+
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+        return [sanitize_tool_trace_value(item) for item in value]
+
+    return value
+
+
+def compact_tool_trace_content(content: Any) -> str:
+    """Return a bounded, secret-aware tool trace content string."""
+
+    text = str(content)
+    if contains_obvious_secret_value(text):
+        return "[redacted: possible secret-like value]"
+    if len(text) > MAX_TOOL_TRACE_CONTENT_CHARS:
+        return f"{text[:MAX_TOOL_TRACE_CONTENT_CHARS]}... [truncated]"
+    return text
+
+
+def extract_tool_trace(result: dict[str, Any]) -> tuple[dict[str, Any], ...]:
+    """Return sanitized tool calls and tool outputs from an agent result."""
+
+    trace: list[dict[str, Any]] = []
+
+    for message in result.get("messages", []):
+        for tool_call in getattr(message, "tool_calls", None) or []:
+            if not isinstance(tool_call, Mapping):
+                continue
+            trace.append(
+                {
+                    "event": "call",
+                    "tool_name": tool_call.get("name"),
+                    "arguments": sanitize_tool_trace_value(tool_call.get("args", {})),
+                }
+            )
+
+        message_type = getattr(message, "type", None)
+        if message_type == "tool" or message.__class__.__name__ == "ToolMessage":
+            trace.append(
+                {
+                    "event": "result",
+                    "tool_name": getattr(message, "name", None),
+                    "content": compact_tool_trace_content(
+                        getattr(message, "content", "")
+                    ),
+                }
+            )
+
+    return tuple(trace)
 
 
 def is_azure_content_filter_error(error: BaseException) -> bool:
@@ -372,8 +447,15 @@ async def execute_guarded_message(
             input_rail_categories=get_rail_categories(input_result),
             tool_guard_status="blocked",
             tool_guard_source="gms_tool_guard",
+            tool_trace=(
+                {
+                    "event": "blocked",
+                    "tool_name": error.tool_name,
+                    "content": compact_tool_trace_content(error),
+                },
+            ),
         )
-    except ToolException:
+    except ToolException as error:
         response = TOOL_ERROR_RESPONSE
         output_result = None
 
@@ -399,6 +481,13 @@ async def execute_guarded_message(
             input_rail_categories=get_rail_categories(input_result),
             output_rail_categories=get_rail_categories(output_result),
             tool_guard_status="passed",
+            tool_trace=(
+                {
+                    "event": "error",
+                    "tool_name": None,
+                    "content": compact_tool_trace_content(error),
+                },
+            ),
         )
     except (BadRequestError, LLMCallException, ValueError) as error:
         if not is_azure_content_filter_error(error):
@@ -449,6 +538,7 @@ async def execute_guarded_message(
             input_rail_categories=get_rail_categories(input_result),
             output_rail_categories=azure_categories,
             tool_guard_status="passed",
+            tool_trace=extract_tool_trace(agent_result),
         )
 
     raw_agent_response = str(agent_result["messages"][-1].content)
@@ -492,4 +582,5 @@ async def execute_guarded_message(
         output_rail_categories=get_rail_categories(output_result),
         tool_guard_status="passed",
         blocked_output_phrase=blocked_phrase,
+        tool_trace=extract_tool_trace(agent_result),
     )

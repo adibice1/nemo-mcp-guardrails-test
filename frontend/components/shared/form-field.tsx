@@ -1,10 +1,11 @@
+import { type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 type FormFieldProps = {
-  label: string;
+  label: ReactNode;
   required?: boolean;
   className?: string;
-  children: React.ReactNode;
+  children: ReactNode;
 };
 
 export function FormField({

@@ -104,7 +104,11 @@ export default function PoliciesPage() {
         setApps(nextApps);
         setGlobalAssignments(nextGlobalAssignments);
         setPolicyDefinitions(nextPolicyDefinitions);
-        setPolicyOptions(nextPolicyOptions);
+        setPolicyOptions(
+          nextPolicyOptions.filter(
+            (option) => option.value.toLowerCase() === "github"
+          )
+        );
         if (
           selectedApp &&
           !nextApps.some((app) => app.display_label === selectedApp)
@@ -264,7 +268,14 @@ export default function PoliciesPage() {
         ? await resolvePolicyGlobally(payload, draft.name)
         : await resolvePolicyForApp(app!.client_id, payload, draft.name);
 
-      setNotice(resolutionNotice(resolution.resolution, resolution.policy_label));
+      setNotice({
+        tone:
+          resolution.resolution === "already_assigned" ? "warning" : "success",
+        message:
+          resolution.resolution === "already_assigned"
+            ? `${draft.name} is already active for this policy scope.`
+            : `${draft.name} was created.`
+      });
     } catch (error) {
       showWarning(
         error instanceof Error ? error.message : "Could not create policy."
@@ -353,10 +364,7 @@ export default function PoliciesPage() {
       setApiStatus("ready");
       setNotice({
         tone: "success",
-        message:
-          resolution.resolution === "created"
-            ? `${draft.name} was saved as a new reusable policy.`
-            : `${draft.name} now uses the matching reusable policy.`
+        message: `${draft.name} was edited.`
       });
       setEditingPolicy(null);
       setModalOpen(false);
@@ -418,7 +426,7 @@ export default function PoliciesPage() {
       setApiStatus("ready");
       setNotice({
         tone: "success",
-        message: `${policy.name} was unassigned. Its reusable definition remains available.`
+        message: `${policy.name} was deleted.`
       });
     } catch (error) {
       showWarning(
@@ -504,8 +512,12 @@ export default function PoliciesPage() {
         <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h1 className="text-4xl font-extrabold tracking-normal text-gms-text lg:text-[42px]">
-              Guardrails Management System
+              Policies
             </h1>
+            <p className="mt-3 max-w-2xl text-sm text-gms-muted">
+              Create and manage app-specific or global guardrail policies for
+              GitHub MCP runtime requests.
+            </p>
 
             <div className="relative mt-12 w-[210px]">
               <label className="text-xs font-semibold uppercase tracking-wide text-gms-text">
@@ -748,27 +760,5 @@ function policyRowToDraft(
         : "",
     name: row.name,
     global: row.global
-  };
-}
-
-function resolutionNotice(
-  resolution: "created" | "reused" | "already_assigned",
-  policyLabel: string
-): Notice {
-  if (resolution === "already_assigned") {
-    return {
-      tone: "warning",
-      message: `${policyLabel} is already active for this policy scope.`
-    };
-  }
-  if (resolution === "reused") {
-    return {
-      tone: "success",
-      message: `An equivalent reusable policy was found and assigned: ${policyLabel}.`
-    };
-  }
-  return {
-    tone: "success",
-    message: `Policy created and assigned: ${policyLabel}.`
   };
 }

@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -69,3 +69,4 @@ class GuardrailsRunResponse(BaseModel):
     debug_agent_response: str | None = None
     debug_output_rail_source: str | None = None
     debug_output_rule_texts: list[str] | None = None
+    debug_tool_trace: list[dict[str, Any]] | None = None

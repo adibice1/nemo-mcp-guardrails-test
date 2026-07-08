@@ -16,7 +16,6 @@ type AppOverviewProps = {
 
 export function AppOverview({ app, onUpdated }: AppOverviewProps) {
   const [name, setName] = useState(app.name);
-  const [clientId, setClientId] = useState(app.client_id);
   const [generatedKey, setGeneratedKey] = useState<AppApiKeyResponse | null>(null);
   const [saving, setSaving] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
@@ -25,14 +24,11 @@ export function AppOverview({ app, onUpdated }: AppOverviewProps) {
 
   useEffect(() => {
     setName(app.name);
-    setClientId(app.client_id);
     setGeneratedKey(null);
     setCopiedKey(false);
   }, [app.client_id, app.name]);
 
-  const dirty =
-    name.trim() !== app.name ||
-    clientId.trim() !== app.client_id;
+  const dirty = name.trim() !== app.name;
 
   async function handleSave() {
     if (!dirty) {
@@ -42,8 +38,7 @@ export function AppOverview({ app, onUpdated }: AppOverviewProps) {
     setMessage("");
     try {
       const updated = await updateApp(app.id, {
-        name: name.trim(),
-        client_id: clientId.trim()
+        name: name.trim()
       });
       onUpdated(updated);
       setMessage("Application details saved.");
@@ -106,8 +101,8 @@ export function AppOverview({ app, onUpdated }: AppOverviewProps) {
         <DetailField label="Client ID">
           <input
             className="detail-input font-mono"
-            value={clientId}
-            onChange={(event) => setClientId(event.target.value)}
+            readOnly
+            value={app.client_id}
           />
         </DetailField>
       </div>

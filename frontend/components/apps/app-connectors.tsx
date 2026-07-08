@@ -40,7 +40,7 @@ export function AppConnectors({ clientId }: { clientId: string }) {
 
   async function handleLink() {
     if (connectorName !== "github") {
-      setMessage("SharePoint runtime support is coming soon.");
+      setMessage("Only GitHub is available for this demo.");
       return;
     }
     try {
@@ -102,14 +102,13 @@ export function AppConnectors({ clientId }: { clientId: string }) {
             }}
           >
             <option value="github">GitHub</option>
-            <option value="sharepoint">SharePoint (Coming soon)</option>
           </select>
         </label>
         <label className="text-sm font-bold text-gms-text">
           Credential Reference
           <input
             className="detail-input mt-2 font-mono text-xs"
-            disabled={connectorName === "sharepoint"}
+            disabled={connectorName !== "github"}
             placeholder="env:VARIABLE_NAME"
             value={credentialReference}
             onChange={(event) => setCredentialReference(event.target.value)}
@@ -117,7 +116,7 @@ export function AppConnectors({ clientId }: { clientId: string }) {
         </label>
         <button
           className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-gms-blue px-5 text-sm font-semibold text-white shadow-button disabled:opacity-50"
-          disabled={connectorName === "sharepoint"}
+          disabled={connectorName !== "github"}
           type="button"
           onClick={handleLink}
         >

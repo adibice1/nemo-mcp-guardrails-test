@@ -1,12 +1,22 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  type Dispatch,
+  type FormEvent,
+  type SetStateAction,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState
+} from "react";
 import {
   Check,
   Copy,
   Link2,
   RefreshCw,
   Search,
+  ShieldCheck,
+  UserCircle,
   UserPlus,
   X
 } from "lucide-react";
@@ -27,7 +37,7 @@ import {
   type ManagedUserPasswordResetResponse,
   type UserAppLink
 } from "@/lib/api-client";
-import { formatPolicyDate } from "@/lib/utils";
+import { cn, formatPolicyDate } from "@/lib/utils";
 
 type SecretDisplay = {
   email: string;
@@ -46,13 +56,12 @@ const EMPTY_CREATE_FORM = {
 export default function UserManagementPage() {
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [apps, setApps] = useState<ClientApp[]>([]);
-  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [links, setLinks] = useState<UserAppLink[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [createForm, setCreateForm] = useState(EMPTY_CREATE_FORM);
-  const [linkForm, setLinkForm] = useState({
-    appId: ""
-  });
+  const [linkForm, setLinkForm] = useState({ appId: "" });
+  const [modalMode, setModalMode] = useState<"create" | "edit" | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -69,7 +78,8 @@ export default function UserManagementPage() {
       (user) =>
         user.email.toLowerCase().includes(needle) ||
         user.name.toLowerCase().includes(needle) ||
-        user.username.toLowerCase().includes(needle)
+        user.username.toLowerCase().includes(needle) ||
+        user.system_role.toLowerCase().includes(needle)
     );
   }, [search, users]);
 
@@ -100,13 +110,6 @@ export default function UserManagementPage() {
       ]);
       setUsers(nextUsers);
       setApps(nextApps);
-      const nextSelectedId = selectedUserId ?? nextUsers[0]?.id ?? null;
-      setSelectedUserId(nextSelectedId);
-      if (nextSelectedId !== null) {
-        await loadUserLinks(nextSelectedId);
-      } else {
-        setLinks([]);
-      }
     } catch (loadError) {
       setError(
         loadError instanceof Error
@@ -116,17 +119,19 @@ export default function UserManagementPage() {
     } finally {
       setLoading(false);
     }
-  }, [loadUserLinks, selectedUserId]);
+  }, []);
 
   useEffect(() => {
     void loadData();
   }, [loadData]);
 
-  async function handleSelectUser(user: ManagedUser) {
+  async function openEditModal(user: ManagedUser) {
     setSelectedUserId(user.id);
+    setLinkForm({ appId: "" });
     setSecret(null);
     setNotice("");
     setError("");
+    setModalMode("edit");
     try {
       await loadUserLinks(user.id);
     } catch (loadError) {
@@ -138,7 +143,22 @@ export default function UserManagementPage() {
     }
   }
 
-  async function handleCreateUser(event: React.FormEvent<HTMLFormElement>) {
+  function openCreateModal() {
+    setCreateForm(EMPTY_CREATE_FORM);
+    setSelectedUserId(null);
+    setLinks([]);
+    setSecret(null);
+    setNotice("");
+    setError("");
+    setModalMode("create");
+  }
+
+  function closeModal() {
+    setModalMode(null);
+    setLinkForm({ appId: "" });
+  }
+
+  async function handleCreateUser(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (saving) return;
 
@@ -168,6 +188,7 @@ export default function UserManagementPage() {
         notice: created.temporary_password_notice
       });
       setNotice(`${created.email} was created.`);
+      setModalMode("edit");
     } catch (createError) {
       setError(
         createError instanceof Error
@@ -189,7 +210,7 @@ export default function UserManagementPage() {
       setUsers((current) =>
         current.map((user) => (user.id === updated.id ? updated : user))
       );
-      setNotice(`${updated.email} was updated.`);
+      setNotice(`${updated.email} was edited.`);
     } catch (updateError) {
       setError(
         updateError instanceof Error
@@ -225,7 +246,7 @@ export default function UserManagementPage() {
     }
   }
 
-  async function handleLinkApp(event: React.FormEvent<HTMLFormElement>) {
+  async function handleLinkApp(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedUser || !linkForm.appId) return;
 
@@ -243,9 +264,7 @@ export default function UserManagementPage() {
       setNotice(`${selectedUser.email} was linked to ${link.app_name}.`);
     } catch (linkError) {
       setError(
-        linkError instanceof Error
-          ? linkError.message
-          : "Could not link app."
+        linkError instanceof Error ? linkError.message : "Could not link app."
       );
     }
   }
@@ -292,299 +311,104 @@ export default function UserManagementPage() {
               users to the applications they can manage.
             </p>
           </div>
-          <label className="relative block w-full lg:w-[405px]">
-            <input
-              className="h-11 w-full rounded-xl border border-gms-line bg-white px-4 pr-11 text-sm text-gms-text shadow-field outline-none placeholder:text-gms-muted dark:bg-[#252932]"
-              placeholder="Search users"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
-            <Search className="absolute right-5 top-3 h-5 w-5 text-gms-text" />
-          </label>
+          <div className="flex w-full flex-col gap-4 lg:w-auto lg:flex-row lg:items-center">
+            <label className="relative block w-full lg:w-[405px]">
+              <input
+                className="h-11 w-full rounded-xl border border-gms-line bg-white px-4 pr-11 text-sm text-gms-text shadow-field outline-none placeholder:text-gms-muted dark:bg-[#252932]"
+                placeholder="Search users"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+              />
+              <Search className="absolute right-5 top-3 h-5 w-5 text-gms-text" />
+            </label>
+            <button
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-gms-blue px-5 text-sm font-semibold text-white shadow-button"
+              type="button"
+              onClick={openCreateModal}
+            >
+              <UserPlus className="h-4 w-4" />
+              Create User
+            </button>
+          </div>
         </div>
 
-        <div className="mt-8 grid gap-6 xl:grid-cols-[1fr_1.1fr]">
-          <div className="space-y-6">
-            <form
-              className="rounded-lg border border-gms-line bg-[#fbfcff] p-5 dark:bg-[#20242c]"
-              onSubmit={handleCreateUser}
+        <div className="mt-12 grid grid-cols-[64px_1.2fr_1.4fr_0.7fr_0.7fr] items-center px-8 text-sm text-gms-muted">
+          <span />
+          <span>Name</span>
+          <span>Email</span>
+          <span>Role</span>
+          <span>Enable</span>
+        </div>
+
+        <div className="mt-4 space-y-4">
+          {visibleUsers.map((user, index) => (
+            <button
+              key={user.id}
+              className="grid min-h-[74px] w-full grid-cols-[64px_1.2fr_1.4fr_0.7fr_0.7fr] items-center rounded-md border border-gms-line bg-white px-8 text-left text-sm text-gms-text transition hover:border-gms-blue hover:bg-gms-blue hover:text-white dark:bg-[#20242c]"
+              type="button"
+              onClick={() => void openEditModal(user)}
             >
-              <div className="flex items-center gap-3">
+              <span className="text-2xl font-extrabold text-[#9fb8ff] group-hover:text-white">
+                {index + 1}
+              </span>
+              <span className="flex items-center gap-4">
                 <span className="flex h-10 w-10 items-center justify-center rounded-md bg-gms-blue-soft text-gms-blue">
-                  <UserPlus className="h-5 w-5" />
+                  <UserCircle className="h-5 w-5" />
                 </span>
-                <div>
-                  <h2 className="text-lg font-extrabold text-gms-text">
-                    Create User
-                  </h2>
-                  <p className="text-xs text-gms-muted">
-                    The temporary password is shown once after creation.
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                <input
-                  className="h-11 rounded-md border border-gms-line bg-white px-3 text-sm outline-none dark:bg-[#252932]"
-                  placeholder="Email"
-                  type="email"
-                  value={createForm.email}
-                  onChange={(event) =>
-                    setCreateForm((current) => ({
-                      ...current,
-                      email: event.target.value
-                    }))
-                  }
-                />
-                <input
-                  className="h-11 rounded-md border border-gms-line bg-white px-3 text-sm outline-none dark:bg-[#252932]"
-                  placeholder="Name"
-                  value={createForm.name}
-                  onChange={(event) =>
-                    setCreateForm((current) => ({
-                      ...current,
-                      name: event.target.value
-                    }))
-                  }
-                />
-                <input
-                  className="h-11 rounded-md border border-gms-line bg-white px-3 text-sm outline-none dark:bg-[#252932]"
-                  placeholder="Username"
-                  value={createForm.username}
-                  onChange={(event) =>
-                    setCreateForm((current) => ({
-                      ...current,
-                      username: event.target.value
-                    }))
-                  }
-                />
-                <select
-                  className="h-11 rounded-md border border-gms-line bg-white px-3 text-sm outline-none dark:bg-[#252932]"
-                  value={createForm.systemRole}
-                  onChange={(event) =>
-                    setCreateForm((current) => ({
-                      ...current,
-                      systemRole: event.target.value as "developer" | "admin"
-                    }))
-                  }
+                <span className="font-extrabold">{user.name || user.email}</span>
+              </span>
+              <span className="break-all">{user.email}</span>
+              <span className="capitalize">{user.system_role}</span>
+              <span>
+                <span
+                  className={cn(
+                    "inline-flex rounded-full px-3 py-1 text-xs font-extrabold",
+                    user.enabled
+                      ? "bg-[#e7f7ed] text-[#257342]"
+                      : "bg-[#fff0f1] text-gms-danger"
+                  )}
                 >
-                  <option value="developer">Developer</option>
-                  <option value="admin">Admin</option>
-                </select>
-              </div>
-
-              <div className="mt-4 flex items-center justify-between">
-                <label className="flex items-center gap-2 text-sm font-semibold text-gms-text">
-                  <input
-                    checked={createForm.enabled}
-                    type="checkbox"
-                    onChange={(event) =>
-                      setCreateForm((current) => ({
-                        ...current,
-                        enabled: event.target.checked
-                      }))
-                    }
-                  />
-                  Enabled
-                </label>
-                <button
-                  className="inline-flex h-10 items-center gap-2 rounded-md bg-gms-blue px-4 text-sm font-semibold text-white shadow-button disabled:opacity-50"
-                  disabled={!createForm.email.trim() || saving}
-                  type="submit"
-                >
-                  <UserPlus className="h-4 w-4" />
-                  Create User
-                </button>
-              </div>
-            </form>
-
-            <div className="space-y-3">
-              {visibleUsers.map((user) => (
-                <button
-                  key={user.id}
-                  className={`grid min-h-[64px] w-full grid-cols-[1fr_120px_100px] items-center rounded-md border px-4 text-left text-sm transition ${
-                    selectedUserId === user.id
-                      ? "border-gms-blue bg-gms-blue text-white"
-                      : "border-gms-line bg-white text-gms-text hover:border-gms-blue dark:bg-[#20242c]"
-                  }`}
-                  type="button"
-                  onClick={() => void handleSelectUser(user)}
-                >
-                  <span>
-                    <span className="block font-extrabold">{user.name}</span>
-                    <span
-                      className={
-                        selectedUserId === user.id
-                          ? "text-white/80"
-                          : "text-gms-muted"
-                      }
-                    >
-                      {user.email}
-                    </span>
-                  </span>
-                  <span className="capitalize">{user.system_role}</span>
-                  <span>{user.enabled ? "Enabled" : "Blocked"}</span>
-                </button>
-              ))}
-              {!loading && visibleUsers.length === 0 && (
-                <div className="rounded-md border border-dashed border-gms-line py-12 text-center text-sm text-gms-muted">
-                  No users found.
-                </div>
-              )}
+                  {user.enabled ? "Enabled" : "Blocked"}
+                </span>
+              </span>
+            </button>
+          ))}
+          {!loading && visibleUsers.length === 0 && (
+            <div className="rounded-md border border-dashed border-gms-line py-16 text-center text-sm text-gms-muted">
+              No users found.
             </div>
-          </div>
-
-          <div className="rounded-lg border border-gms-line bg-[#fbfcff] p-5 dark:bg-[#20242c]">
-            {selectedUser ? (
-              <>
-                <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-gms-blue">
-                      Selected User
-                    </p>
-                    <h2 className="mt-1 text-2xl font-extrabold text-gms-text">
-                      {selectedUser.name}
-                    </h2>
-                    <p className="mt-1 text-sm text-gms-muted">
-                      {selectedUser.email}
-                    </p>
-                    <p className="mt-1 text-xs text-gms-muted">
-                      Created {formatPolicyDate(selectedUser.created_at)}
-                    </p>
-                  </div>
-                  <button
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-gms-blue px-4 text-sm font-semibold text-white shadow-button"
-                    type="button"
-                    onClick={() => void handleResetPassword()}
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                    Reset Password
-                  </button>
-                </div>
-
-                <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                  <label className="text-xs font-bold uppercase text-gms-muted">
-                    System Role
-                    <select
-                      className="mt-2 h-11 w-full rounded-md border border-gms-line bg-white px-3 text-sm normal-case text-gms-text outline-none dark:bg-[#252932]"
-                      value={selectedUser.system_role}
-                      onChange={(event) =>
-                        void handleUpdateSelected({
-                          system_role: event.target.value as
-                            | "developer"
-                            | "admin"
-                        })
-                      }
-                    >
-                      <option value="developer">Developer</option>
-                      <option value="admin">Admin</option>
-                    </select>
-                  </label>
-                  <label className="text-xs font-bold uppercase text-gms-muted">
-                    Account Status
-                    <select
-                      className="mt-2 h-11 w-full rounded-md border border-gms-line bg-white px-3 text-sm normal-case text-gms-text outline-none dark:bg-[#252932]"
-                      value={selectedUser.enabled ? "enabled" : "blocked"}
-                      onChange={(event) =>
-                        void handleUpdateSelected({
-                          enabled: event.target.value === "enabled"
-                        })
-                      }
-                    >
-                      <option value="enabled">Enabled</option>
-                      <option value="blocked">Blocked</option>
-                    </select>
-                  </label>
-                </div>
-
-                <div className="mt-8">
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-md bg-gms-blue-soft text-gms-blue">
-                      <Link2 className="h-5 w-5" />
-                    </span>
-                    <div>
-                      <h3 className="text-lg font-extrabold text-gms-text">
-                        App Links
-                      </h3>
-                      <p className="text-xs text-gms-muted">
-                        Assign which apps this user can manage.
-                      </p>
-                    </div>
-                  </div>
-
-                  <form
-                    className="mt-5 grid gap-3 sm:grid-cols-[1fr_120px]"
-                    onSubmit={handleLinkApp}
-                  >
-                    <select
-                      className="h-11 rounded-md border border-gms-line bg-white px-3 text-sm outline-none dark:bg-[#252932]"
-                      value={linkForm.appId}
-                      onChange={(event) =>
-                        setLinkForm((current) => ({
-                          ...current,
-                          appId: event.target.value
-                        }))
-                      }
-                    >
-                      <option value="">Choose app</option>
-                      {linkableApps.map((app) => (
-                        <option key={app.id} value={app.id}>
-                          {app.name}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      className="h-11 rounded-md bg-gms-blue text-sm font-semibold text-white shadow-button disabled:opacity-50"
-                      disabled={!linkForm.appId}
-                      type="submit"
-                    >
-                      Link
-                    </button>
-                  </form>
-
-                  <div className="mt-5 space-y-3">
-                    {links.map((link) => (
-                      <div
-                        key={link.id}
-                        className="grid min-h-[58px] grid-cols-[1fr_120px_80px] items-center rounded-md border border-gms-line bg-white px-4 text-sm text-gms-text dark:bg-[#252932]"
-                      >
-                        <span>
-                          <span className="block font-extrabold">
-                            {link.app_name}
-                          </span>
-                          <span className="text-gms-muted">
-                            {link.client_id}
-                          </span>
-                        </span>
-                        <span>App Developer</span>
-                        <button
-                          className="justify-self-end rounded-full bg-[#fff0f1] p-2 text-gms-danger"
-                          type="button"
-                          onClick={() => void handleUnlinkApp(link)}
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      </div>
-                    ))}
-                    {links.length === 0 && (
-                      <div className="rounded-md border border-dashed border-gms-line py-10 text-center text-sm text-gms-muted">
-                        This user is not linked to any apps yet.
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="py-24 text-center text-sm text-gms-muted">
-                Select or create a user to manage app access.
-              </div>
-            )}
-          </div>
+          )}
         </div>
 
         {loading && <p className="mt-4 text-xs text-gms-muted">Loading users...</p>}
         {error && <p className="mt-4 text-xs font-semibold text-gms-danger">{error}</p>}
       </section>
+
+      {modalMode === "create" && (
+        <UserCreateModal
+          createForm={createForm}
+          saving={saving}
+          setCreateForm={setCreateForm}
+          onClose={closeModal}
+          onSubmit={handleCreateUser}
+        />
+      )}
+
+      {modalMode === "edit" && selectedUser && (
+        <UserEditModal
+          apps={apps}
+          linkForm={linkForm}
+          linkableApps={linkableApps}
+          links={links}
+          selectedUser={selectedUser}
+          setLinkForm={setLinkForm}
+          onClose={closeModal}
+          onLinkApp={handleLinkApp}
+          onResetPassword={handleResetPassword}
+          onUnlinkApp={handleUnlinkApp}
+          onUpdateUser={handleUpdateSelected}
+        />
+      )}
 
       {secret && (
         <div className="fixed right-6 top-6 z-[80] w-full max-w-md rounded-md border border-gms-line bg-white p-5 text-sm text-gms-text shadow-modal dark:bg-[#252932]">
@@ -620,5 +444,299 @@ export default function UserManagementPage() {
         </div>
       )}
     </main>
+  );
+}
+
+function UserCreateModal({
+  createForm,
+  saving,
+  setCreateForm,
+  onClose,
+  onSubmit
+}: {
+  createForm: typeof EMPTY_CREATE_FORM;
+  saving: boolean;
+  setCreateForm: Dispatch<SetStateAction<typeof EMPTY_CREATE_FORM>>;
+  onClose: () => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/10 px-6">
+      <section className="relative w-full max-w-[720px] rounded-[14px] bg-white px-8 pb-8 pt-20 shadow-modal dark:bg-[#20242c]">
+        <button
+          aria-label="Close create user modal"
+          className="absolute left-6 top-6 flex h-10 w-10 items-center justify-center rounded-xl bg-white text-gms-text shadow-[0_3px_12px_rgba(40,48,78,0.12)] dark:bg-[#2a2f39]"
+          type="button"
+          onClick={onClose}
+        >
+          <X className="h-4 w-4" />
+        </button>
+        <h2 className="text-2xl font-extrabold text-gms-text">Create User</h2>
+        <p className="mt-2 text-sm text-gms-muted">
+          The temporary password is generated by GMS and shown once after creation.
+        </p>
+
+        <form className="mt-7 grid gap-4" onSubmit={onSubmit}>
+          <div className="grid gap-4 md:grid-cols-2">
+            <input
+              className="detail-input"
+              placeholder="Email"
+              type="email"
+              value={createForm.email}
+              onChange={(event) =>
+                setCreateForm((current) => ({
+                  ...current,
+                  email: event.target.value
+                }))
+              }
+            />
+            <input
+              className="detail-input"
+              placeholder="Name"
+              value={createForm.name}
+              onChange={(event) =>
+                setCreateForm((current) => ({
+                  ...current,
+                  name: event.target.value
+                }))
+              }
+            />
+            <input
+              className="detail-input"
+              placeholder="Username"
+              value={createForm.username}
+              onChange={(event) =>
+                setCreateForm((current) => ({
+                  ...current,
+                  username: event.target.value
+                }))
+              }
+            />
+            <select
+              className="detail-input"
+              value={createForm.systemRole}
+              onChange={(event) =>
+                setCreateForm((current) => ({
+                  ...current,
+                  systemRole: event.target.value as "developer" | "admin"
+                }))
+              }
+            >
+              <option value="developer">Developer</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <label className="flex items-center gap-3 text-sm font-semibold text-gms-text">
+              <input
+                checked={createForm.enabled}
+                type="checkbox"
+                onChange={(event) =>
+                  setCreateForm((current) => ({
+                    ...current,
+                    enabled: event.target.checked
+                  }))
+                }
+              />
+              Enabled
+            </label>
+            <button
+              className="inline-flex h-10 items-center gap-2 rounded-md bg-gms-blue px-5 text-sm font-semibold text-white shadow-button disabled:opacity-50"
+              disabled={!createForm.email.trim() || saving}
+              type="submit"
+            >
+              <UserPlus className="h-4 w-4" />
+              {saving ? "Creating..." : "Create User"}
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
+  );
+}
+
+function UserEditModal({
+  apps,
+  linkForm,
+  linkableApps,
+  links,
+  selectedUser,
+  setLinkForm,
+  onClose,
+  onLinkApp,
+  onResetPassword,
+  onUnlinkApp,
+  onUpdateUser
+}: {
+  apps: ClientApp[];
+  linkForm: { appId: string };
+  linkableApps: ClientApp[];
+  links: UserAppLink[];
+  selectedUser: ManagedUser;
+  setLinkForm: Dispatch<SetStateAction<{ appId: string }>>;
+  onClose: () => void;
+  onLinkApp: (event: FormEvent<HTMLFormElement>) => void;
+  onResetPassword: () => void;
+  onUnlinkApp: (link: UserAppLink) => void;
+  onUpdateUser: (
+    values: Partial<Pick<ManagedUser, "system_role" | "enabled">>
+  ) => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/10 px-6">
+      <section className="relative max-h-[90vh] w-full max-w-[900px] overflow-y-auto rounded-[14px] bg-white px-8 pb-8 pt-20 shadow-modal dark:bg-[#20242c]">
+        <button
+          aria-label="Close user details modal"
+          className="absolute left-6 top-6 flex h-10 w-10 items-center justify-center rounded-xl bg-white text-gms-text shadow-[0_3px_12px_rgba(40,48,78,0.12)] dark:bg-[#2a2f39]"
+          type="button"
+          onClick={onClose}
+        >
+          <X className="h-4 w-4" />
+        </button>
+
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-gms-blue">User Profile</p>
+            <h2 className="mt-1 text-3xl font-extrabold text-gms-text">
+              {selectedUser.name || selectedUser.email}
+            </h2>
+            <p className="mt-1 text-sm text-gms-muted">{selectedUser.email}</p>
+            <p className="mt-1 text-xs text-gms-muted">
+              Created {formatPolicyDate(selectedUser.created_at)}
+            </p>
+          </div>
+          <button
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-gms-blue px-4 text-sm font-semibold text-white shadow-button"
+            type="button"
+            onClick={() => onResetPassword()}
+          >
+            <RefreshCw className="h-4 w-4" />
+            Reset Password
+          </button>
+        </div>
+
+        <div className="mt-7 grid gap-4 md:grid-cols-3">
+          <InfoCard label="Username" value={selectedUser.username} />
+          <label className="rounded-md border border-gms-line bg-white p-4 text-xs font-bold uppercase text-gms-muted dark:bg-[#252932]">
+            Role
+            <select
+              className="mt-2 h-10 w-full rounded-md border border-gms-line bg-white px-3 text-sm normal-case text-gms-text outline-none dark:bg-[#20242c]"
+              value={selectedUser.system_role}
+              onChange={(event) =>
+                onUpdateUser({
+                  system_role: event.target.value as "developer" | "admin"
+                })
+              }
+            >
+              <option value="developer">Developer</option>
+              <option value="admin">Admin</option>
+            </select>
+          </label>
+          <label className="rounded-md border border-gms-line bg-white p-4 text-xs font-bold uppercase text-gms-muted dark:bg-[#252932]">
+            Enable
+            <select
+              className="mt-2 h-10 w-full rounded-md border border-gms-line bg-white px-3 text-sm normal-case text-gms-text outline-none dark:bg-[#20242c]"
+              value={selectedUser.enabled ? "enabled" : "blocked"}
+              onChange={(event) =>
+                onUpdateUser({ enabled: event.target.value === "enabled" })
+              }
+            >
+              <option value="enabled">Enabled</option>
+              <option value="blocked">Blocked</option>
+            </select>
+          </label>
+        </div>
+
+        <div className="mt-8 rounded-lg border border-gms-line bg-[#fbfcff] p-5 dark:bg-[#1b1e25]">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-md bg-gms-blue-soft text-gms-blue">
+              <Link2 className="h-5 w-5" />
+            </span>
+            <div>
+              <h3 className="text-lg font-extrabold text-gms-text">App Links</h3>
+              <p className="text-xs text-gms-muted">
+                Assign which apps this user can manage.
+              </p>
+            </div>
+          </div>
+
+          <form
+            className="mt-5 grid gap-3 sm:grid-cols-[1fr_120px]"
+            onSubmit={onLinkApp}
+          >
+            <select
+              className="h-11 rounded-md border border-gms-line bg-white px-3 text-sm outline-none dark:bg-[#252932]"
+              value={linkForm.appId}
+              onChange={(event) =>
+                setLinkForm((current) => ({
+                  ...current,
+                  appId: event.target.value
+                }))
+              }
+            >
+              <option value="">
+                {apps.length === 0 ? "No apps available" : "Choose app"}
+              </option>
+              {linkableApps.map((app) => (
+                <option key={app.id} value={app.id}>
+                  {app.name}
+                </option>
+              ))}
+            </select>
+            <button
+              className="h-11 rounded-md bg-gms-blue text-sm font-semibold text-white shadow-button disabled:opacity-50"
+              disabled={!linkForm.appId}
+              type="submit"
+            >
+              Link
+            </button>
+          </form>
+
+          <div className="mt-5 space-y-3">
+            {links.map((link) => (
+              <div
+                key={link.id}
+                className="grid min-h-[58px] grid-cols-[1fr_140px_56px] items-center rounded-md border border-gms-line bg-white px-4 text-sm text-gms-text dark:bg-[#252932]"
+              >
+                <span>
+                  <span className="block font-extrabold">{link.app_name}</span>
+                  <span className="break-all text-gms-muted">
+                    {link.client_id}
+                  </span>
+                </span>
+                <span className="inline-flex items-center gap-2 text-gms-muted">
+                  <ShieldCheck className="h-4 w-4 text-gms-blue" />
+                  Developer
+                </span>
+                <button
+                  className="justify-self-end rounded-full bg-[#fff0f1] p-2 text-gms-danger"
+                  type="button"
+                  onClick={() => onUnlinkApp(link)}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
+            {links.length === 0 && (
+              <div className="rounded-md border border-dashed border-gms-line py-10 text-center text-sm text-gms-muted">
+                This user is not linked to any apps yet.
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function InfoCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-gms-line bg-white p-4 dark:bg-[#252932]">
+      <p className="text-xs font-bold uppercase text-gms-muted">{label}</p>
+      <p className="mt-2 break-all text-sm font-semibold text-gms-text">
+        {value || "Not set"}
+      </p>
+    </div>
   );
 }

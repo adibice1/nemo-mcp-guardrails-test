@@ -15,9 +15,6 @@ import { cn } from "@/lib/utils";
 
 type SettingsState = {
   darkMode: boolean;
-  placeholderOne: boolean;
-  placeholderTwo: boolean;
-  placeholderThree: boolean;
 };
 
 type ProfileState = {
@@ -27,10 +24,7 @@ type ProfileState = {
 };
 
 const initialSettings: SettingsState = {
-  darkMode: false,
-  placeholderOne: true,
-  placeholderTwo: true,
-  placeholderThree: true
+  darkMode: false
 };
 
 const initialProfile: ProfileState = {
@@ -75,11 +69,8 @@ export function SettingsForm() {
       });
   }, [router]);
 
-  function toggleSetting(key: keyof SettingsState) {
-    setSettings((current) => ({
-      ...current,
-      [key]: !current[key]
-    }));
+  function setDarkMode(enabled: boolean) {
+    setSettings({ darkMode: enabled });
     setDirty(true);
     setSaved(false);
   }
@@ -130,7 +121,7 @@ export function SettingsForm() {
   function toggleDarkMode() {
     const enabled = !settings.darkMode;
     document.documentElement.classList.toggle("dark", enabled);
-    toggleSetting("darkMode");
+    setDarkMode(enabled);
   }
 
   return (
@@ -151,26 +142,8 @@ export function SettingsForm() {
 
       <h1 className="text-[26px] font-extrabold text-gms-text">Account</h1>
 
-      <div className="mt-9 grid gap-14 lg:grid-cols-[560px_1fr]">
-        <div className="space-y-8">
-          <div className="grid grid-cols-[160px_1fr] items-start gap-10">
-            <span className="pt-5 text-right text-sm font-extrabold">
-              Profile picture
-            </span>
-            <div>
-              <button
-                className="h-12 rounded-xl border border-[#dddddd] bg-white px-5 text-sm font-extrabold uppercase tracking-widest text-gms-blue shadow-[0_4px_0_rgba(0,0,0,0.08)] dark:border-gms-line dark:bg-[#252932]"
-                type="button"
-              >
-                Choose File
-              </button>
-              <p className="mt-3 text-sm text-[#9a9a9a]">no file selected</p>
-              <p className="mt-3 text-base text-[#9a9a9a]">
-                maximum image size is 1 MB
-              </p>
-            </div>
-          </div>
-
+      <div className="mt-12 grid gap-14 lg:grid-cols-[560px_1fr] lg:items-start">
+        <div className="space-y-8 pt-8">
           <SettingsInput
             label="Name"
             value={profile.name}
@@ -199,25 +172,10 @@ export function SettingsForm() {
             label="Dark Mode"
             onToggle={toggleDarkMode}
           />
-          <SettingsToggle
-            enabled={settings.placeholderOne}
-            label="Placeholder"
-            onToggle={() => toggleSetting("placeholderOne")}
-          />
-          <SettingsToggle
-            enabled={settings.placeholderTwo}
-            label="Placeholder"
-            onToggle={() => toggleSetting("placeholderTwo")}
-          />
-          <SettingsToggle
-            enabled={settings.placeholderThree}
-            label="Placeholder"
-            onToggle={() => toggleSetting("placeholderThree")}
-          />
 
           <div className="ml-[200px] space-y-8 pt-2 text-sm font-extrabold uppercase tracking-widest">
             <button
-              className="block text-[#b8b8b8] hover:text-gms-blue"
+              className="block text-gms-danger hover:text-[#d9283d]"
               type="button"
               onClick={handleLogout}
             >
@@ -226,7 +184,7 @@ export function SettingsForm() {
           </div>
         </div>
 
-        <div className="pt-7">
+        <div>
           <h2 className="text-lg font-extrabold text-gms-text">
             Profile picture
           </h2>

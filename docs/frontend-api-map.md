@@ -28,20 +28,19 @@ Local backend mode is enabled by creating `frontend/.env.local`:
 
 ```env
 NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
-GMS_DEMO_RUNTIME_API_KEY=
-GMS_DEMO_RUNTIME_API_KEYS=
 ```
 
 If this env var is absent, the frontend remains in mock mode. This keeps the
 Vercel/design preview working without a backend.
 
-Runtime Test no longer asks users to type the app API key into the browser.
-The page calls the local Next.js route `POST /api/guardrails/run`, and that
-route forwards the request to backend `POST /v1/guardrails/run` with
-`X-App-ID` plus an API key from `frontend/.env.local`. Use
-`GMS_DEMO_RUNTIME_API_KEY` for one local demo key, or
-`GMS_DEMO_RUNTIME_API_KEYS` as semicolon-separated `client-id=api-key` pairs
-when testing multiple apps.
+Runtime Test asks for the selected app's plaintext API key for local/manual
+testing convenience. Real client applications should never expose this key to
+end users; they send `X-App-ID` and `X-API-Key` from their own backend. The
+runtime result is displayed as a three-step progress bar:
+`Input -> Tool guard -> Output`, with blocked stages shown in red and skipped
+stages shown in grey.
+When backend `.env` sets `NEMO_RUNTIME_DEBUG=1`, Runtime Test also renders the
+sanitized connector debug trace returned by `/v1/guardrails/run`.
 
 The current `/policies` page reads:
 
@@ -74,7 +73,8 @@ independently.
 
 Resolution responses return `created`, `reused`, or `already_assigned` plus
 the reusable `policy_id`, concrete `assignment_id`, and assignment-specific
-`display_name`.
+`display_name`. The frontend intentionally does not expose the internal
+`reused` wording; users see simple create/edit/delete notices.
 
 Browser access from the local frontend is controlled by:
 
@@ -99,9 +99,9 @@ same policy definition.
 | --- | --- | --- | --- |
 | Create/Edit Policy | `GET` | `/policy-options` | Enabled connector/action/resource combinations from normalized tool mappings |
 
-The frontend filters actions by connector and resources by action. Connectors
-without enabled mappings, including the current SharePoint placeholder, are not
-offered in the policy form.
+The frontend filters actions by connector and resources by action. The demo UI
+currently offers only GitHub in connector selectors; SharePoint remains hidden
+until its executable runtime workflow is implemented.
 
 ## Health
 
@@ -126,12 +126,19 @@ screen, then issue a one-time temporary password.
 The browser stores the prototype token in session storage, or local storage
 when Remember Me is selected. `api-client.ts` automatically attaches it as a
 Bearer token. Settings displays the real read-only email, persists
-name/username, and clears the session on Logout.
+name/username, has only the Dark Mode preference toggle, and clears the session
+on the red Logout action. Runtime app-auth failures such as invalid app API
+keys must not clear the management login; the frontend only clears the stored
+management session when the backend returns the management-auth detail
+`Authentication required`.
 
 ## User Management
 
 These endpoints power `/user-management`. The shared top nav shows that tab only
-for management users with `system_role = admin`.
+for management users with `system_role = admin`. The screen now mirrors the
+Apps layout: users are listed in rows with `name`, `email`, `role`, and
+`enabled` status; clicking a user opens a details modal for role/status,
+temporary-password reset, and app links.
 
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
@@ -179,7 +186,6 @@ Create app body:
 ```json
 {
   "name": "Finance Bot",
-  "client_id": "finance-bot",
   "authorized": true,
   "main_llm_config_id": null,
   "guardrail_llm_config_id": null
@@ -188,7 +194,8 @@ Create app body:
 
 Important frontend behavior:
 
-- The backend generates app API keys. Users do not type their own keys.
+- The backend generates GUID-format client IDs and app API keys. Users do not
+  type either value when creating apps.
 - Create and regenerate responses return the plaintext API key once with a
   notice to copy it before closing the UI.
 - GMS stores only the SHA-256 key hash. Lost keys cannot be recovered; users

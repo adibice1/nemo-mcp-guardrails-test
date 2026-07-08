@@ -91,7 +91,7 @@ export type ClientApp = {
 
 export type AppCreatePayload = {
   name: string;
-  client_id: string;
+  client_id?: string;
   authorized: boolean;
   main_llm_config_id: number | null;
   guardrail_llm_config_id: number | null;
@@ -172,6 +172,12 @@ export type GuardrailsRunResponse = {
   history_messages_received: number;
   history_messages_loaded: number;
   history_messages_used: number;
+  debug_tool_trace?: Array<{
+    event: string;
+    tool_name?: string | null;
+    arguments?: Record<string, unknown> | null;
+    content?: string | null;
+  }> | null;
 };
 
 export type GlobalPolicyAssignment = {
@@ -288,11 +294,13 @@ async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   });
 
   if (!response.ok) {
-    if (response.status === 401) clearManagementSession();
     const body = (await response.json().catch(() => null)) as {
       detail?: string | { code?: string; policy_id?: number };
     } | null;
     const detail = body?.detail;
+    if (response.status === 401 && detail === "Authentication required") {
+      clearManagementSession();
+    }
     const message =
       typeof detail === "string"
         ? detail
@@ -502,37 +510,6 @@ export function runGuardrails(
     },
     body: JSON.stringify(payload)
   });
-}
-
-export async function runGuardrailsViaProxy(
-  clientId: string,
-  payload: {
-    message: string;
-    conversation_id?: string | null;
-    conversation_history?: Array<{
-      role: "user" | "assistant";
-      content: string;
-    }>;
-  }
-) {
-  const response = await fetch("/api/guardrails/run", {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ client_id: clientId, ...payload }),
-    cache: "no-store"
-  });
-
-  if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as {
-      detail?: string;
-    } | null;
-    throw new Error(body?.detail ?? `Runtime request failed: ${response.status}`);
-  }
-
-  return (await response.json()) as GuardrailsRunResponse;
 }
 
 export function listGlobalPolicyAssignments() {

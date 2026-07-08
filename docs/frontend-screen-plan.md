@@ -13,8 +13,8 @@ TanStack Query or typed fetch wrappers
 ```
 
 The first frontend should demonstrate GitHub MCP guardrail management. Other
-connectors can appear as disabled/future UI affordances, but should not block
-the MVP.
+connectors should stay hidden from active selectors until their executable
+runtime workflows exist.
 
 ## Navigation
 
@@ -61,8 +61,8 @@ Components:
 Notes:
 
 - Runtime app auth is separate. The app backend still needs `X-App-ID` and
-  `X-API-Key`; the local frontend Runtime Test proxies through a Next.js route
-  so the browser does not show the key field.
+  `X-API-Key`; the local frontend Runtime Test has a key field only for
+  manual testing convenience.
 - Keep labels honest: "Demo login" or "Local management session".
 
 ## Screen 2: Dashboard
@@ -138,13 +138,13 @@ Actions:
 Create form fields:
 
 - name
-- client ID
-- API key
 - main LLM config ID
 - guardrail LLM config ID
 
 UX note:
 
+- Client IDs are generated server-side in GUID format.
+- API keys are generated server-side and returned once.
 - After create, show a warning that the API key cannot be retrieved again.
 
 ## Screen 4: App Detail
@@ -404,6 +404,10 @@ Purpose:
 
 This can reuse the same runtime tester component from app detail.
 
+The app detail Runtime Test renders the runtime sequence as
+`Input -> Tool guard -> Output`: green means the stage passed, red means the
+stage blocked or errored, and grey means the stage did not run.
+
 Extra controls:
 
 - app client ID
@@ -470,8 +474,10 @@ components/
 4. Apps list/detail, connector management, effective policy list, and runtime
    test are backend-wired. LLM metadata editing is hidden from normal
    developer-facing app detail screens for now.
-5. Admin-only User Management now creates users, resets temporary passwords,
-   blocks/enables users, changes roles, and links users to apps.
+5. Admin-only User Management now mirrors the Apps list style. Rows show
+   `name`, `email`, `role`, and `enabled`; Create User is a top-level button,
+   and clicking a user opens a modal for role/status, temporary-password reset,
+   and app links.
 7. Runtime tester.
 8. Policy library create/edit polish.
 9. Dashboard polish.

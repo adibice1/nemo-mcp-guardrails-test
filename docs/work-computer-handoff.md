@@ -152,12 +152,17 @@ output rail as `not run`; connector failures remain the separate `tool_error`
 path. `Guarded tool types` is a policy-coverage count, not a count of calls made
 by the current request.
 
-The frontend Runtime Test no longer exposes an app API key text box. It calls
-`frontend/app/api/guardrails/run/route.ts`, which forwards to
-`POST /v1/guardrails/run` with the app key read from `frontend/.env.local`.
-Set `GMS_DEMO_RUNTIME_API_KEY` for one local demo app, or
-`GMS_DEMO_RUNTIME_API_KEYS` with semicolon-separated `client-id=api-key` pairs
-for multiple apps.
+The frontend Runtime Test has an app API key field for local/manual testing
+convenience. Real apps still call `POST /v1/guardrails/run` from their own
+backend with `X-App-ID` and `X-API-Key`.
+The app Runtime Test now displays the request path as an
+`Input -> Tool guard -> Output` progress bar: green means passed, red means the
+blocked/error stage, and grey means the stage did not run.
+
+When `.env` sets `NEMO_RUNTIME_DEBUG=1`, `/v1/guardrails/run` includes a
+sanitized `debug_tool_trace` and the app Runtime Test displays it under
+Connector debug trace. Use this only for local troubleshooting of GitHub MCP
+tool calls/results, such as branch or pull-request validation failures.
 
 `tests/test_nemo_mcp.py` calls this reusable function and still prints the
 same detailed terminal workflow. The full read-only NeMo + GitHub MCP run
@@ -215,26 +220,34 @@ The normal-developer Apps workflow is now implemented:
 -> click row to open /apps/[clientId]
 
 /apps/[clientId]
--> Overview: edit name/client ID and rotate API key
+-> Overview: edit name and rotate API key
 -> Connectors: link/enable/disable/unlink GitHub
 -> LLM: update main and guardrail config IDs
 -> Policies: effective summary and link to filtered policy management
 -> Runtime Test: authenticated POST /v1/guardrails/run
 ```
 
-SharePoint is shown as coming soon because only GitHub has normalized runtime
-metadata and an executable adapter. The LLM tab uses numeric config IDs until a
-readable LLM-config listing endpoint is added.
+SharePoint is hidden from active connector selectors because only GitHub has
+normalized runtime metadata and an executable adapter. The LLM tab uses numeric
+config IDs until a readable LLM-config listing endpoint is added.
+
+App creation no longer accepts user-entered client IDs or API keys. The backend
+generates GUID-format client IDs and high-entropy API keys, returns the API key
+once, and stores only the hash.
+
+User Management now mirrors the Apps screen: rows show name, email, role, and
+enabled status. Create User is a button, and clicking a user opens a modal for
+role/status changes, password reset, and app links.
 
 The Settings dark-mode toggle now applies an app-wide Tailwind `dark` class.
 Saving writes `gms:theme` to browser `localStorage`; `app/layout.tsx` restores
 the class before rendering to reduce theme flashing.
 
 The policy builder loads valid connector/action/resource choices from
-`GET /policy-options`; currently only GitHub has mappings, so SharePoint is not
-offered in the policy form. In the policy table, global assignments use a globe
-icon, app-specific GitHub and SharePoint assignments use connector marks, and
-unknown connector values fall back to the folder icon.
+`GET /policy-options`; the frontend filters this to GitHub for the current
+demo. In the policy table, global assignments use a globe icon, app-specific
+GitHub assignments use the GitHub connector mark, and unknown connector values
+fall back to the folder icon.
 
 The shared Create/Edit Policy modal now has an Input/Output rail selector.
 Policy naming is unlocked immediately. Input mode keeps the cascading GitHub

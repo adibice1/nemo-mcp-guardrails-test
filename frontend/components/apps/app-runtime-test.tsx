@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Play } from "lucide-react";
-import { runGuardrailsViaProxy, type GuardrailsRunResponse } from "@/lib/api-client";
+import { Eye, EyeOff, Play } from "lucide-react";
+import { runGuardrails, type GuardrailsRunResponse } from "@/lib/api-client";
 
 export function AppRuntimeTest({ clientId }: { clientId: string }) {
+  const [apiKey, setApiKey] = useState("");
+  const [showKey, setShowKey] = useState(false);
   const [conversationId, setConversationId] = useState("frontend-demo-1");
   const [message, setMessage] = useState("List recent pull requests.");
   const [result, setResult] = useState<GuardrailsRunResponse | null>(null);
@@ -12,7 +14,7 @@ export function AppRuntimeTest({ clientId }: { clientId: string }) {
   const [running, setRunning] = useState(false);
 
   async function handleRun() {
-    if (!message.trim()) {
+    if (!apiKey || !message.trim()) {
       return;
     }
     setRunning(true);
@@ -20,7 +22,7 @@ export function AppRuntimeTest({ clientId }: { clientId: string }) {
     setResult(null);
     try {
       setResult(
-        await runGuardrailsViaProxy(clientId, {
+        await runGuardrails(clientId, apiKey, {
           message: message.trim(),
           conversation_id: conversationId.trim() || null,
           conversation_history: []
@@ -38,9 +40,28 @@ export function AppRuntimeTest({ clientId }: { clientId: string }) {
       <h2 className="text-2xl font-extrabold text-gms-text">Runtime Test</h2>
       <p className="mt-2 text-sm text-gms-muted">
         Send a real authenticated request through input rails, guarded tools and output rails.
-        The app key is supplied by the local Next.js proxy.
+        The API key field is only for this local GMS test panel; real apps send it from their backend.
       </p>
       <div className="mt-7 grid gap-5 md:grid-cols-2">
+        <label className="text-sm font-bold text-gms-text">
+          App API Key
+          <div className="relative mt-2">
+            <input
+              className="detail-input pr-12"
+              placeholder="Enter the app API key"
+              type={showKey ? "text" : "password"}
+              value={apiKey}
+              onChange={(event) => setApiKey(event.target.value)}
+            />
+            <button
+              className="absolute right-3 top-3 text-gms-muted"
+              type="button"
+              onClick={() => setShowKey((current) => !current)}
+            >
+              {showKey ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+            </button>
+          </div>
+        </label>
         <label className="text-sm font-bold text-gms-text">
           Conversation ID
           <input
@@ -60,7 +81,7 @@ export function AppRuntimeTest({ clientId }: { clientId: string }) {
       </label>
       <button
         className="mt-5 inline-flex h-10 items-center gap-2 rounded-md bg-gms-blue px-5 text-sm font-semibold text-white shadow-button disabled:opacity-50"
-        disabled={!message.trim() || running}
+        disabled={!apiKey || !message.trim() || running}
         type="button"
         onClick={handleRun}
       >
@@ -70,14 +91,34 @@ export function AppRuntimeTest({ clientId }: { clientId: string }) {
 
       {result && (
         <div className="mt-7 rounded-md border border-gms-line bg-[#f9fbff] p-5 dark:bg-[#20242c]">
-          <div className="flex flex-wrap gap-2">
-            <Status label={`Status: ${result.status}`} passed={result.status === "passed"} />
-            <Status label={`Input: ${formatRailStatus(result.input_rail_status, result.input_rail_source, result.input_rail_categories)}`} passed={result.input_rail_status === "passed"} />
-            <Status label={`Tool guard: ${formatToolGuardStatus(result)}`} passed={result.tool_guard_status === "passed"} />
-            <Status label={`Output: ${formatRailStatus(result.output_rail_status, result.output_rail_source, result.output_rail_categories)}`} passed={result.output_rail_status === "passed"} />
-          </div>
+          <RuntimeProgress result={result} />
           <h3 className="mt-5 text-sm font-bold text-gms-text">Response</h3>
           <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gms-text">{result.response}</p>
+          {result.debug_tool_trace && result.debug_tool_trace.length > 0 && (
+            <div className="mt-5 rounded-md border border-gms-line bg-white p-4 text-xs text-gms-text dark:bg-[#252932]">
+              <h3 className="text-sm font-extrabold">Connector debug trace</h3>
+              <div className="mt-3 space-y-3">
+                {result.debug_tool_trace.map((entry, index) => (
+                  <div key={`${entry.event}-${entry.tool_name ?? "tool"}-${index}`}>
+                    <p className="font-bold">
+                      {entry.event}
+                      {entry.tool_name ? `: ${entry.tool_name}` : ""}
+                    </p>
+                    {entry.arguments && (
+                      <pre className="mt-1 whitespace-pre-wrap rounded bg-[#f4f7ff] p-2 dark:bg-[#1b1f27]">
+                        {JSON.stringify(entry.arguments, null, 2)}
+                      </pre>
+                    )}
+                    {entry.content && (
+                      <p className="mt-1 whitespace-pre-wrap leading-5 text-gms-muted">
+                        {entry.content}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           {result.block_reason && (
             <div className="mt-4 rounded-md border border-[#ffd8dc] bg-[#fff6f7] p-4 text-sm text-gms-danger dark:border-[#63343a] dark:bg-[#302024]">
               <p className="font-extrabold">
@@ -107,6 +148,7 @@ export function AppRuntimeTest({ clientId }: { clientId: string }) {
 }
 
 function formatToolGuardStatus(result: GuardrailsRunResponse) {
+  if (result.status === "tool_error") return "tool error";
   if (result.tool_guard_status === "blocked") return "blocked (GMS)";
   return result.tool_guard_status;
 }
@@ -127,10 +169,108 @@ function formatRailStatus(
   return "blocked (GMS)";
 }
 
-function Status({ label, passed }: { label: string; passed: boolean }) {
+type StageState = "passed" | "blocked" | "idle";
+
+type RuntimeStage = {
+  label: string;
+  detail: string;
+  state: StageState;
+};
+
+function RuntimeProgress({ result }: { result: GuardrailsRunResponse }) {
+  const stages = buildRuntimeStages(result);
+
   return (
-    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${passed ? "bg-[#e7f7ed] text-[#257342]" : "bg-[#fff0f1] text-gms-danger"}`}>
-      {label}
-    </span>
+    <div>
+      <div className="flex flex-col gap-3 md:flex-row md:items-stretch">
+        {stages.map((stage, index) => (
+          <div key={stage.label} className="flex flex-1 items-center gap-3">
+            <div
+              className={`flex min-h-[74px] flex-1 flex-col justify-center rounded-lg border px-4 ${stageClass(stage.state)}`}
+            >
+              <span className="text-xs font-extrabold uppercase tracking-[0.08em]">
+                {stage.label}
+              </span>
+              <span className="mt-1 text-sm font-semibold">
+                {stage.detail}
+              </span>
+            </div>
+            {index < stages.length - 1 && (
+              <span className="hidden h-[2px] w-7 bg-gms-line md:block" />
+            )}
+          </div>
+        ))}
+      </div>
+      {result.block_reason && (
+        <p className="mt-3 text-xs font-semibold text-gms-danger">
+          Blocked at {result.block_stage ?? "runtime"}: {result.block_reason}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function buildRuntimeStages(result: GuardrailsRunResponse): RuntimeStage[] {
+  const inputBlocked = result.input_rail_status === "blocked";
+  const toolBlocked = result.tool_guard_status === "blocked";
+  const toolErrored = result.status === "tool_error";
+  const outputBlocked = result.output_rail_status === "blocked";
+  const inputPassed = result.input_rail_status === "passed";
+  const toolPassed =
+    inputPassed && !toolBlocked && !toolErrored && result.tool_guard_status === "passed";
+
+  return [
+    {
+      label: "Input",
+      detail: formatRailStatus(
+        result.input_rail_status,
+        result.input_rail_source,
+        result.input_rail_categories
+      ),
+      state: inputBlocked ? "blocked" : inputPassed ? "passed" : "idle"
+    },
+    {
+      label: "Tool guard",
+      detail: inputBlocked ? "not run" : formatToolGuardStatus(result),
+      state:
+        inputBlocked || !result.tool_guard_status
+          ? "idle"
+          : toolBlocked || toolErrored
+          ? "blocked"
+          : toolPassed
+          ? "passed"
+          : "idle"
+    },
+    {
+      label: "Output",
+      detail:
+        inputBlocked || toolBlocked || toolErrored
+          ? "not run"
+          : formatRailStatus(
+              result.output_rail_status,
+              result.output_rail_source,
+              result.output_rail_categories
+            ),
+      state:
+        inputBlocked || toolBlocked || toolErrored || !result.output_rail_status
+          ? "idle"
+          : outputBlocked
+          ? "blocked"
+          : result.output_rail_status === "passed"
+          ? "passed"
+          : "idle"
+    }
+  ];
+}
+
+function stageClass(state: StageState) {
+  if (state === "passed") {
+    return "border-[#b9e7c8] bg-[#e7f7ed] text-[#257342]";
+  }
+  if (state === "blocked") {
+    return "border-[#ffc9cf] bg-[#fff0f1] text-gms-danger";
+  }
+  return (
+    "border-gms-line bg-white text-gms-muted dark:bg-[#252932]"
   );
 }

@@ -502,4 +502,9 @@ async def run_guardrails(
             if debug_enabled
             else None
         ),
+        debug_tool_trace=(
+            [dict(entry) for entry in execution_result.tool_trace]
+            if debug_enabled
+            else None
+        ),
     )

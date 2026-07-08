@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, ChevronDown, Plus, X } from "lucide-react";
+import { Check, ChevronDown, HelpCircle, Plus, X } from "lucide-react";
 import { type PolicyConnectorOption } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import { FormField } from "@/components/shared/form-field";
@@ -188,6 +188,7 @@ export function CreatePolicyModal({
               label="Choose Rail Type:"
               required
               placeholder="Rail Type"
+              tip="Input policies check the user's request before tools run. Output policies check the assistant response."
               value={policyType}
               options={[
                 { value: "input", label: "Input" },
@@ -210,6 +211,7 @@ export function CreatePolicyModal({
                 label="Choose Connector:"
                 required
                 placeholder="Connector"
+                tip="Choose the external integration this input policy applies to."
                 value={connector}
                 options={connectorOptions}
                 onChange={(value) => {
@@ -225,6 +227,7 @@ export function CreatePolicyModal({
                 label="Choose Action:"
                 required
                 placeholder="Action"
+                tip="Choose the action to allow or block, such as create, update, merge, or read."
                 value={action}
                 options={actionOptions}
                 disabled={actionLocked}
@@ -240,6 +243,7 @@ export function CreatePolicyModal({
                 label="Choose Resource Type:"
                 required
                 placeholder="Resource Type"
+                tip="Only resources valid for the selected connector and action are shown."
                 value={resourceType}
                 options={resourceOptions}
                 disabled={resourceLocked}
@@ -307,6 +311,7 @@ type SelectFieldProps = {
   placeholder: string;
   value: string;
   options: Array<{ value: string; label: string }>;
+  tip?: string;
   required?: boolean;
   disabled?: boolean;
   onChange: (value: string) => void;
@@ -317,6 +322,7 @@ function SelectField({
   placeholder,
   value,
   options,
+  tip,
   required = false,
   disabled = false,
   onChange
@@ -330,7 +336,22 @@ function SelectField({
   }
 
   return (
-    <FormField label={label} required={required}>
+    <FormField
+      label={
+        <span className="inline-flex items-center gap-1">
+          {label}
+          {tip && (
+            <span
+              className="inline-flex text-gms-muted"
+              title={tip}
+            >
+              <HelpCircle className="h-3.5 w-3.5" />
+            </span>
+          )}
+        </span>
+      }
+      required={required}
+    >
       <div className="relative">
         <button
           className={cn(

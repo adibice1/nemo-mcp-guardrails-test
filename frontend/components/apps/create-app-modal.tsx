@@ -6,7 +6,6 @@ import { FormField } from "@/components/shared/form-field";
 
 export type AppDraft = {
   name: string;
-  clientId: string;
 };
 
 export type CreatedAppSecret = {
@@ -27,7 +26,6 @@ export function CreateAppModal({
   onSubmit
 }: CreateAppModalProps) {
   const [name, setName] = useState("");
-  const [clientId, setClientId] = useState("");
   const [createdSecret, setCreatedSecret] = useState<CreatedAppSecret | null>(null);
   const [copied, setCopied] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -35,15 +33,14 @@ export function CreateAppModal({
   useEffect(() => {
     if (!open) {
       setName("");
-      setClientId("");
       setCreatedSecret(null);
       setCopied(false);
     }
   }, [open]);
 
   const canCreate = useMemo(
-    () => name.trim() && clientId.trim() && !createdSecret,
-    [clientId, createdSecret, name]
+    () => name.trim() && !createdSecret,
+    [createdSecret, name]
   );
 
   if (!open) {
@@ -56,8 +53,7 @@ export function CreateAppModal({
     }
     setSubmitting(true);
     const result = await onSubmit({
-      name: name.trim(),
-      clientId: clientId.trim()
+      name: name.trim()
     });
     if (result) {
       setCreatedSecret(result);
@@ -93,7 +89,7 @@ export function CreateAppModal({
           Register an application that will send guarded requests through GMS.
         </p>
 
-        <div className="mt-7 grid gap-5 md:grid-cols-2">
+        <div className="mt-7 grid gap-5">
           <FormField label="Application Name:" required>
             <input
               className="h-11 w-full rounded border border-gms-blue bg-white px-3 text-sm text-gms-text outline-none placeholder:text-[#a9bdff] dark:bg-[#252932]"
@@ -101,15 +97,6 @@ export function CreateAppModal({
               placeholder="Finance Bot"
               value={name}
               onChange={(event) => setName(event.target.value)}
-            />
-          </FormField>
-          <FormField label="Client ID:" required>
-            <input
-              className="h-11 w-full rounded border border-gms-blue bg-white px-3 text-sm text-gms-text outline-none placeholder:text-[#a9bdff] dark:bg-[#252932]"
-              disabled={Boolean(createdSecret)}
-              placeholder="finance-bot"
-              value={clientId}
-              onChange={(event) => setClientId(event.target.value)}
             />
           </FormField>
         </div>
@@ -140,8 +127,9 @@ export function CreateAppModal({
           </div>
         ) : (
           <p className="mt-6 rounded-xl border border-gms-line bg-[#f7f9ff] p-4 text-sm text-gms-muted dark:bg-[#20242c]">
-            GMS will generate a secure API key after creation. Copy it before
-            closing this dialog because it will not be shown again.
+            GMS will generate a GUID client ID and secure API key after
+            creation. Copy the API key before closing this dialog because it
+            will not be shown again.
           </p>
         )}
 
