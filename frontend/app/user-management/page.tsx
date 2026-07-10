@@ -16,6 +16,7 @@ import {
   RefreshCw,
   Search,
   ShieldCheck,
+  Trash2,
   UserCircle,
   UserPlus,
   X
@@ -23,6 +24,7 @@ import {
 import { AppTopNav } from "@/components/shared/app-top-nav";
 import {
   createManagedUser,
+  deleteManagedUser,
   hasApiBaseUrl,
   linkManagedUserApp,
   listApps,
@@ -37,6 +39,7 @@ import {
   type ManagedUserPasswordResetResponse,
   type UserAppLink
 } from "@/lib/api-client";
+import { loadManagementSession } from "@/lib/management-auth";
 import { cn, formatPolicyDate } from "@/lib/utils";
 
 type SecretDisplay = {
@@ -58,6 +61,7 @@ export default function UserManagementPage() {
   const [apps, setApps] = useState<ClientApp[]>([]);
   const [links, setLinks] = useState<UserAppLink[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [createForm, setCreateForm] = useState(EMPTY_CREATE_FORM);
   const [linkForm, setLinkForm] = useState({ appId: "" });
@@ -122,6 +126,7 @@ export default function UserManagementPage() {
   }, []);
 
   useEffect(() => {
+    setCurrentUserId(loadManagementSession()?.user.id ?? null);
     void loadData();
   }, [loadData]);
 
@@ -246,6 +251,32 @@ export default function UserManagementPage() {
     }
   }
 
+  async function handleDeleteSelectedUser() {
+    if (!selectedUser) return;
+    const confirmed = window.confirm(
+      `Delete ${selectedUser.email}? This removes the GMS user and app links.`
+    );
+    if (!confirmed) return;
+
+    try {
+      setError("");
+      await deleteManagedUser(selectedUser.id);
+      setUsers((current) =>
+        current.filter((user) => user.id !== selectedUser.id)
+      );
+      setLinks([]);
+      setSelectedUserId(null);
+      setModalMode(null);
+      setNotice(`${selectedUser.email} was deleted.`);
+    } catch (deleteError) {
+      setError(
+        deleteError instanceof Error
+          ? deleteError.message
+          : "Could not delete user."
+      );
+    }
+  }
+
   async function handleLinkApp(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedUser || !linkForm.appId) return;
@@ -311,7 +342,7 @@ export default function UserManagementPage() {
               users to the applications they can manage.
             </p>
           </div>
-          <div className="flex w-full flex-col gap-4 lg:w-auto lg:flex-row lg:items-center">
+          <div className="flex flex-col items-stretch gap-7 lg:items-end">
             <label className="relative block w-full lg:w-[405px]">
               <input
                 className="h-11 w-full rounded-xl border border-gms-line bg-white px-4 pr-11 text-sm text-gms-text shadow-field outline-none placeholder:text-gms-muted dark:bg-[#252932]"
@@ -322,11 +353,11 @@ export default function UserManagementPage() {
               <Search className="absolute right-5 top-3 h-5 w-5 text-gms-text" />
             </label>
             <button
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-gms-blue px-5 text-sm font-semibold text-white shadow-button"
+              className="inline-flex h-10 w-full items-center justify-center gap-3 rounded-md bg-gms-blue px-4 text-sm font-medium text-white shadow-button lg:w-[170px]"
               type="button"
               onClick={openCreateModal}
             >
-              <UserPlus className="h-4 w-4" />
+              <UserPlus className="h-5 w-5" />
               Create User
             </button>
           </div>
@@ -402,8 +433,11 @@ export default function UserManagementPage() {
           links={links}
           selectedUser={selectedUser}
           setLinkForm={setLinkForm}
+          deleteDisabled={selectedUser.id === currentUserId}
+          error={error}
           onClose={closeModal}
           onLinkApp={handleLinkApp}
+          onDeleteUser={handleDeleteSelectedUser}
           onResetPassword={handleResetPassword}
           onUnlinkApp={handleUnlinkApp}
           onUpdateUser={handleUpdateSelected}
@@ -563,7 +597,10 @@ function UserEditModal({
   links,
   selectedUser,
   setLinkForm,
+  deleteDisabled,
+  error,
   onClose,
+  onDeleteUser,
   onLinkApp,
   onResetPassword,
   onUnlinkApp,
@@ -575,7 +612,10 @@ function UserEditModal({
   links: UserAppLink[];
   selectedUser: ManagedUser;
   setLinkForm: Dispatch<SetStateAction<{ appId: string }>>;
+  deleteDisabled: boolean;
+  error: string;
   onClose: () => void;
+  onDeleteUser: () => void;
   onLinkApp: (event: FormEvent<HTMLFormElement>) => void;
   onResetPassword: () => void;
   onUnlinkApp: (link: UserAppLink) => void;
@@ -597,7 +637,7 @@ function UserEditModal({
 
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p className="text-sm font-semibold text-gms-blue">User Profile</p>
+            <p className="text-sm font-semibold text-gms-blue">User Details</p>
             <h2 className="mt-1 text-3xl font-extrabold text-gms-text">
               {selectedUser.name || selectedUser.email}
             </h2>
@@ -606,15 +646,42 @@ function UserEditModal({
               Created {formatPolicyDate(selectedUser.created_at)}
             </p>
           </div>
-          <button
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-gms-blue px-4 text-sm font-semibold text-white shadow-button"
-            type="button"
-            onClick={() => onResetPassword()}
-          >
-            <RefreshCw className="h-4 w-4" />
-            Reset Password
-          </button>
+          <div className="flex flex-wrap gap-3">
+            <button
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-gms-blue px-4 text-sm font-semibold text-white shadow-button"
+              type="button"
+              onClick={() => onResetPassword()}
+            >
+              <RefreshCw className="h-4 w-4" />
+              Reset Password
+            </button>
+            <button
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-[#fff0f1] px-4 text-sm font-semibold text-gms-danger disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={deleteDisabled}
+              title={
+                deleteDisabled
+                  ? "You cannot delete the account you are currently using."
+                  : undefined
+              }
+              type="button"
+              onClick={() => onDeleteUser()}
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete User
+            </button>
+          </div>
         </div>
+
+        {deleteDisabled && (
+          <p className="mt-4 rounded-md bg-[#f6f8ff] px-4 py-3 text-sm font-semibold text-gms-muted dark:bg-[#252932]">
+            You cannot delete the admin account you are currently using.
+          </p>
+        )}
+        {error && (
+          <p className="mt-4 rounded-md bg-[#fff0f1] px-4 py-3 text-sm font-semibold text-gms-danger">
+            {error}
+          </p>
+        )}
 
         <div className="mt-7 grid gap-4 md:grid-cols-3">
           <InfoCard label="Username" value={selectedUser.username} />

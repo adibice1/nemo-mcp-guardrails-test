@@ -374,6 +374,12 @@ export function resetManagedUserPassword(userId: number) {
   );
 }
 
+export function deleteManagedUser(userId: number) {
+  return apiRequest<void>(`/management-users/${userId}`, {
+    method: "DELETE"
+  });
+}
+
 export function listManagedUserApps(userId: number) {
   return apiRequest<UserAppLink[]>(`/management-users/${userId}/apps`);
 }

@@ -93,7 +93,7 @@ export default function LoginPage() {
               />
             </label>
 
-            <div className="flex items-center justify-between text-xs font-semibold">
+            <div className="flex items-center text-xs font-semibold">
               <label className="flex items-center gap-2 text-gms-text">
                 <input
                   checked={remember}
@@ -103,7 +103,6 @@ export default function LoginPage() {
                 />
                 Remember Me
               </label>
-              <span className="text-gms-muted">Password recovery coming later</span>
             </div>
 
             {error && (

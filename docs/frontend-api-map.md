@@ -145,6 +145,7 @@ temporary-password reset, and app links.
 | `GET` | `/management-users` | Admin list of all GMS users |
 | `POST` | `/management-users` | Admin-created user with one-time temporary password |
 | `PUT` | `/management-users/{user_id}` | Update system role or enabled/blocked state |
+| `DELETE` | `/management-users/{user_id}` | Delete one user and their app links; admins cannot delete their own current account |
 | `POST` | `/management-users/{user_id}/password` | Generate a replacement temporary password |
 | `GET` | `/management-users/{user_id}/apps` | List app-role links for one user |
 | `POST` | `/management-users/{user_id}/apps` | Link or relink a user to an app as an app developer |

@@ -554,7 +554,7 @@ export default function PoliciesPage() {
             </label>
 
             <button
-              className="inline-flex h-10 items-center justify-center gap-3 rounded-md bg-gms-blue px-4 text-sm font-medium text-white shadow-button"
+              className="inline-flex h-10 w-full items-center justify-center gap-3 rounded-md bg-gms-blue px-4 text-sm font-medium text-white shadow-button lg:w-[170px]"
               type="button"
               onClick={() => {
                 setEditingPolicy(null);

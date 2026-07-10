@@ -215,6 +215,25 @@ def reset_managed_user_password(
     )
 
 
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_managed_user(
+    user_id: int,
+    current_user: UserRecord = Depends(require_system_admin),
+    db: Session = Depends(get_db),
+) -> None:
+    """Delete one admin-managed user and its app links."""
+
+    if current_user.id == user_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Administrators cannot delete their own account",
+        )
+
+    user = _require_user(user_id, db)
+    db.delete(user)
+    db.commit()
+
+
 @router.get("/{user_id}/apps", response_model=list[UserAppLinkRead])
 def list_managed_user_apps(
     user_id: int,

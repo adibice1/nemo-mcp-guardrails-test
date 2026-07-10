@@ -16,9 +16,9 @@ export function FormField({
 }: FormFieldProps) {
   return (
     <label className={cn("block text-sm font-bold text-gms-text", className)}>
-      <span>
+      <span className="inline-flex items-center gap-1 whitespace-nowrap">
         {label}
-        {required && <span className="ml-1 text-gms-danger">*</span>}
+        {required && <span className="text-gms-danger">*</span>}
       </span>
       <div className="mt-2">{children}</div>
     </label>
