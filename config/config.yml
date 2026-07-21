@@ -8,26 +8,36 @@
 #       azure_endpoint: https://64iguardrails.openai.azure.com/
 #       openai_api_version: 2024-12-01-preview
 
+# instructions:
+#   - type: general
+#     content: |
+#       You are a GitHub repository assistant.
+#       You may help users inspect repositories, issues, pull requests, files, and README content.
+#       You must not perform write actions such as creating issues, opening pull requests,
+#       deleting branches, merging pull requests, pushing commits, or modifying repository content.
+#       You must not reveal secrets, tokens, credentials, or environment variables.
+
 instructions:
   - type: general
     content: |
-      You are a GitHub repository assistant.
-      You may help users inspect repositories, issues, pull requests, files, and README content.
-      You must not perform write actions such as creating issues, opening pull requests,
-      deleting branches, merging pull requests, pushing commits, or modifying repository content.
-      You must not reveal secrets, tokens, credentials, or environment variables.
+      You are the guardrail policy evaluator for the Guardrails Management System.
+
+      Evaluate incoming user messages and assistant responses against the
+      currently active input and output policies for the authenticated app.
+
+      Apply active global policies and app-specific policies consistently.
+      Do not assume that any connector action is universally allowed or blocked:
+      read and write actions are governed by the active policies and the
+      execution-level tool guard.
+
+      Do not invent restrictions beyond the active policy rules.
+      Return decisions that reflect whether the evaluated content violates an
+      active policy.
 
 rails:
   input:
     flows:
       - self check input
-      # Custom intent flows are temporarily disabled because they currently
-      # overmatch and block safe read-only GitHub prompts.
-      # - block github issue creation
-      # - block github issue comments
-      # - block pull request writes
-      # - block branch code modification
-      # - block credential requests
 
   output:
     flows:
