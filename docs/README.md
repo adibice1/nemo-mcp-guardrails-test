@@ -74,6 +74,7 @@ Start here for current project context:
 - `frontend-api-map.md`: endpoint map for the Next.js frontend
 - `frontend-screen-plan.md`: proposed screens and component structure
 - `frontend-demo-flow.md`: presentation-ready GitHub MCP demo flow
+- `containerisation.md`: Docker image, Compose, health-check, and local MCP notes
 - `testing-notes.md`: verified tests and commands
 - `next-steps.md`: recommended next work item
 - `runtime-flow-map.md`: concise file/function runtime flow map

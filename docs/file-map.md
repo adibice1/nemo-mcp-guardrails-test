@@ -23,6 +23,7 @@ excluded.
 | Output text is incorrectly allowed or blocked | `src/nemo_mcp_guardrails/output_guard.py`, `src/nemo_mcp_guardrails/guarded_execution.py`, `config/prompts.yml` |
 | Conversation history is missing or too large | `src/nemo_mcp_guardrails/database/conversation_store.py`, `src/nemo_mcp_guardrails/api/runtime.py` |
 | Database cannot connect | `src/nemo_mcp_guardrails/database/connection.py`, `.env`, `docker-compose.yml` |
+| Docker frontend/backend is unhealthy | `Dockerfile`, `frontend/Dockerfile`, `docker-compose.yml`, `docs/containerisation.md` |
 | Apps list/detail UI is wrong | `frontend/app/apps/page.tsx`, `frontend/app/apps/[clientId]/page.tsx`, `frontend/components/apps/` |
 
 ## Backend Core
@@ -84,6 +85,7 @@ excluded.
 - `frontend/app/apps/[clientId]/page.tsx` - Loads one app and coordinates its overview, connectors, LLM, policies, and runtime tabs.
 - `frontend/app/user-management/page.tsx` - Lets system admins create users, reset temporary passwords, and link users to apps.
 - `frontend/app/settings/page.tsx` - Wraps the account settings form in the shared GMS navigation/layout.
+- `frontend/app/api/gms/[...path]/route.ts` - Proxies same-origin frontend API requests to FastAPI using the runtime server URL.
 
 ## Frontend Components
 
@@ -109,7 +111,7 @@ excluded.
 - `frontend/lib/management-auth.ts` - Saves, restores, and clears prototype management sessions in browser storage.
 - `frontend/lib/mock-data.ts` - Supplies fallback policies/options for static demos without a backend URL.
 - `frontend/lib/utils.ts` - Provides Tailwind class merging and policy date formatting helpers.
-- `frontend/next.config.js` - Configures Next.js behavior for the frontend project.
+- `frontend/next.config.js` - Configures Next.js behavior and standalone container output.
 - `frontend/next-env.d.ts` - Supplies generated Next.js TypeScript declarations; do not edit manually.
 - `frontend/tailwind.config.ts` - Tells Tailwind which files to scan and defines theme extensions.
 - `frontend/postcss.config.js` - Connects Tailwind and Autoprefixer to the CSS build.
@@ -125,7 +127,12 @@ excluded.
 - `config/prompts.yml` - Holds stable self-check prompt templates that receive compiled DB rules at runtime.
 - `config/rails.co` - Defines the Colang input/output flow and safe refusal behavior.
 - `.env.example` - Documents backend environment variables without storing real secrets.
-- `docker-compose.yml` - Starts the local Postgres and pgAdmin services.
+- `Dockerfile` - Builds the production-style FastAPI image with Linux wheels and Docker CLI support for local MCP execution.
+- `.dockerignore` - Keeps secrets, frontend files, caches, tests and docs out of the backend image context.
+- `frontend/Dockerfile` - Builds and runs the Next.js standalone production image.
+- `frontend/.dockerignore` - Keeps local secrets, dependencies, build output and logs out of the frontend image context.
+- `docker-compose.yml` - Runs the frontend, backend, Postgres and pgAdmin local stack with health ordering.
+- `docs/containerisation.md` - Documents container architecture, commands, verification and the local-only Docker socket limitation.
 - `scripts/run_api.py` - Starts the FastAPI/Uvicorn development server.
 - `scripts/migrate_management_auth.py` - Adds the system-wide developer/admin role to existing user tables.
 - `scripts/backfill_existing_app_users.py` - Idempotently links existing demo users to pre-RBAC apps.

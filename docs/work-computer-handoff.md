@@ -36,6 +36,20 @@ git commit -m "Prepare backend and frontend handoff for GMS demo"
 git push
 ```
 
+The frontend and backend are now containerized too. To run the complete local
+stack instead of separate Python/npm development servers:
+
+```powershell
+docker compose build backend frontend
+docker compose up -d
+docker compose ps
+```
+
+Open `http://127.0.0.1:3000/login`. Backend health is available at
+`http://127.0.0.1:8000/health`, and the frontend proxy can be checked at
+`http://127.0.0.1:3000/api/gms/health`. Read `docs/containerisation.md` before
+changing the Docker or future OpenShift layout.
+
 Review `git status` before committing and confirm `.env` is not staged.
 
 The work computer may use Postgres host port `5432`. The home computer uses

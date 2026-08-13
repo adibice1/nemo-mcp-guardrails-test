@@ -141,6 +141,22 @@ Open:
 http://127.0.0.1:3000/policies
 ```
 
+## Run In Docker
+
+From the repository root, build and start the complete stack:
+
+```powershell
+docker compose build backend frontend
+docker compose up -d
+docker compose ps
+```
+
+The containerized frontend uses `/api/gms` as its browser API base. Next.js
+proxies requests to `GMS_API_BASE_URL=http://backend:8000` inside the Compose
+network, so `frontend/.env.local` is not required for the containerized build.
+See `docs/containerisation.md` for health checks and the local GitHub MCP Docker
+socket note.
+
 ## Verify
 
 ```powershell

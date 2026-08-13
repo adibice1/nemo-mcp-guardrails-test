@@ -1,0 +1,16 @@
+.git
+.github
+.agents
+.codex
+.waylog
+.venv
+__pycache__
+*.py[cod]
+*.log
+.env
+.env.*
+!.env.example
+frontend
+docs
+scripts
+tests

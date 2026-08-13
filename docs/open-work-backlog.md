@@ -61,6 +61,11 @@ The GMS backend prototype now has these core runtime pieces:
   implements the uploaded Figma screens and current management pages:
   `/login`, `/signup` admin-managed notice, `/apps`, `/apps/[clientId]`,
   `/policies`, `/user-management`, and `/settings`.
+- Production-style frontend and backend Docker images now build successfully.
+  Local Compose runs them with Postgres and pgAdmin, and the frontend
+  same-origin `/api/gms` proxy reaches FastAPI over the private Compose network.
+  The backend Docker socket mount is explicitly local-only; OpenShift still
+  needs a separate GitHub MCP service/sidecar design.
 - The normal-developer Apps workflow is implemented: `/apps` lists and opens
   assigned client applications; `/apps/[clientId]` provides Overview,
   Connectors, LLM, Policies, and Runtime Test tabs backed by FastAPI. App
@@ -378,6 +383,25 @@ Future enhancements:
 - Runtime event logging.
 - Redis cache for compiled app policy bundles.
 - Background workers for compilation and invalidation.
+
+### 12. Registry And CI/CD
+
+Current local milestone:
+
+- Backend and frontend images build successfully.
+- Compose health checks pass for frontend, backend and Postgres.
+- Backend database health and frontend-to-backend proxy health are verified.
+- Backend can access Docker Desktop for the current local GitHub MCP launch.
+
+Next deployment work:
+
+- Create Azure Container Registry repositories for `gms-backend` and
+  `gms-frontend`.
+- Manually push and pull a commit-SHA-tagged image pair.
+- Add GitHub Actions pull-request CI for tests and Docker builds.
+- Add main-branch image publishing with GitHub OIDC and Azure `AcrPush`.
+- Design the OpenShift GitHub MCP service/sidecar boundary without a Docker
+  socket mount.
 
 ## Current Useful Verification Commands
 
