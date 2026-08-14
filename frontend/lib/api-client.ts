@@ -12,6 +12,20 @@ export function hasApiBaseUrl() {
   return apiBaseUrl.length > 0;
 }
 
+export class ApiRequestError extends Error {
+  constructor(
+    message: string,
+    readonly status: number
+  ) {
+    super(message);
+    this.name = "ApiRequestError";
+  }
+}
+
+export function isAuthenticationError(error: unknown) {
+  return error instanceof ApiRequestError && error.status === 401;
+}
+
 export type ManagementUser = {
   id: number;
   email: string;
@@ -307,7 +321,7 @@ async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
         : detail?.code === "equivalent_policy_exists"
         ? `An equivalent policy already exists as policy ${detail.policy_id}.`
         : `API request failed: ${response.status}`;
-    throw new Error(message);
+    throw new ApiRequestError(message, response.status);
   }
 
   return response.status === 204

@@ -29,18 +29,33 @@ async function proxyRequest(request: NextRequest, context: RouteContext) {
   headers.delete("content-length");
   headers.delete("accept-encoding");
 
-  const body =
+  const bodyBuffer =
     request.method === "GET" || request.method === "HEAD"
       ? undefined
       : await request.arrayBuffer();
 
-  const upstreamResponse = await fetch(upstreamUrl, {
-    method: request.method,
-    headers,
-    body,
-    cache: "no-store",
-    redirect: "manual"
-  });
+  const body =
+    bodyBuffer && bodyBuffer.byteLength > 0 ? bodyBuffer : undefined;
+
+  if (!body) {
+    headers.delete("content-type");
+  }
+
+  let upstreamResponse: Response;
+  try {
+    upstreamResponse = await fetch(upstreamUrl, {
+      method: request.method,
+      headers,
+      body,
+      cache: "no-store",
+      redirect: "manual"
+    });
+  } catch {
+    return Response.json(
+      { detail: "GMS service is temporarily unavailable." },
+      { status: 503 }
+    );
+  }
 
   const responseHeaders = new Headers(upstreamResponse.headers);
   responseHeaders.delete("content-encoding");

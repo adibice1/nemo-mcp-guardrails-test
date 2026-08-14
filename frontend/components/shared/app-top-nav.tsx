@@ -4,7 +4,10 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useRouter } from "next/navigation";
-import { getCurrentManagementUser } from "@/lib/api-client";
+import {
+  getCurrentManagementUser,
+  isAuthenticationError
+} from "@/lib/api-client";
 import {
   clearManagementSession,
   loadManagementSession,
@@ -43,9 +46,11 @@ export function AppTopNav({ active }: AppTopNavProps) {
         updateStoredManagementUser(user);
         setIsAdmin(user.system_role === "admin");
       })
-      .catch(() => {
-        clearManagementSession();
-        router.replace("/login");
+      .catch((error) => {
+        if (isAuthenticationError(error)) {
+          clearManagementSession();
+          router.replace("/login");
+        }
       });
   }, [router]);
 

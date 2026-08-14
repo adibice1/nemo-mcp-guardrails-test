@@ -56,6 +56,18 @@ docker compose stop backend frontend
 `--volumes` is explicitly supplied. Do not use `--volumes` when local database
 data must be preserved.
 
+## Dependency Outages
+
+The Next.js proxy returns a JSON `503` response when the backend container is
+temporarily unavailable. Frontend management sessions are cleared only after a
+real `401` authentication response, so stopping the backend or Postgres does
+not log out an already signed-in user. New logins and database-backed requests
+still cannot complete until their required services recover.
+
+Bodyless `DELETE` requests are forwarded without an empty request buffer. This
+avoids request content-length mismatches when deleting policy assignments and
+other resources through the same-origin proxy.
+
 ## GitHub MCP In Local Docker
 
 The current backend launches GitHub MCP with the Docker CLI over stdio. Local
@@ -87,4 +99,3 @@ The next milestone is Azure Container Registry and GitHub Actions:
 3. Add pull-request CI for backend tests, frontend build and image builds.
 4. Add main-branch CD using GitHub-to-Azure OIDC and the `AcrPush` role.
 5. Tag immutable images with the Git commit SHA.
-

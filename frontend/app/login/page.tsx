@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AuthIllustration } from "@/components/shared/auth-illustration";
 import {
   getCurrentManagementUser,
+  isAuthenticationError,
   loginManagementUser
 } from "@/lib/api-client";
 import {
@@ -28,7 +29,13 @@ export default function LoginPage() {
 
     getCurrentManagementUser(session.access_token)
       .then(() => router.replace("/apps"))
-      .catch(() => clearManagementSession());
+      .catch((sessionError) => {
+        if (isAuthenticationError(sessionError)) {
+          clearManagementSession();
+          return;
+        }
+        setError("GMS service is temporarily unavailable.");
+      });
   }, [router]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
