@@ -64,8 +64,8 @@ The GMS backend prototype now has these core runtime pieces:
 - Production-style frontend and backend Docker images now build successfully.
   Local Compose runs them with Postgres and pgAdmin, and the frontend
   same-origin `/api/gms` proxy reaches FastAPI over the private Compose network.
-  The backend Docker socket mount is explicitly local-only; OpenShift still
-  needs a separate GitHub MCP service/sidecar design.
+  The backend image bundles the native GitHub MCP executable, so neither local
+  Compose nor the Azure Container Instances target needs a Docker socket.
 - The normal-developer Apps workflow is implemented: `/apps` lists and opens
   assigned client applications; `/apps/[clientId]` provides Overview,
   Connectors, LLM, Policies, and Runtime Test tabs backed by FastAPI. App
@@ -391,17 +391,23 @@ Current local milestone:
 - Backend and frontend images build successfully.
 - Compose health checks pass for frontend, backend and Postgres.
 - Backend database health and frontend-to-backend proxy health are verified.
-- Backend can access Docker Desktop for the current local GitHub MCP launch.
+- Backend image bundles the pinned native GitHub MCP executable and does not
+  require a Docker socket or root runtime user.
+- Direct source runs retain the Docker-based GitHub MCP launcher by default.
+- Backend and frontend image contracts use internal ports `8000` and `3000`.
+- The target hosting service is Azure Container Instances, not OpenShift.
 
 Next deployment work:
 
-- Create Azure Container Registry repositories for `gms-backend` and
-  `gms-frontend`.
-- Manually push and pull a commit-SHA-tagged image pair.
+- Build and locally test `guardrail-be` and `guardrail-fe` directly.
+- Push a matching image pair to `guardrail.azurecr.io`.
+- Let the deployment team create a two-container ACI group with frontend
+  `GMS_API_BASE_URL=http://127.0.0.1:8000` and external PostgreSQL.
+- Validate the deployed proxy, management login, policy CRUD, and guarded
+  GitHub runtime.
 - Add GitHub Actions pull-request CI for tests and Docker builds.
 - Add main-branch image publishing with GitHub OIDC and Azure `AcrPush`.
-- Design the OpenShift GitHub MCP service/sidecar boundary without a Docker
-  socket mount.
+- Publish immutable Git commit SHA tags alongside any `latest` tag.
 
 ## Current Useful Verification Commands
 

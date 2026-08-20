@@ -300,32 +300,8 @@ async def build_guarded_github_tools(
 ) -> McpToolBundle:
     """Build GitHub MCP tools wrapped with the tool guard."""
 
-    github_read_only = environment.github_mcp_read_only
-
     client = MultiServerMCPClient(
-        {
-            "github": {
-                "command": "docker",
-                "args": [
-                    "run",
-                    "-i",
-                    "--rm",
-                    "-e",
-                    "GITHUB_PERSONAL_ACCESS_TOKEN",
-                    "-e",
-                    f"GITHUB_READ_ONLY={github_read_only}",
-                    "-e",
-                    "GITHUB_TOOLSETS=repos,issues,pull_requests",
-                    "ghcr.io/github/github-mcp-server",
-                ],
-                "transport": "stdio",
-                "env": {
-                    "GITHUB_PERSONAL_ACCESS_TOKEN": environment.github_pat,
-                    "GITHUB_READ_ONLY": github_read_only,
-                    "GITHUB_TOOLSETS": "repos,issues,pull_requests",
-                },
-            }
-        }
+        {"github": github_mcp_client_config(environment)}
     )
     raw_tools = await client.get_tools()
     guarded_tools = tuple(
@@ -338,6 +314,53 @@ async def build_guarded_github_tools(
     )
 
     return McpToolBundle(client=client, tools=guarded_tools)
+
+
+def github_mcp_client_config(environment: RuntimeEnvironment) -> dict[str, Any]:
+    """Build the local-Docker or native-container GitHub MCP configuration."""
+
+    github_read_only = environment.github_mcp_read_only
+    shared_config: dict[str, Any] = {
+        "transport": "stdio",
+        "env": {
+            "GITHUB_PERSONAL_ACCESS_TOKEN": environment.github_pat,
+            "GITHUB_READ_ONLY": github_read_only,
+            "GITHUB_TOOLSETS": "repos,issues,pull_requests",
+        },
+    }
+    launch_mode = os.getenv("GITHUB_MCP_LAUNCH_MODE", "docker").strip().lower()
+
+    if launch_mode == "native":
+        return {
+            **shared_config,
+            "command": os.getenv(
+                "GITHUB_MCP_BINARY_PATH",
+                "/usr/local/bin/github-mcp-server",
+            ),
+            "args": ["stdio"],
+        }
+
+    if launch_mode == "docker":
+        return {
+            **shared_config,
+            "command": "docker",
+            "args": [
+                "run",
+                "-i",
+                "--rm",
+                "-e",
+                "GITHUB_PERSONAL_ACCESS_TOKEN",
+                "-e",
+                f"GITHUB_READ_ONLY={github_read_only}",
+                "-e",
+                "GITHUB_TOOLSETS=repos,issues,pull_requests",
+                "ghcr.io/github/github-mcp-server",
+            ],
+        }
+
+    raise RuntimeError(
+        "GITHUB_MCP_LAUNCH_MODE must be either 'native' or 'docker'"
+    )
 
 
 async def build_guardrails_runtime_parts(app_id: int) -> GuardrailsRuntimeParts:

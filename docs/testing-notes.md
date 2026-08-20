@@ -536,6 +536,26 @@ Runtime connector credential checks passed.
 Only `env:VAR_NAME` is executable in the current prototype. References such as
 `vault:...` fail clearly until a real secrets-manager resolver is added.
 
+## Runtime GitHub MCP Launch Test
+
+The backend image runs the bundled GitHub MCP executable directly, while a
+Python API started from the host defaults to the existing Docker launcher.
+Verify both configurations without Postgres, Azure, GitHub, or real secrets:
+
+```powershell
+python tests/test_runtime_mcp_launch.py
+```
+
+Expected output:
+
+```text
+Runtime GitHub MCP launch-mode checks passed.
+- Source runs default to the Docker launcher.
+- Container runs can use the bundled native stdio binary.
+- Credential, read-only and toolset environment values are preserved.
+- Invalid launch modes fail clearly.
+```
+
 ## Reusable Guarded Execution
 
 `src/nemo_mcp_guardrails/guarded_execution.py` now owns the single-request

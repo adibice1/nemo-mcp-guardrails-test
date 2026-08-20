@@ -61,7 +61,8 @@ Backend/database direction:
 - PostgreSQL
 - Postgres in Docker for the first local prototype
 - pgAdmin in Docker or DBeaver for database inspection
-- Later containerisation/OpenShift deployment
+- Container images targeting Azure Container Registry and Azure Container
+  Instances
 
 ## Current Repository Layout
 
@@ -166,6 +167,8 @@ User prompt
 -> if passed: LangChain agent
 -> src/nemo_mcp_guardrails/tool_guard.py wraps MCP tools and blocks restricted tool names before execution
 -> GitHub MCP tools, normally read-only through `GITHUB_MCP_READ_ONLY=1`
+   (native bundled executable in the backend image; Docker launcher for direct
+   local source runs)
 -> NeMo self_check_output using the app guardrail AzureChatOpenAI config
 -> final answer
 ```
@@ -265,7 +268,7 @@ compiled_policy_rules
 src/nemo_mcp_guardrails/tool_guard.py
 -> blocks DB-derived restricted MCP tool names before execution
 
-GitHub MCP Docker env
+GitHub MCP runtime env
 -> GITHUB_MCP_READ_ONLY=1 maps to GitHub MCP `GITHUB_READ_ONLY=1`
 -> prevents write tools from being offered during normal tests
 ```

@@ -127,12 +127,12 @@ excluded.
 - `config/prompts.yml` - Holds stable self-check prompt templates that receive compiled DB rules at runtime.
 - `config/rails.co` - Defines the Colang input/output flow and safe refusal behavior.
 - `.env.example` - Documents backend environment variables without storing real secrets.
-- `Dockerfile` - Builds the production-style FastAPI image with Linux wheels and Docker CLI support for local MCP execution.
+- `Dockerfile` - Builds the FastAPI image with Linux wheels and a pinned native GitHub MCP executable for container deployments.
 - `.dockerignore` - Keeps secrets, frontend files, caches, tests and docs out of the backend image context.
 - `frontend/Dockerfile` - Builds and runs the Next.js standalone production image.
 - `frontend/.dockerignore` - Keeps local secrets, dependencies, build output and logs out of the frontend image context.
 - `docker-compose.yml` - Runs the frontend, backend, Postgres and pgAdmin local stack with health ordering.
-- `docs/containerisation.md` - Documents container architecture, commands, verification and the local-only Docker socket limitation.
+- `docs/containerisation.md` - Documents direct image builds, local verification, ACR publishing, and the recommended ACI layout.
 - `scripts/run_api.py` - Starts the FastAPI/Uvicorn development server.
 - `scripts/migrate_management_auth.py` - Adds the system-wide developer/admin role to existing user tables.
 - `scripts/backfill_existing_app_users.py` - Idempotently links existing demo users to pre-RBAC apps.

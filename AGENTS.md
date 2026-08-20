@@ -34,7 +34,7 @@ User prompt
 -> NeMo Guardrails input rail using the app's guardrail AzureChatOpenAI config
 -> LangChain agent
 -> `src/nemo_mcp_guardrails/tool_guard.py` wraps GitHub MCP tools and blocks DB-derived restricted tool names before execution
--> GitHub MCP tools, normally in read-only Docker mode unless local `.env` explicitly sets `GITHUB_MCP_READ_ONLY=0`
+-> GitHub MCP tools, normally read-only; the backend image uses its bundled native executable while direct local source runs default to the Docker launcher
 -> NeMo Guardrails output rail using the app's guardrail AzureChatOpenAI config
 -> final model answer
 
@@ -67,7 +67,7 @@ Blocked actions:
 - `.env.example` stores placeholder values and should be committed.
 - `config/config.yml` should be committed but must not contain real API keys.
 - Azure OpenAI credentials are loaded from `.env`.
-- GitHub MCP runs in Docker with `GITHUB_READ_ONLY` derived from `.env` `GITHUB_MCP_READ_ONLY`; the committed default is `1` for read-only mode.
+- GitHub MCP receives `GITHUB_READ_ONLY` from `.env` `GITHUB_MCP_READ_ONLY`; the committed default is `1`. The backend image sets `GITHUB_MCP_LAUNCH_MODE=native` and bundles the pinned official executable, while direct local source runs default to `docker` launch mode.
 - Current input blocking is handled by NeMo `self check input` using `config/prompts.yml` plus enabled DB rules from `compiled_policy_rules`.
 - Current output checking is handled by NeMo `self check output` using `config/prompts.yml` plus enabled DB rules from `compiled_policy_rules`.
 - `config/config.yml` enables both `self check input` and `self check output`.
@@ -86,7 +86,7 @@ Blocked actions:
 - `tests/test_app_policy_scope.py` is a self-cleaning Postgres integration diagnostic. It creates two temporary apps, assigns GitHub issue creation only to App A, verifies app-scoped NeMo rules and blocked tools, and deletes both apps and their assignments in `finally`.
 - `scripts/debug_nemo_output_check.py` is an isolated diagnostic script for NeMo output rails without GitHub MCP. It uses `build_rails_config_with_prompt_rules("config")` so it tests the same DB-injected prompt configuration as the full runner.
 - NeMo output rails are now enabled through `config/config.yml` and verified in the full GitHub MCP test runner.
-- The database/API phase uses PostgreSQL. Local development starts from `docker-compose.yml`, which runs Postgres and pgAdmin. DBeaver can also connect to the same local Postgres database. The target deployment direction is containerisation and OpenShift.
+- The database/API phase uses PostgreSQL. Local development can use `docker-compose.yml`, which runs Postgres and pgAdmin. DBeaver can also connect to the same local Postgres database. The deployment target is Azure Container Registry plus a multi-container Azure Container Instances group with external PostgreSQL.
 - The home computer runs the project Docker Postgres service on host port `5433` because a Windows PostgreSQL service already uses host port `5432`. Home-computer `.env`, `DATABASE_URL`, and DBeaver settings must use `5433`; Postgres still listens on port `5432` inside the container.
 - FastAPI policy CRUD endpoints live under `/policies`.
 - `POST /policies/compile-preview` reads enabled DB policy rows, converts them into `InputPolicyObject` / `OutputPolicyObject`, and returns generated input rules, blocked tools, generated test prompts, and output rules.
@@ -132,6 +132,7 @@ Blocked actions:
 - `tests/test_runtime_connector_access.py` proves linked apps can use the enabled GitHub connector and unlinked or disabled-link apps are rejected before MCP construction.
 - `tests/test_app_connector_api.py` proves app connector CRUD, connector lookup by name or ID, upsert behavior, and missing-link errors.
 - `tests/test_runtime_connector_credentials.py` proves default PAT fallback, app-specific `env:VAR_NAME` credential references, missing env vars, and unsupported reference schemes.
+- `tests/test_runtime_mcp_launch.py` proves direct source runs default to the Docker launcher, backend containers can select the bundled native stdio executable, and both modes preserve PAT/read-only/toolset environment values.
 - Management CRUD now requires the management JWT. `/apps` is filtered through
   active `app_users` developer links; linked app developers can mutate their
   assigned apps, and system admins can access every app. Global assignments,
@@ -204,6 +205,7 @@ test_guardrails_run_http.py covers allowed and blocked /run behavior with real D
 test_runtime_connector_access.py covers runtime connector access enforcement
 test_app_connector_api.py covers app connector CRUD by app ID and client ID
 test_runtime_connector_credentials.py covers env:VAR_NAME PAT resolution
+test_runtime_mcp_launch.py covers local Docker and container-native GitHub MCP launch modes
 POST /v1/guardrails/run executes app-scoped guarded requests
 runtime_schemas.py defines the future-compatible message request and execution response
 guarded_execution.py coordinates input rail, agent/tools, and output rail
@@ -244,6 +246,7 @@ Useful verification commands for the current state:
 - `python tests/test_runtime_connector_access.py`
 - `python tests/test_app_connector_api.py`
 - `python tests/test_runtime_connector_credentials.py`
+- `python tests/test_runtime_mcp_launch.py`
 - `python tests/test_runtime_llm_selection.py`
 - `python scripts/migrate_management_auth.py`
 - `python tests/test_management_auth_http.py`
@@ -251,5 +254,5 @@ Useful verification commands for the current state:
 - `python tests/test_management_rbac_http.py`
 - `python scripts/debug_nemo_output_check.py`
 - `python scripts/run_api.py`
-- `python -m py_compile src/nemo_mcp_guardrails/app_auth.py src/nemo_mcp_guardrails/guarded_execution.py src/nemo_mcp_guardrails/runtime_factory.py src/nemo_mcp_guardrails/api/app_schemas.py src/nemo_mcp_guardrails/api/apps.py src/nemo_mcp_guardrails/api/assignment_serializers.py src/nemo_mcp_guardrails/api/auth.py src/nemo_mcp_guardrails/api/runtime.py src/nemo_mcp_guardrails/api/runtime_schemas.py src/nemo_mcp_guardrails/policy_compiler.py src/nemo_mcp_guardrails/policy_rule_service.py src/nemo_mcp_guardrails/tool_guard.py src/nemo_mcp_guardrails/database/models.py src/nemo_mcp_guardrails/database/conversation_store.py src/nemo_mcp_guardrails/database/policy_loader.py src/nemo_mcp_guardrails/database/test_case_loader.py src/nemo_mcp_guardrails/database/prompt_rule_loader.py src/nemo_mcp_guardrails/prompt_rule_compiler.py scripts/seed_normalized_policy_metadata.py tests/test_nemo_mcp.py tests/test_tool_guard.py tests/test_policy_loader.py tests/test_app_policy_scope.py tests/test_app_auth.py tests/test_app_auth_http.py tests/test_policy_auto_compile.py tests/test_guardrails_run_http.py tests/test_runtime_connector_access.py tests/test_app_connector_api.py tests/test_runtime_connector_credentials.py tests/test_runtime_llm_selection.py scripts/debug_nemo_self_check.py scripts/debug_nemo_output_check.py`
+- `python -m py_compile src/nemo_mcp_guardrails/app_auth.py src/nemo_mcp_guardrails/guarded_execution.py src/nemo_mcp_guardrails/runtime_factory.py src/nemo_mcp_guardrails/api/app_schemas.py src/nemo_mcp_guardrails/api/apps.py src/nemo_mcp_guardrails/api/assignment_serializers.py src/nemo_mcp_guardrails/api/auth.py src/nemo_mcp_guardrails/api/runtime.py src/nemo_mcp_guardrails/api/runtime_schemas.py src/nemo_mcp_guardrails/policy_compiler.py src/nemo_mcp_guardrails/policy_rule_service.py src/nemo_mcp_guardrails/tool_guard.py src/nemo_mcp_guardrails/database/models.py src/nemo_mcp_guardrails/database/conversation_store.py src/nemo_mcp_guardrails/database/policy_loader.py src/nemo_mcp_guardrails/database/test_case_loader.py src/nemo_mcp_guardrails/database/prompt_rule_loader.py src/nemo_mcp_guardrails/prompt_rule_compiler.py scripts/seed_normalized_policy_metadata.py tests/test_nemo_mcp.py tests/test_tool_guard.py tests/test_policy_loader.py tests/test_app_policy_scope.py tests/test_app_auth.py tests/test_app_auth_http.py tests/test_policy_auto_compile.py tests/test_guardrails_run_http.py tests/test_runtime_connector_access.py tests/test_app_connector_api.py tests/test_runtime_connector_credentials.py tests/test_runtime_mcp_launch.py tests/test_runtime_llm_selection.py scripts/debug_nemo_self_check.py scripts/debug_nemo_output_check.py`
 - `python tests/test_nemo_mcp.py`

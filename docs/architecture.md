@@ -416,7 +416,7 @@ authenticated POST /v1/guardrails/run execution already exists
 -> execute_guarded_message() runs the submitted message
 -> return final structured execution JSON
 -> keep normal GitHub MCP tests read-only
--> later OpenShift deployment
+-> publish frontend/backend images to ACR for Azure Container Instances
 ```
 
 Future write-capable behavior should not rely only on prompt rails or a tool-name denylist. Use cases like allowing PR merges only in sequence `A -> B -> C` need tool arguments and workflow state, for example current merge history and the next allowed step.

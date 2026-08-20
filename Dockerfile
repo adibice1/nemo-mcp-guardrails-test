@@ -1,4 +1,4 @@
-FROM docker:27-cli AS docker_cli
+FROM ghcr.io/github/github-mcp-server@sha256:e3816a476a977cfb836e7d221510011436c654d11861db66ecfd826601aba6a4 AS github_mcp
 
 FROM python:3.12-slim AS python_dependencies
 
@@ -19,11 +19,12 @@ FROM python:3.12-slim AS runtime
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    PYTHONPATH=/app/src
+    PYTHONPATH=/app/src \
+    GITHUB_MCP_LAUNCH_MODE=native
 
 WORKDIR /app
 
-COPY --from=docker_cli /usr/local/bin/docker /usr/local/bin/docker
+COPY --from=github_mcp /server/github-mcp-server /usr/local/bin/github-mcp-server
 COPY --from=python_dependencies /wheels /wheels
 COPY requirements.txt .
 RUN python -m pip install --no-index --find-links=/wheels -r requirements.txt \

@@ -831,7 +831,9 @@ Important architectural decisions:
 - Use pgAdmin in Docker or DBeaver to inspect and manage the local database.
 - On the home computer, use host port `5433` for Docker Postgres,
   `DATABASE_URL`, and DBeaver because Windows PostgreSQL owns host port `5432`.
-- Plan for later containerisation/OpenShift deployment.
+- Publish the tested frontend/backend images to Azure Container Registry for a
+  multi-container Azure Container Instances deployment. The backend image
+  bundles GitHub MCP natively and does not require a Docker socket.
 
 Historical recommended next step from 2026-05-26, now completed:
 

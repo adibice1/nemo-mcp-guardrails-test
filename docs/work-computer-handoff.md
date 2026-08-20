@@ -1,4 +1,43 @@
-# Work Computer Handoff - 2026-06-16
+# Work/Home Computer Handoff
+
+## Current Deployment Milestone - 2026-08-20
+
+The backend and frontend are ready to be built as separate Linux AMD64 images
+for Azure Container Registry and Azure Container Instances:
+
+```text
+guardrail.azurecr.io/guardrail-be:latest  -> internal port 8000
+guardrail.azurecr.io/guardrail-fe:latest  -> internal port 3000
+```
+
+The backend image now bundles the pinned official GitHub MCP executable and
+launches it natively over stdio. No Docker socket mount, nested Docker daemon,
+or root runtime user is required. Direct local Python runs still default to the
+existing Docker-based MCP launcher.
+
+Build from the repository root without Compose:
+
+```powershell
+docker build --platform linux/amd64 -t guardrail-be:latest .
+docker build --platform linux/amd64 --build-arg NEXT_PUBLIC_API_BASE_URL=/api/gms -t guardrail-fe:latest .\frontend
+```
+
+For ACI, place both images in one container group, expose frontend port `3000`,
+and set frontend `GMS_API_BASE_URL=http://127.0.0.1:8000`. The backend remains
+on internal port `8000`. ACI does not provide Docker-style host-to-container
+port remapping; use an Azure ingress service later if public `80`/`443` is
+required.
+
+Read `docs/containerisation.md` before building, pushing, or changing ports. It
+contains direct `docker run`, ACR tag/push, ACI topology, secrets, and health
+check instructions. Actual ACI resource creation remains with the supervisor's
+deployment team; the current developer handoff is the tested image pair.
+
+Run the new launch-mode check after pulling this milestone:
+
+```powershell
+.\.venv\Scripts\python.exe tests\test_runtime_mcp_launch.py
+```
 
 ## Read This First
 
@@ -48,7 +87,7 @@ docker compose ps
 Open `http://127.0.0.1:3000/login`. Backend health is available at
 `http://127.0.0.1:8000/health`, and the frontend proxy can be checked at
 `http://127.0.0.1:3000/api/gms/health`. Read `docs/containerisation.md` before
-changing the Docker or future OpenShift layout.
+changing the Docker or Azure Container Instances layout.
 
 Review `git status` before committing and confirm `.env` is not staged.
 
