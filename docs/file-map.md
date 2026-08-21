@@ -129,10 +129,12 @@ excluded.
 - `.env.example` - Documents backend environment variables without storing real secrets.
 - `Dockerfile` - Builds the FastAPI image with Linux wheels and a pinned native GitHub MCP executable for container deployments.
 - `.dockerignore` - Keeps secrets, frontend files, caches, tests and docs out of the backend image context.
-- `frontend/Dockerfile` - Builds and runs the Next.js standalone production image.
+- `frontend/Dockerfile` - Builds and runs the non-root Next.js image on HTTP
+  port `80` with `NET_BIND_SERVICE`.
 - `frontend/.dockerignore` - Keeps local secrets, dependencies, build output and logs out of the frontend image context.
 - `docker-compose.yml` - Runs the frontend, backend, Postgres and pgAdmin local stack with health ordering.
-- `docs/containerisation.md` - Documents direct image builds, local verification, ACR publishing, and the recommended ACI layout.
+- `docs/containerisation.md` - Documents direct image builds, local verification,
+  ACR publishing, and the public-frontend-80/private-backend-8000 ACI layout.
 - `scripts/run_api.py` - Starts the FastAPI/Uvicorn development server.
 - `scripts/migrate_management_auth.py` - Adds the system-wide developer/admin role to existing user tables.
 - `scripts/backfill_existing_app_users.py` - Idempotently links existing demo users to pre-RBAC apps.

@@ -32,6 +32,9 @@ external integrations.
   rules.
 - Redis is a future optimization, not a current priority.
 - The management frontend will use Next.js 13.
+- The ACI frontend listens directly on public HTTP port `80`, proxies
+  same-origin `/api/gms` requests to private backend port `8000` over
+  `localhost`, and does not rely on unsupported ACI port remapping.
 
 ## Terminology
 

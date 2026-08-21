@@ -154,8 +154,10 @@ docker compose ps
 The containerized frontend uses `/api/gms` as its browser API base. Next.js
 proxies requests to `GMS_API_BASE_URL=http://backend:8000` inside the Compose
 network, so `frontend/.env.local` is not required for the containerized build.
-See `docs/containerisation.md` for health checks and the local GitHub MCP Docker
-socket note.
+The production image listens directly on port `80` as the non-root `nextjs`
+user. Compose exposes it at `http://127.0.0.1` by default; set
+`FRONTEND_PORT=3000` in the root `.env` when local host port `80` is occupied.
+See `docs/containerisation.md` for health checks and the ACI network contract.
 
 ## Verify
 

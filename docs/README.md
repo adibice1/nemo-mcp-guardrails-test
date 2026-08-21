@@ -52,9 +52,9 @@ Current handoff status:
   without manual SQL.
 - `credential_reference="env:VAR_NAME"` is executable for GitHub connector
   PAT selection; blank references fall back to `GITHUB_PERSONAL_ACCESS_TOKEN`.
-- Admin CRUD endpoints remain unprotected. The next cleanup is production
-  secrets-manager credential resolution, followed by management/admin
-  authentication and role checks.
+- Management CRUD requires JWT authentication and enforces system-admin or
+  app-developer permissions. Production secrets-manager credential resolution
+  remains future work.
 - `scripts/seed_normalized_policy_metadata.py` seeds normalized connector/action/resource/tool metadata and backfills allowed-test expected-tool links.
 - Normalized metadata tables now include `connectors`, `connector_actions`, `connector_resources`, `connector_tool_mappings`, and `allowed_test_case_expected_tools`.
 - Input/output diagnostic scripts now distinguish Azure `content_filter`
@@ -64,11 +64,14 @@ Current handoff status:
   assignment data when `frontend/.env.local` sets
   `NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000`; otherwise it uses mock data
   for static demos.
+- The production frontend image listens directly on port `80` as a non-root
+  process and proxies `/api/gms` to private backend port `8000`. ACI exposes
+  only frontend `80`; local npm development remains on `3000`.
 
 Start here for current project context:
 
 - `file-map.md`: one-line backend/frontend file index and symptom lookup
-- `work-computer-handoff.md`: exact 2026-06-16 continuation point and next slice
+- `work-computer-handoff.md`: exact 2026-08-21 deployment continuation point
 - `open-work-backlog.md`: active unfinished work tracker
 - `project-context.md`: current architecture and implementation state
 - `frontend-api-map.md`: endpoint map for the Next.js frontend

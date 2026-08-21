@@ -157,26 +157,32 @@ Normalized policy metadata seeded.
 
 Use `docs/open-work-backlog.md` as the source of truth for unfinished work.
 
-The backend is ready enough to begin the frontend MVP for the GitHub MCP demo.
-The next implementation slice should be the Next.js 13 management UI, guided by:
+The frontend/backend MVP is implemented. The next implementation slice is the
+corrected Azure Container Registry and Azure Container Instances deployment
+handoff, guided by:
 
 ```text
-docs/frontend-api-map.md
-docs/frontend-screen-plan.md
-docs/frontend-demo-flow.md
+docs/containerisation.md
+docs/work-computer-handoff.md
+docs/open-work-backlog.md
 ```
 
-Recommended frontend slice from the current state:
+Recommended deployment slice from the current state:
 
 ```text
-1. Keep the existing Next.js 13 scaffold in `frontend/`.
-2. Use `frontend/.env.local` with NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000 for local backend mode.
-3. Create and assignment-only Delete are complete; implement assignment-safe Edit through resolve-and-swap behavior.
-4. Implement /apps with list/create/edit behavior.
-5. Implement /apps/[clientId] with the Connectors tab first.
-6. Wire GitHub connector linking with credential_reference="env:VAR_NAME".
-7. Add the Runtime Tester tab after the connector tab is working.
+1. Build the Linux AMD64 `guardrail-be` and `guardrail-fe` images directly.
+2. Verify frontend container port 80 as the non-root `nextjs` user.
+3. Verify the same-origin `/api/gms` proxy reaches private backend port 8000.
+4. Push a matching image pair to `guardrail.azurecr.io`.
+5. Give the deployment team the public-80/private-8000 ACI contract.
+6. Validate login, policy CRUD, and one guarded GitHub request after deployment.
+7. Add immutable Git-SHA tags and GitHub Actions after the manual handoff works.
 ```
+
+ACI must expose only frontend port `80`. The frontend image listens directly
+on `80`; it does not depend on unsupported ACI `80 -> 3000` remapping. Backend
+`8000` stays internal and is reached through
+`GMS_API_BASE_URL=http://127.0.0.1:8000`.
 
 Current frontend status:
 

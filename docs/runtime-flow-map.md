@@ -33,6 +33,17 @@ connector = GitHub MCP, SharePoint, Outlook, etc.
 The connector terminology migration is complete. `apps` represent GMS client
 applications and `connectors` represent external integrations.
 
+Deployment request boundary:
+
+```text
+browser -> ACI public port 80 -> Next.js frontend port 80
+browser /api/gms request -> Next.js route handler
+-> http://127.0.0.1:8000 -> private FastAPI backend port 8000
+```
+
+The production frontend listens directly on `80`; ACI does not map public
+`80` to an internal `3000`. Local npm development still uses `3000`.
+
 ## Current Management API Flow
 
 ```text

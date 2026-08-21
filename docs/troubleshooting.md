@@ -279,10 +279,11 @@ docker compose ps
 Then reconnect DBeaver using the current `.env` values. This is usually the
 fastest fix on a newly configured home laptop.
 
-Confirm the effective Compose configuration and exposed port:
+Confirm the Compose service list and runtime port without printing resolved
+environment values:
 
 ```powershell
-docker compose config
+docker compose config --services
 docker compose ps
 ```
 
@@ -430,3 +431,29 @@ The join table is the preferred runtime source for expected tool names.
 `test_case_loader.py` falls back to the old
 `allowed_test_cases.expected_tools` text column only when no normalized links
 exist for that allowed test.
+
+## ACI Frontend Port 80
+
+The deployed frontend image listens directly on port `80`. ACI should expose
+only group port `80`; backend port `8000` stays internal. Do not configure ACI
+as if it could map public `80` to frontend `3000`, because ACI does not support
+Docker-style port translation.
+
+Expected ACI flow:
+
+```text
+http://<aci-fqdn> -> frontend :80
+/api/gms/* -> Next.js proxy -> http://127.0.0.1:8000
+```
+
+If the ACI URL requires `:3000`, the old frontend image or old container-group
+port configuration is still deployed. Confirm the image tag, frontend `PORT`,
+and the group public-port list.
+
+If port `80` returns a connection failure, inspect frontend logs for a bind
+error. The image keeps the `nextjs` user non-root and grants the Node executable
+only `NET_BIND_SERVICE` so it can bind the privileged HTTP port.
+
+For local Compose only, a busy host port `80` can be bypassed with
+`FRONTEND_PORT=3000` in `.env`. That produces local mapping `3000:80` without
+changing the image or ACI contract.

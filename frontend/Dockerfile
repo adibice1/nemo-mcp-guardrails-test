@@ -26,9 +26,11 @@ WORKDIR /app
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     HOSTNAME=0.0.0.0 \
-    PORT=3000
+    PORT=80
 
-RUN addgroup --system --gid 1001 nodejs \
+RUN apk add --no-cache libcap \
+    && setcap 'cap_net_bind_service=+ep' /usr/local/bin/node \
+    && addgroup --system --gid 1001 nodejs \
     && adduser --system --uid 1001 nextjs
 
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
@@ -36,9 +38,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 USER nextjs
 
-EXPOSE 3000
+EXPOSE 80
 
 HEALTHCHECK --interval=10s --timeout=5s --retries=5 \
-    CMD wget --quiet --spider http://127.0.0.1:3000/login || exit 1
+    CMD wget --quiet --spider http://127.0.0.1:80/login || exit 1
 
 CMD ["node", "server.js"]

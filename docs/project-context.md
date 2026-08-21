@@ -33,8 +33,10 @@ Confirmed target behavior:
 - GMS acts as a full proxy for input rail, agent/tool execution, and output rail
 - policy changes automatically compile or invalidate generated rules
 - frontend target is Next.js 13
-- frontend scaffold exists in `frontend/`; `/policies` has a read-only FastAPI
-  adapter when `NEXT_PUBLIC_API_BASE_URL` is set
+- frontend implementation exists in `frontend/`; management pages use the
+  authenticated FastAPI adapter when `NEXT_PUBLIC_API_BASE_URL` is set
+- production deployment uses a frontend image listening publicly on `80` and
+  a backend image listening privately on `8000` in one ACI container group
 
 The authoritative target design is in `docs/target-architecture.md`.
 
@@ -49,7 +51,8 @@ Long-term project idea: build a web app for administrators to drag and drop app-
 - Python
 - LangChain
 - Azure OpenAI
-- GitHub MCP Server via Docker
+- GitHub MCP Server via the bundled native executable in backend images or the
+  Docker launcher during direct local source runs
 - NVIDIA NeMo Guardrails
 - `.env` for secrets
 - `.env.example` for shareable placeholders
@@ -63,6 +66,8 @@ Backend/database direction:
 - pgAdmin in Docker or DBeaver for database inspection
 - Container images targeting Azure Container Registry and Azure Container
   Instances
+- ACI public frontend port `80`, private backend port `8000`, and same-origin
+  `/api/gms` proxying to `http://127.0.0.1:8000`
 
 ## Current Repository Layout
 

@@ -356,7 +356,7 @@ Target frontend:
 - Global policy management for admins.
 - Later: visual policy builder.
 
-Current prep:
+Current implementation:
 
 - `docs/frontend-api-map.md` maps backend endpoints to frontend screens.
 - `docs/frontend-screen-plan.md` proposes the first app structure and
@@ -366,6 +366,9 @@ Current prep:
   interaction notes.
 - `frontend/` contains the Figma-matched implementation, a read/write
   API-backed `/policies` adapter, and functional app list/detail routes.
+- `/user-management` provides admin-only user creation, password reset,
+  enable/block, role changes, and app-developer links.
+- The app LLM tab uses a readable LLM-config catalogue and named selectors.
 
 Next implementation slice:
 
@@ -373,7 +376,8 @@ Next implementation slice:
   definition deletion to also remove assignment references.
 - Add LLM configuration update/delete and ownership controls after the
   organization confirms its provider-administration workflow.
-- Add user/admin management screens for assigning app roles.
+- Keep richer audit/logging screens as post-presentation work pending
+  supervisor confirmation.
 
 ### 11. Audit, Analytics, And Caching
 
@@ -394,7 +398,11 @@ Current local milestone:
 - Backend image bundles the pinned native GitHub MCP executable and does not
   require a Docker socket or root runtime user.
 - Direct source runs retain the Docker-based GitHub MCP launcher by default.
-- Backend and frontend image contracts use internal ports `8000` and `3000`.
+- Backend and frontend image contracts use private backend port `8000` and
+  public frontend port `80`. The non-root Node process receives only
+  `NET_BIND_SERVICE` so it can bind the HTTP port.
+- The Linux AMD64 frontend port-80 image build and non-root `/login` runtime
+  probe passed on 2026-08-21.
 - The target hosting service is Azure Container Instances, not OpenShift.
 
 Next deployment work:
@@ -402,7 +410,8 @@ Next deployment work:
 - Build and locally test `guardrail-be` and `guardrail-fe` directly.
 - Push a matching image pair to `guardrail.azurecr.io`.
 - Let the deployment team create a two-container ACI group with frontend
-  `GMS_API_BASE_URL=http://127.0.0.1:8000` and external PostgreSQL.
+  public port `80`, private backend port `8000`, frontend
+  `GMS_API_BASE_URL=http://127.0.0.1:8000`, and external PostgreSQL.
 - Validate the deployed proxy, management login, policy CRUD, and guarded
   GitHub runtime.
 - Add GitHub Actions pull-request CI for tests and Docker builds.

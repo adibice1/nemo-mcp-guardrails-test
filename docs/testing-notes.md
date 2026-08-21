@@ -386,9 +386,9 @@ receive missing values itself to return the same generic `401`. Declaring the
 headers required would let FastAPI return a distinguishable `422` before the
 authentication logic runs.
 
-The admin CRUD endpoints remain unprotected. The dependency currently protects
-both runtime endpoints. The run endpoint now calls the reusable guarded
-execution.
+Management CRUD requires the management JWT and role-aware permission checks.
+The app credential dependency separately protects both runtime endpoints. The
+run endpoint calls the reusable guarded execution.
 
 ## Guardrails Run HTTP Integration Test
 
@@ -1126,3 +1126,44 @@ access-control-allow-origin: http://127.0.0.1:3000
 Avoid running `npm run build` while the dev server is already running. Both
 commands write `.next`; if the page renders as raw HTML or CSS appears missing,
 restart with `npm run dev:clean`.
+
+### Container Port Verification
+
+Local npm development continues to use `http://127.0.0.1:3000`. The production
+frontend image is different: its non-root Node process listens directly on
+container port `80`.
+
+After Docker Desktop is running, verify the deployment contract from the
+repository root:
+
+```powershell
+docker compose config --services
+docker compose build backend frontend
+docker compose up -d
+docker compose ps
+Invoke-WebRequest -UseBasicParsing http://127.0.0.1/login
+Invoke-RestMethod http://127.0.0.1/api/gms/health
+Invoke-RestMethod http://127.0.0.1:8000/health
+```
+
+Expected behavior:
+
+```text
+host/public 80 -> frontend container 80
+/api/gms -> Next.js server-side proxy -> backend 8000
+backend 8000 is private in ACI even though local Compose publishes it for debugging
+frontend process runs as nextjs, not root
+```
+
+If local host port `80` is occupied, set `FRONTEND_PORT=3000` in `.env`. This
+changes only the local host mapping to `3000:80`; the image and ACI contract
+remain frontend port `80`.
+
+Latest 2026-08-21 result:
+
+```text
+Linux AMD64 guardrail-fe image build: passed
+runtime user: uid=1001(nextjs)
+Next.js listener: http://0.0.0.0:80
+internal /login probe: passed
+```

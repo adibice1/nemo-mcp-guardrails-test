@@ -32,6 +32,21 @@ See `docs/target-architecture.md` for the authoritative target tables and
 runtime flow. The large diagram below remains useful conceptually, but labels
 such as "App Adapter" should now be read as "Connector Adapter".
 
+Current deployment boundary:
+
+```text
+Internet HTTP request (implicit port 80)
+-> ACI exposes frontend port 80 only
+-> Next.js frontend listens on port 80
+-> same-origin /api/gms proxy
+-> http://127.0.0.1:8000
+-> FastAPI backend listens privately on port 8000
+```
+
+ACI does not translate public `80` to frontend `3000`. The production frontend
+image therefore listens directly on `80`; local `npm run dev:clean` continues
+to use `3000` and is a separate development mode.
+
 ```mermaid
 flowchart TB
 
@@ -301,7 +316,8 @@ User prompt
 -> LangChain agent
 -> src/nemo_mcp_guardrails/tool_guard.py MCP tool wrapper
 -> blocked tool names compiled from enabled Postgres input policies
--> GitHub MCP server in Docker with GITHUB_READ_ONLY=1
+-> GitHub MCP server with GITHUB_READ_ONLY=1
+   (native executable in backend images; Docker launcher for direct source runs)
 -> NeMo self_check_output using injected AzureChatOpenAI
 -> final answer
 ```

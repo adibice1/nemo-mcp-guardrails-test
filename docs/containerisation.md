@@ -10,16 +10,20 @@ deployment team.
 | Image | Internal port | Purpose |
 | --- | --- | --- |
 | `guardrail-be` | `8000` | FastAPI management and guarded runtime API |
-| `guardrail-fe` | `3000` | Next.js management UI and `/api/gms` proxy |
+| `guardrail-fe` | `80` | Next.js management UI and `/api/gms` proxy |
 
 Internal ports belong to the processes inside each image. A local command such
 as `-p 8080:8000` may map host port `8080` to backend port `8000`, but the image
 itself still listens on `8000`. Azure Container Instances exposes container
-ports directly and does not provide Docker-style port remapping.
+ports directly and does not provide Docker-style port remapping. The production
+frontend therefore listens directly on `80`; ACI must not be configured as if
+it could translate public `80` to container `3000`.
 
 The frontend is built with `NEXT_PUBLIC_API_BASE_URL=/api/gms`. Browser calls
 therefore use the frontend origin, while the server-side route handler forwards
-them to `GMS_API_BASE_URL`.
+them to `GMS_API_BASE_URL`. The image grants the non-root Node executable only
+`NET_BIND_SERVICE`, the narrow Linux capability needed to bind port `80`; the
+frontend process does not run as root.
 
 ## GitHub MCP In The Backend Image
 
@@ -68,14 +72,22 @@ In another terminal, verify the backend and start the frontend:
 ```powershell
 Invoke-RestMethod http://127.0.0.1:8000/health
 Invoke-RestMethod http://127.0.0.1:8000/health/db
-docker run --rm --name guardrail-fe -e GMS_API_BASE_URL=http://host.docker.internal:8000 -p 3000:3000 guardrail-fe:latest
+docker run --rm --name guardrail-fe -e GMS_API_BASE_URL=http://host.docker.internal:8000 -p 80:80 guardrail-fe:latest
 ```
 
-Then open `http://127.0.0.1:3000/login` and verify the proxy:
+Then open `http://127.0.0.1/login` and verify the proxy:
 
 ```powershell
-Invoke-RestMethod http://127.0.0.1:3000/api/gms/health
+Invoke-RestMethod http://127.0.0.1/api/gms/health
 ```
+
+If host port `80` is already occupied during local testing, use
+`-p 3000:80` and open `http://127.0.0.1:3000`. This is a local Docker mapping
+only; the deployed ACI contract remains public port `80` to frontend port `80`.
+
+Latest verified result on 2026-08-21: the Linux AMD64 frontend image built
+successfully, ran as `uid=1001(nextjs)`, listened on `0.0.0.0:80`, and served
+the `/login` health probe without running as root.
 
 Replace the example database user, password, port, and database name with the
 local values. The home computer normally uses host port `5433`; the work
@@ -94,14 +106,18 @@ docker compose ps
 ```
 
 The Compose backend now uses the same native GitHub MCP executable as ACI. It
-does not mount `/var/run/docker.sock` or run as root. Local URLs remain:
+does not mount `/var/run/docker.sock` or run as root. The default containerized
+local URLs are:
 
 ```text
-Frontend:       http://127.0.0.1:3000
+Frontend:       http://127.0.0.1
 Backend:        http://127.0.0.1:8000
-Frontend proxy: http://127.0.0.1:3000/api/gms/health
+Frontend proxy: http://127.0.0.1/api/gms/health
 pgAdmin:        http://127.0.0.1:5050
 ```
+
+Set `FRONTEND_PORT=3000` in the local `.env` if host port `80` is unavailable;
+Compose will then map host `3000` to frontend container port `80`.
 
 ## Push To Azure Container Registry
 
@@ -127,7 +143,8 @@ Deploy the frontend and backend in one Linux multi-container ACI group:
 
 ```text
 Public request
--> frontend container :3000
+-> ACI public port :80
+-> frontend container :80
 -> Next.js /api/gms proxy
 -> http://127.0.0.1:8000
 -> backend container :8000
@@ -140,11 +157,14 @@ Set this frontend runtime variable in the container group:
 GMS_API_BASE_URL=http://127.0.0.1:8000
 ```
 
-Expose frontend port `3000` from the group. Keep backend port `8000` internal
-unless another trusted application must call it directly. If a public standard
-port such as `80` or TLS on `443` is required, place Azure Front Door,
-Application Gateway, or another ingress/reverse proxy in front; do not change
-the backend process to port `80` merely to imitate host port mapping.
+Expose only frontend port `80` on the container group's public IP. Keep backend
+port `8000` internal unless another trusted application must call it directly.
+The browser uses the same frontend origin for `/api/gms`, and Next.js reaches
+the backend over the container group's shared localhost network. No Azure port
+translation service is required for plain HTTP. Add Azure Front Door,
+Application Gateway, or another ingress later only when the deployment needs
+TLS on `443`, a custom domain, WAF behavior, or another production ingress
+feature.
 
 Use an external persistent PostgreSQL service for deployment. A database
 container inside ACI is ephemeral and is not the production persistence plan.
@@ -170,9 +190,11 @@ Do not bake these values into either image.
 2. Push one matching image pair to `guardrail.azurecr.io`.
 3. Hand image names, ports, health endpoints, and runtime variables to the ACI
    deployment owner.
-4. Validate login, policy CRUD, frontend proxy health, and one guarded GitHub
-   request in the deployed environment.
-5. Add GitHub Actions CI for tests/builds, then CD with GitHub-to-Azure OIDC and
+4. Configure the ACI group with public port `80`, frontend `80`, private
+   backend `8000`, and `GMS_API_BASE_URL=http://127.0.0.1:8000`.
+5. Validate login, policy CRUD, frontend proxy health, and one guarded GitHub
+   request in the deployed environment without a URL port suffix.
+6. Add GitHub Actions CI for tests/builds, then CD with GitHub-to-Azure OIDC and
    immutable commit-SHA image tags.
 
 References:

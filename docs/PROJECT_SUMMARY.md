@@ -20,7 +20,7 @@ The terminology migration is complete. `apps` now represent GMS client
 applications, while connector metadata lives in `connectors`,
 `connector_actions`, `connector_resources`, and `connector_tool_mappings`.
 
-## Current Handoff - 2026-06-16
+## Current Handoff - 2026-08-21
 
 For the shortest exact continuation guide, read
 `docs/work-computer-handoff.md` first.
@@ -28,6 +28,19 @@ For the shortest exact continuation guide, read
 The current prototype is DB-backed through the main guardrail path. Enabled
 Postgres policies feed runtime tool guarding, generated blocked tests, compiled
 NeMo prompt rules, and the full `tests/test_nemo_mcp.py` output.
+
+Current deployment contract:
+
+```text
+ACI public port 80 -> frontend listens on 80
+frontend /api/gms -> http://127.0.0.1:8000
+backend listens on 8000 and is not publicly exposed
+```
+
+The frontend listens directly on `80` because ACI does not provide Docker-style
+port translation. Its non-root Node process receives only
+`NET_BIND_SERVICE`. External PostgreSQL and runtime-injected secrets remain
+part of the deployment contract.
 
 Current implemented flow:
 
@@ -77,7 +90,8 @@ Current backend/API state:
 - `require_authenticated_app` verifies `X-App-ID` and `X-API-Key` before
   protected runtime work and returns a generic `401` for invalid requests.
 - `GET /v1/guardrails/auth-check` is the first protected runtime proof
-  endpoint. Admin CRUD endpoints remain unprotected.
+  endpoint. Management CRUD requires management JWT authentication and
+  role-aware system-admin or app-developer authorization.
 - `POST /v1/guardrails/run` authenticates, builds app-scoped policies,
   prompt rules, blocked tools, NeMo rails, and GitHub MCP tools, then
   executes the submitted message through the guarded runtime.
@@ -136,7 +150,7 @@ Current backend/API state:
   folder fallback for unknown legacy connectors.
 - `/apps` provides a backend-backed application table and create/delete flow.
   `/apps/[clientId]` provides app Overview, GitHub connector management,
-  numeric LLM configuration, effective policy summary, and guarded runtime
+  named LLM configuration selectors, effective policy summary, and guarded runtime
   testing.
 - Policy rows in both policy-management views open a shared summary modal backed
   by `GET /policies/{policy_id}`.
@@ -834,6 +848,9 @@ Important architectural decisions:
 - Publish the tested frontend/backend images to Azure Container Registry for a
   multi-container Azure Container Instances deployment. The backend image
   bundles GitHub MCP natively and does not require a Docker socket.
+- Expose only frontend port `80` in ACI. Keep backend `8000` private and set
+  frontend `GMS_API_BASE_URL=http://127.0.0.1:8000`; no ACI port remapping is
+  used.
 
 Historical recommended next step from 2026-05-26, now completed:
 

@@ -1,13 +1,13 @@
 # Work/Home Computer Handoff
 
-## Current Deployment Milestone - 2026-08-20
+## Current Deployment Milestone - 2026-08-21
 
 The backend and frontend are ready to be built as separate Linux AMD64 images
 for Azure Container Registry and Azure Container Instances:
 
 ```text
 guardrail.azurecr.io/guardrail-be:latest  -> internal port 8000
-guardrail.azurecr.io/guardrail-fe:latest  -> internal port 3000
+guardrail.azurecr.io/guardrail-fe:latest  -> public/internal port 80
 ```
 
 The backend image now bundles the pinned official GitHub MCP executable and
@@ -22,11 +22,12 @@ docker build --platform linux/amd64 -t guardrail-be:latest .
 docker build --platform linux/amd64 --build-arg NEXT_PUBLIC_API_BASE_URL=/api/gms -t guardrail-fe:latest .\frontend
 ```
 
-For ACI, place both images in one container group, expose frontend port `3000`,
-and set frontend `GMS_API_BASE_URL=http://127.0.0.1:8000`. The backend remains
-on internal port `8000`. ACI does not provide Docker-style host-to-container
-port remapping; use an Azure ingress service later if public `80`/`443` is
-required.
+For ACI, place both images in one container group, expose only frontend port
+`80`, and set frontend `GMS_API_BASE_URL=http://127.0.0.1:8000`. The frontend
+process listens directly on `80`; ACI is not expected to map `80` to `3000`.
+The backend remains on internal port `8000`, and browser calls use the
+same-origin `/api/gms` route. An Azure ingress service is optional future work
+for TLS, a custom domain, WAF behavior, or other production ingress features.
 
 Read `docs/containerisation.md` before building, pushing, or changing ports. It
 contains direct `docker run`, ACR tag/push, ACI topology, secrets, and health
@@ -84,10 +85,14 @@ docker compose up -d
 docker compose ps
 ```
 
-Open `http://127.0.0.1:3000/login`. Backend health is available at
+Open `http://127.0.0.1/login`. Backend health is available at
 `http://127.0.0.1:8000/health`, and the frontend proxy can be checked at
-`http://127.0.0.1:3000/api/gms/health`. Read `docs/containerisation.md` before
+`http://127.0.0.1/api/gms/health`. Read `docs/containerisation.md` before
 changing the Docker or Azure Container Instances layout.
+
+If local host port `80` is occupied, set `FRONTEND_PORT=3000` in `.env` and use
+the previous `http://127.0.0.1:3000` local URLs. This override does not change
+the deployed image contract: the frontend container still listens on `80`.
 
 Review `git status` before committing and confirm `.env` is not staged.
 
@@ -425,6 +430,8 @@ controlled connector tool-error responses: passed
 controlled Azure output-filter responses: passed
 authenticated /run allowed/blocked app-scope HTTP coverage: passed
 runtime connector access enforcement: passed
+Linux AMD64 frontend port-80 image build: passed
+non-root uid=1001 Next.js port-80 /login probe: passed
 temporary authentication rows cleanup: passed
 temporary app policy-scope rows cleanup: passed
 App A issue_write blocked / App B issue_write allowed: passed
@@ -453,69 +460,55 @@ Read `docs/open-work-backlog.md` first. It is the source of truth for
 unfinished plans and prevents half-completed ideas from being lost between
 machines.
 
-Immediate top priority: continue the Next.js 13 frontend MVP for the GitHub MCP
-demo. The first frontend scaffold now exists in `frontend/` and recreates the
-uploaded Figma pages:
+Immediate top priority: verify and hand off the corrected ACI image pair. The
+frontend management MVP, management JWT/RBAC, named LLM selectors, connector
+management, policy management, and Runtime Test are already implemented.
 
 ```text
-/login
-/signup
-/policies
-/settings
+guardrail.azurecr.io/guardrail-fe:<matching-tag> -> public port 80
+guardrail.azurecr.io/guardrail-be:<matching-tag> -> private port 8000
 ```
 
-Run it with:
+Build both Linux AMD64 images from the repository root:
 
 ```powershell
-cd frontend
-npm install
-npm run dev:clean
+docker build --platform linux/amd64 -t guardrail-be:latest .
+docker build --platform linux/amd64 --build-arg NEXT_PUBLIC_API_BASE_URL=/api/gms -t guardrail-fe:latest .\frontend
 ```
 
-Open:
-
-```text
-http://127.0.0.1:3000/policies
-```
-
-`npm run build` passed on the work computer. If Codex sandboxing blocks Next's
-worker process with `spawn EPERM`, rerun the build outside the sandbox.
-
-To use backend data locally, also run the API:
+Verify the containerized local stack:
 
 ```powershell
-.\.venv\Scripts\python.exe scripts\run_api.py
+docker compose up -d
+Invoke-RestMethod http://127.0.0.1/api/gms/health
+Invoke-WebRequest -UseBasicParsing http://127.0.0.1/login
 ```
 
-Then add `frontend/.env.local`:
-
-```env
-NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
-```
-
-Recommended incremental slice:
+Then push one matching image pair and give the deployment owner this ACI
+contract:
 
 ```text
-1. Read docs/frontend-api-map.md.
-2. Read docs/frontend-screen-plan.md.
-3. Read docs/frontend-demo-flow.md.
-4. Add admin-only reusable-definition deletion safeguards.
-5. Add a readable LLM-config catalogue endpoint and named selectors.
-6. Completed: management JWT authentication, app-developer filtering, and
-   role-aware policy/LLM controls.
-7. Keep Logs as an admin-only post-presentation slice.
+one Linux multi-container ACI group
+public group port: 80 only
+frontend process: 0.0.0.0:80
+backend process: 0.0.0.0:8000, not publicly exposed
+frontend GMS_API_BASE_URL: http://127.0.0.1:8000
+external persistent PostgreSQL
+runtime-injected secrets
 ```
 
-Keep `GITHUB_MCP_READ_ONLY=1` for scripted tests. Do not add write-capable
-endpoint testing to the normal harness.
+Actual ACI resource creation remains with the supervisor's deployment team.
+After deployment, validate login, policy CRUD, proxy health, and one guarded
+GitHub request without a port suffix in the browser URL. Keep
+`GITHUB_MCP_READ_ONLY=1` for scripted tests.
 
 ## Boundaries Not Yet Implemented
 
-- User/admin management screens for assigning system and app roles are not
-  implemented.
 - Connector credentials and LLM credentials are not managed through a secrets
   manager yet.
 - Argument-level and workflow-state policies are not implemented.
+- TLS/custom-domain ingress, audit screens, and CI/CD publishing are not
+  implemented yet.
 
 ## Editing Rules
 

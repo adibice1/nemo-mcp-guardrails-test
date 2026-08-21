@@ -12,8 +12,8 @@ Confirmed target terminology:
 - `connector` means an external integration such as GitHub MCP, SharePoint, or Outlook.
 - The connector terminology migration is complete: `apps` are GMS client applications, while `connectors`, `connector_actions`, `connector_resources`, and `connector_tool_mappings` model external integrations.
 - Read `docs/target-architecture.md` before proposing the next schema migration.
-- Read `docs/work-computer-handoff.md` first when continuing this exact
-  2026-06-16 home-computer milestone on another machine.
+- Read `docs/work-computer-handoff.md` first when continuing the current
+  2026-08-21 deployment milestone on another machine.
 - The target GMS is a full proxy that owns input rails, agent/tool execution, and output rails.
 - One app may use multiple connectors; users and apps are many-to-many.
 - Global policies are mandatory across every app.
@@ -68,6 +68,11 @@ Blocked actions:
 - `config/config.yml` should be committed but must not contain real API keys.
 - Azure OpenAI credentials are loaded from `.env`.
 - GitHub MCP receives `GITHUB_READ_ONLY` from `.env` `GITHUB_MCP_READ_ONLY`; the committed default is `1`. The backend image sets `GITHUB_MCP_LAUNCH_MODE=native` and bundles the pinned official executable, while direct local source runs default to `docker` launch mode.
+- The production frontend image listens directly on port `80` as the non-root
+  `nextjs` user. The Node executable receives only `NET_BIND_SERVICE`; ACI
+  exposes frontend `80` publicly, keeps backend `8000` internal, and uses
+  `GMS_API_BASE_URL=http://127.0.0.1:8000` for the same-origin `/api/gms`
+  proxy. ACI port remapping is not part of the design.
 - Current input blocking is handled by NeMo `self check input` using `config/prompts.yml` plus enabled DB rules from `compiled_policy_rules`.
 - Current output checking is handled by NeMo `self check output` using `config/prompts.yml` plus enabled DB rules from `compiled_policy_rules`.
 - `config/config.yml` enables both `self check input` and `self check output`.
@@ -114,7 +119,7 @@ Blocked actions:
 - `tests/test_policy_metadata_api.py` proves `/policy-options` returns only
   connectors with enabled mappings and filters resources by action.
 - The frontend policy builder currently lists GitHub and SharePoint only. Global policy rows display a globe; app-specific rows display GitHub or Microsoft/SharePoint connector marks, with a folder fallback for unknown connectors. SharePoint is not runtime-enabled yet.
-- The frontend now has `/apps` and `/apps/[clientId]`. The list uses real app, connector-count, and effective-policy data; the detail page provides Overview, GitHub Connectors, numeric LLM configuration, effective Policies, and an authenticated Runtime Test. SharePoint remains a disabled coming-soon choice.
+- The frontend now has `/apps` and `/apps/[clientId]`. The list uses real app, connector-count, and effective-policy data; the detail page provides Overview, GitHub Connectors, named LLM configuration selectors, effective Policies, and an authenticated Runtime Test. SharePoint remains a disabled coming-soon choice.
 - Main and app-detail policy rows open a shared `policy-summary-modal.tsx` backed by `GET /policies/{policy_id}`. Edit/Delete buttons stop row propagation.
 - App/global assignment bulk update/delete also uses `policy_ids`; the API returns `404` if a requested policy is not assigned in that app/global scope.
 - Developer-friendly client-ID aliases exist under `/apps/by-client-id/{client_id}` and `/apps/by-client-id/{client_id}/policy-assignments`; they resolve to the same internal app rows and full assignment CRUD logic.
@@ -174,15 +179,12 @@ Blocked actions:
 Read `docs/open-work-backlog.md` before choosing the next implementation
 slice. It is the single backlog for unfinished plans.
 
-The assignment-aware, app-authentication, protected HTTP boundary,
-authenticated runtime endpoint, reusable guarded-execution slice,
-conversation-history persistence/truncation, app-selected main/guardrail LLM
-selection, policy CRUD auto-compilation, app connector CRUD, env-based
-connector credential resolution, frontend policy Create/Edit/Delete integration,
-and duplicate consolidation are green. The next main implementation slice is
-the app-management frontend for the GitHub MCP demo.
-Use `docs/frontend-api-map.md`, `docs/frontend-screen-plan.md`, and
-`docs/frontend-demo-flow.md` before changing UI code:
+The authenticated runtime, app-scoped policy enforcement, management RBAC,
+app/user/policy frontend workflows, named LLM selectors, native containerized
+GitHub MCP launch, and separate frontend/backend images are implemented. The
+next main slice is deployment verification and handoff. Read
+`docs/containerisation.md` and `docs/work-computer-handoff.md` before changing
+ports, images, or Azure topology:
 
 ```text
 users + apps + llm_configs now exist
@@ -218,8 +220,13 @@ frontend-demo-flow.md defines the presentation GitHub MCP demo path
 frontend/ contains Next.js 13 pages: /login, /signup admin-managed notice, /apps, /apps/[clientId], /policies, /user-management, /settings
 /policies supports backend-backed duplicate-aware Create, assignment-safe Edit, and assignment-only Delete
 Apps list/detail and GitHub connector/runtime management are backend-backed
--> add a readable LLM-config catalogue and named selectors next
--> defer production secrets-manager and admin auth unless specifically requested
+readable LLM-config catalogue and named selectors are implemented
+management JWT authentication and role checks are implemented
+frontend image listens on port 80; backend remains private on port 8000 in ACI
+-> build and test both Linux AMD64 images directly
+-> push a matching image pair to guardrail.azurecr.io
+-> hand the port-80 ACI contract to the supervisor's deployment team
+-> defer production secrets-manager resolution until its provider is confirmed
 -> keep policy CRUD auto-compilation covered by test_policy_auto_compile.py
 -> keep normal GitHub MCP tests read-only
 ```
