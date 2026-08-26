@@ -405,9 +405,17 @@ Current local milestone:
   probe passed on 2026-08-21.
 - The target hosting service is Azure Container Instances, not OpenShift.
 
-Next deployment work:
+2026-08-27 work-computer handoff boundary:
 
-- Build and locally test `guardrail-be` and `guardrail-fe` directly.
+- Runtime/config changes are committed in `2e74c65`.
+- Full Compose startup and frontend `/api/gms` proxy verification after the
+  port-80 change are still pending.
+- ACR push and deployed ACI validation are still pending.
+
+Next deployment work, in order:
+
+- Run and verify the complete local Compose stack on frontend port `80`.
+- Build final Linux AMD64 `guardrail-be` and `guardrail-fe` images directly.
 - Push a matching image pair to `guardrail.azurecr.io`.
 - Let the deployment team create a two-container ACI group with frontend
   public port `80`, private backend port `8000`, frontend

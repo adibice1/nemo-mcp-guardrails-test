@@ -20,10 +20,16 @@ The terminology migration is complete. `apps` now represent GMS client
 applications, while connector metadata lives in `connectors`,
 `connector_actions`, `connector_resources`, and `connector_tool_mappings`.
 
-## Current Handoff - 2026-08-21
+## Current Handoff - 2026-08-27
 
 For the shortest exact continuation guide, read
 `docs/work-computer-handoff.md` first.
+
+Committed runtime/config checkpoint: `2e74c65`. The frontend Linux AMD64 image
+and non-root port-80 listener are verified. The next machine must verify the
+complete Compose stack and `/api/gms` proxy on port `80`, then build/tag/push
+the final matching ACR image pair. Actual ACI creation remains with the
+supervisor's deployment team.
 
 The current prototype is DB-backed through the main guardrail path. Enabled
 Postgres policies feed runtime tool guarding, generated blocked tests, compiled

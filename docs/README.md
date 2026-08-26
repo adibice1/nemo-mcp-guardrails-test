@@ -71,7 +71,7 @@ Current handoff status:
 Start here for current project context:
 
 - `file-map.md`: one-line backend/frontend file index and symptom lookup
-- `work-computer-handoff.md`: exact 2026-08-21 deployment continuation point
+- `work-computer-handoff.md`: exact 2026-08-27 work-computer deployment handoff
 - `open-work-backlog.md`: active unfinished work tracker
 - `project-context.md`: current architecture and implementation state
 - `frontend-api-map.md`: endpoint map for the Next.js frontend

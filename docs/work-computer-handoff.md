@@ -1,6 +1,37 @@
 # Work/Home Computer Handoff
 
-## Current Deployment Milestone - 2026-08-21
+## Work Computer Start Here - 2026-08-27
+
+The runtime/configuration milestone is committed as `2e74c65` (`ACI changes`).
+The home-computer worktree was clean before this documentation-only handoff
+refresh. Commit and push this refresh before changing computers so the work
+computer receives the instructions below.
+
+Do not begin another frontend/backend feature slice yet. The immediate task is
+to complete the full port-80 Compose/proxy verification and then hand a matching
+image pair to the ACR/ACI deployment owner.
+
+Verified already:
+
+```text
+Next.js production build
+Linux AMD64 frontend image build
+non-root uid=1001(nextjs) process listening on 0.0.0.0:80
+internal frontend /login probe
+Compose rendering frontend target/published port 80
+```
+
+Still pending after the port change:
+
+```text
+full docker compose up -d --build run
+frontend -> /api/gms -> backend proxy health on the complete stack
+management login, policy CRUD, and guarded GitHub Runtime Test through port 80
+final matching backend/frontend image build and ACR push
+deployed ACI validation (owned by the supervisor's deployment team)
+```
+
+## Current Deployment Milestone
 
 The backend and frontend are ready to be built as separate Linux AMD64 images
 for Azure Container Registry and Azure Container Instances:
@@ -48,11 +79,30 @@ work computer.
 Also follow the repository-level rules in `AGENTS.md`, especially the
 requirement to preview exact non-doc code diffs and wait for approval.
 
-Before starting new implementation:
+On the work computer, first synchronize and confirm the handoff:
 
 ```powershell
 git pull
-docker compose up -d postgres
+git log -1 --oneline
+git status
+```
+
+Expected: the latest handoff commit is present and `git status` is clean.
+
+Then run the complete containerized stack before starting new implementation:
+
+```powershell
+docker compose up -d --build
+docker compose ps
+Invoke-RestMethod http://127.0.0.1:8000/health
+Invoke-RestMethod http://127.0.0.1:8000/health/db
+Invoke-RestMethod http://127.0.0.1/api/gms/health
+Invoke-WebRequest -UseBasicParsing http://127.0.0.1/login
+```
+
+After the stack is healthy, keep the focused regression set green:
+
+```powershell
 python tests/test_app_auth_http.py
 python tests/test_policy_assignment_api.py
 python tests/test_policy_auto_compile.py
@@ -66,13 +116,13 @@ python tests/test_tool_guard.py
 python tests/test_nemo_mcp.py
 ```
 
-Before leaving the home computer, make sure this milestone is committed and
-pushed. The work computer cannot see unpushed local files:
+Before leaving the home computer, commit and push this docs-only handoff. The
+work computer cannot see unpushed local files:
 
 ```powershell
 git status
 git add .
-git commit -m "Prepare backend and frontend handoff for GMS demo"
+git commit -m "Refresh work-computer deployment handoff"
 git push
 ```
 
@@ -280,14 +330,14 @@ The normal-developer Apps workflow is now implemented:
 /apps/[clientId]
 -> Overview: edit name and rotate API key
 -> Connectors: link/enable/disable/unlink GitHub
--> LLM: update main and guardrail config IDs
+-> LLM: select named main and guardrail configurations
 -> Policies: effective summary and link to filtered policy management
 -> Runtime Test: authenticated POST /v1/guardrails/run
 ```
 
 SharePoint is hidden from active connector selectors because only GitHub has
-normalized runtime metadata and an executable adapter. The LLM tab uses numeric
-config IDs until a readable LLM-config listing endpoint is added.
+normalized runtime metadata and an executable adapter. The LLM tab now uses the
+readable LLM-config catalogue and named selectors.
 
 App creation no longer accepts user-entered client IDs or API keys. The backend
 generates GUID-format client IDs and high-entropy API keys, returns the API key
@@ -469,19 +519,12 @@ guardrail.azurecr.io/guardrail-fe:<matching-tag> -> public port 80
 guardrail.azurecr.io/guardrail-be:<matching-tag> -> private port 8000
 ```
 
-Build both Linux AMD64 images from the repository root:
+After the complete Compose stack passes, build both final Linux AMD64 images
+from the repository root:
 
 ```powershell
 docker build --platform linux/amd64 -t guardrail-be:latest .
 docker build --platform linux/amd64 --build-arg NEXT_PUBLIC_API_BASE_URL=/api/gms -t guardrail-fe:latest .\frontend
-```
-
-Verify the containerized local stack:
-
-```powershell
-docker compose up -d
-Invoke-RestMethod http://127.0.0.1/api/gms/health
-Invoke-WebRequest -UseBasicParsing http://127.0.0.1/login
 ```
 
 Then push one matching image pair and give the deployment owner this ACI

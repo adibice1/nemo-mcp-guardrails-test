@@ -13,7 +13,7 @@ Confirmed target terminology:
 - The connector terminology migration is complete: `apps` are GMS client applications, while `connectors`, `connector_actions`, `connector_resources`, and `connector_tool_mappings` model external integrations.
 - Read `docs/target-architecture.md` before proposing the next schema migration.
 - Read `docs/work-computer-handoff.md` first when continuing the current
-  2026-08-21 deployment milestone on another machine.
+  2026-08-27 work-computer deployment handoff.
 - The target GMS is a full proxy that owns input rails, agent/tool execution, and output rails.
 - One app may use multiple connectors; users and apps are many-to-many.
 - Global policies are mandatory across every app.
@@ -182,7 +182,8 @@ slice. It is the single backlog for unfinished plans.
 The authenticated runtime, app-scoped policy enforcement, management RBAC,
 app/user/policy frontend workflows, named LLM selectors, native containerized
 GitHub MCP launch, and separate frontend/backend images are implemented. The
-next main slice is deployment verification and handoff. Read
+next main slice is the full port-80 Compose/proxy verification followed by
+deployment handoff. Read
 `docs/containerisation.md` and `docs/work-computer-handoff.md` before changing
 ports, images, or Azure topology:
 
