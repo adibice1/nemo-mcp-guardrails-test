@@ -16,6 +16,14 @@ def main() -> None:
     assert extract_blocked_output_phrases('The bot must not include "private data".') == (
         "private data",
     )
+    assert extract_blocked_output_phrases(
+        "Do not allow the word 'hello' in the response output."
+    ) == ("hello",)
+    assert extract_blocked_output_phrases("Don't say the phrase 'Project Alpha'.") == (
+        "Project Alpha",
+    )
+    assert extract_blocked_output_phrases("dont have word 'adib'.") == ("adib",)
+    assert extract_blocked_output_phrases("No word 'blocked'.") == ("blocked",)
     assert extract_blocked_output_phrases("No profanities.") == ()
 
     phrases = compile_blocked_output_phrases(

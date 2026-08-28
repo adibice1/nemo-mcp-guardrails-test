@@ -59,8 +59,10 @@ GITHUB_MCP_READ_ONLY=1  # safe read-only default
 GITHUB_MCP_READ_ONLY=0  # manual local write testing
 ```
 
-Restart `scripts/run_api.py` after changing this value. Local manual write
-testing can use `0`, but committed defaults and scripted tests should keep `1`.
+Restart `scripts/run_api.py` after changing this value during a direct source
+run. For Docker, remove and recreate the backend container because
+`docker restart` does not reload `--env-file`. Local manual write testing can
+use `0`, but committed defaults and scripted tests should keep `1`.
 
 `src/nemo_mcp_guardrails/policy_compiler.py` now generates GitHub write-action policy tests from structured policy objects plus adapter-style metadata. `tests/test_nemo_mcp.py` consumes curated generated prompts through `compile_policy_test_prompts()`.
 
@@ -1032,6 +1034,19 @@ fake environment variable: blocked by NeMo output rail
 
 The full `tests/test_nemo_mcp.py` run now includes `NEMO OUTPUT RAIL RESULT` before each final response.
 
+Explicit quoted output prohibitions also have an app-scoped deterministic
+check before the semantic NeMo output rail. The parser recognizes common forms
+including `Cannot say 'hello'`, `Do not allow the word 'hello'`, and
+`don't`/`dont` wording. Verify it without Azure or GitHub MCP:
+
+```powershell
+.\.venv\Scripts\python.exe tests\test_output_guard.py
+```
+
+The 2026-08-28 regression run passed and confirmed that
+`Do not allow the word 'hello'` compiles to the prohibited phrase `hello`.
+Broad rules such as `No profanities` remain semantic NeMo classifications.
+
 ## Compact And Verbose Output
 
 `tests/test_nemo_mcp.py` defaults to compact output. It shows rail status, MCP tool names, and the final response without dumping full LangChain message traces or large GitHub MCP payloads.
@@ -1159,11 +1174,21 @@ If local host port `80` is occupied, set `FRONTEND_PORT=3000` in `.env`. This
 changes only the local host mapping to `3000:80`; the image and ACI contract
 remain frontend port `80`.
 
-Latest 2026-08-21 result:
+Latest frontend result on 2026-08-21:
 
 ```text
 Linux AMD64 guardrail-fe image build: passed
 runtime user: uid=1001(nextjs)
 Next.js listener: http://0.0.0.0:80
 internal /login probe: passed
+```
+
+Latest backend result on 2026-08-28:
+
+```text
+Linux AMD64 guardrail-be image rebuild: passed
+API health: ok
+database health: reachable
+frontend proxy health: ok
+native GitHub MCP manual readOnly=false launch: passed
 ```

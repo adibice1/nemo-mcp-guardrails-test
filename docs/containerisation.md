@@ -81,13 +81,33 @@ Then open `http://127.0.0.1/login` and verify the proxy:
 Invoke-RestMethod http://127.0.0.1/api/gms/health
 ```
 
+Docker reads `--env-file .env` only when the container is created. After
+changing values such as `GITHUB_MCP_READ_ONLY`, remove and recreate the backend
+container; `docker restart` keeps the old environment. Confirm the live value
+with:
+
+```powershell
+docker exec guardrail-be printenv GITHUB_MCP_READ_ONLY
+```
+
 If host port `80` is already occupied during local testing, use
 `-p 3000:80` and open `http://127.0.0.1:3000`. This is a local Docker mapping
 only; the deployed ACI contract remains public port `80` to frontend port `80`.
 
-Latest verified result on 2026-08-21: the Linux AMD64 frontend image built
+Latest frontend verification on 2026-08-21: the Linux AMD64 frontend image built
 successfully, ran as `uid=1001(nextjs)`, listened on `0.0.0.0:80`, and served
 the `/login` health probe without running as root.
+
+Latest backend verification on 2026-08-28: `guardrail-be:latest` rebuilt as a
+Linux AMD64 image, served `/health`, reached PostgreSQL, and was reachable
+through the frontend `/api/gms/health` proxy. Its bundled native GitHub MCP
+server launched with `readOnly=false` after the backend container was recreated
+from `.env`, and GitHub issue write tools were offered. This was a controlled
+manual capability probe, not a change to the safe scripted-test default.
+
+The 2026-08-28 backend image is local only at handoff time. Do not tell the ACI
+deployment owner that the fix is available in ACR until a matching image pair
+has actually been tagged and pushed.
 
 Replace the example database user, password, port, and database name with the
 local values. The home computer normally uses host port `5433`; the work
@@ -186,7 +206,9 @@ Do not bake these values into either image.
 
 ## Next Deployment Slice
 
-1. Build and locally test both images with `docker run`.
+1. Build and locally test both images with `docker run`; the corrected backend
+   is verified locally, while the frontend should be rebuilt once more for the
+   matching release pair.
 2. Push one matching image pair to `guardrail.azurecr.io`.
 3. Hand image names, ports, health endpoints, and runtime variables to the ACI
    deployment owner.

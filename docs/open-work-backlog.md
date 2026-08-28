@@ -28,8 +28,9 @@ The GMS backend prototype now has these core runtime pieces:
   `AZURE_OPENAI_API_KEY` fallback.
 - Controlled runtime responses for connector tool errors and Azure output
   content-filter failures.
-- App-scoped deterministic checks for explicit quoted output prohibitions such
-  as `Cannot say 'hello'`; broad rules such as `No profanities` remain NeMo
+- App-scoped deterministic checks cover explicit quoted output prohibitions
+  such as `Cannot say 'hello'`, `Do not allow the word 'hello'`, and common
+  `don't`/`dont` wording. Broad rules such as `No profanities` remain NeMo
   semantic classifications.
 - Runtime responses expose `output_rail_source` and Azure-reported filtered
   categories. The frontend distinguishes `blocked (Azure: category)` from
@@ -403,11 +404,15 @@ Current local milestone:
   `NET_BIND_SERVICE` so it can bind the HTTP port.
 - The Linux AMD64 frontend port-80 image build and non-root `/login` runtime
   probe passed on 2026-08-21.
+- The corrected Linux AMD64 backend image rebuild, API/database/proxy health,
+  and native GitHub MCP manual write-mode capability probe passed on
+  2026-08-28. That backend image is still local and has not been pushed to ACR.
 - The target hosting service is Azure Container Instances, not OpenShift.
 
 Next deployment work:
 
-- Build and locally test `guardrail-be` and `guardrail-fe` directly.
+- Rebuild and locally test the matching `guardrail-fe` release image, then
+  reconfirm the already-corrected `guardrail-be` image.
 - Push a matching image pair to `guardrail.azurecr.io`.
 - Let the deployment team create a two-container ACI group with frontend
   public port `80`, private backend port `8000`, frontend

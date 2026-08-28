@@ -280,9 +280,10 @@ GitHub MCP runtime env
 
 Normal full-run GitHub MCP tests should remain read-only. Manual local write
 testing can set `GITHUB_MCP_READ_ONLY=0` in `.env`, then restart
-`scripts/run_api.py`. Future write-capable scripted testing should use a
-separate opt-in harness with a throwaway repository, limited token, and
-explicit safety flags.
+`scripts/run_api.py` for a direct source run or recreate the backend container
+for Docker. A Docker restart alone retains the old environment. Future
+write-capable scripted testing should use a separate opt-in harness with a
+throwaway repository, limited token, and explicit safety flags.
 
 ## Important Implementation Detail
 
@@ -327,6 +328,12 @@ Assistant response:
 It intentionally does not echo the user input, because unsafe user prompts containing fake token-like strings can trigger Azure content filtering before NeMo can classify the assistant response.
 
 `scripts/debug_nemo_output_check.py` verifies safe assistant output passes and fake token/environment-variable output blocks.
+
+`output_guard.py` also performs an app-scoped deterministic check for explicit
+quoted phrase restrictions before NeMo. Its parser now recognizes common
+policy wording such as `Cannot say 'hello'`, `Do not allow the word 'hello'`,
+and `don't`/`dont` variants. Broad behavioral rules still use the semantic NeMo
+output classifier.
 
 ## Current DB-Backed Runtime State
 

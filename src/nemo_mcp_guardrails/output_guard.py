@@ -3,8 +3,9 @@ from collections.abc import Iterable
 
 
 EXPLICIT_OUTPUT_PHRASE_PATTERN = re.compile(
-    r"\b(?:cannot|must\s+not|do\s+not|never)\s+"
-    r"(?:say|contain|include|mention)\s+"
+    r"\b(?:(?:cannot|can'?t|must\s+not|do\s+not|don'?t|never)\s+"
+    r"(?:say|contain|include|mention|have|allow)|no)\s+"
+    r"(?:(?:the\s+)?(?:word|phrase)\s+)?"
     r"(?P<quote>['\"])(?P<phrase>.+?)(?P=quote)",
     re.IGNORECASE,
 )

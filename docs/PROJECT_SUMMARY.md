@@ -20,7 +20,7 @@ The terminology migration is complete. `apps` now represent GMS client
 applications, while connector metadata lives in `connectors`,
 `connector_actions`, `connector_resources`, and `connector_tool_mappings`.
 
-## Current Handoff - 2026-08-21
+## Current Handoff - 2026-08-28
 
 For the shortest exact continuation guide, read
 `docs/work-computer-handoff.md` first.
@@ -41,6 +41,13 @@ The frontend listens directly on `80` because ACI does not provide Docker-style
 port translation. Its non-root Node process receives only
 `NET_BIND_SERVICE`. External PostgreSQL and runtime-injected secrets remain
 part of the deployment contract.
+
+The corrected Linux AMD64 backend image was rebuilt and verified locally on
+2026-08-28. API, database, and frontend-proxy health checks passed; the native
+GitHub MCP executable also exposed write tools in a controlled
+`GITHUB_MCP_READ_ONLY=0` manual probe. The image has not yet been pushed to
+ACR, so the immediate deployment task is to rebuild/verify the matching
+frontend image and push both images with one release tag.
 
 Current implemented flow:
 
@@ -194,7 +201,8 @@ github update file block -> create_or_update_file
 
 Normal full-run GitHub MCP tests should stay in read-only mode with
 `GITHUB_MCP_READ_ONLY=1`. Manual local write testing can set
-`GITHUB_MCP_READ_ONLY=0` in `.env` and restart the API. Future write-capable
+`GITHUB_MCP_READ_ONLY=0` in `.env` and restart a direct Python API, or recreate
+the backend container so Docker reloads `--env-file`. Future write-capable
 scripted testing should be a separate opt-in harness with a throwaway
 repository and limited token.
 

@@ -409,6 +409,13 @@ print(sorted(compile_blocked_tools(policies)))
 
 Normal full-run GitHub MCP tests should keep `GITHUB_READ_ONLY=1`. Do not switch the default test runner to write mode. Future write-capable tests should be separate, opt-in, and use a throwaway repo plus a limited token.
 
+When manually testing a containerized backend with
+`GITHUB_MCP_READ_ONLY=0`, changing `.env` is not enough for an existing
+container. Recreate the backend container because `docker restart` does not
+reload `--env-file` values. Use `docker exec <backend-container> printenv
+GITHUB_MCP_READ_ONLY` to verify the effective setting before testing a write
+tool.
+
 ## Normalized Metadata Tables
 
 If `allowed_test_case_expected_tools` is empty, run:

@@ -170,10 +170,12 @@ docs/open-work-backlog.md
 Recommended deployment slice from the current state:
 
 ```text
-1. Build the Linux AMD64 `guardrail-be` and `guardrail-fe` images directly.
-2. Verify frontend container port 80 as the non-root `nextjs` user.
-3. Verify the same-origin `/api/gms` proxy reaches private backend port 8000.
-4. Push a matching image pair to `guardrail.azurecr.io`.
+1. Rebuild the Linux AMD64 `guardrail-fe` image for the release pair; the
+   corrected `guardrail-be:latest` image was rebuilt and verified on 2026-08-28.
+2. Reconfirm frontend container port 80 as the non-root `nextjs` user.
+3. Reconfirm the same-origin `/api/gms` proxy reaches private backend port 8000.
+4. Tag and push the matching image pair to `guardrail.azurecr.io`; the
+   2026-08-28 corrected backend image is still local at handoff time.
 5. Give the deployment team the public-80/private-8000 ACI contract.
 6. Validate login, policy CRUD, and one guarded GitHub request after deployment.
 7. Add immutable Git-SHA tags and GitHub Actions after the manual handoff works.

@@ -1,6 +1,6 @@
 # Work/Home Computer Handoff
 
-## Current Deployment Milestone - 2026-08-21
+## Current Deployment Milestone - 2026-08-28
 
 The backend and frontend are ready to be built as separate Linux AMD64 images
 for Azure Container Registry and Azure Container Instances:
@@ -32,7 +32,8 @@ for TLS, a custom domain, WAF behavior, or other production ingress features.
 Read `docs/containerisation.md` before building, pushing, or changing ports. It
 contains direct `docker run`, ACR tag/push, ACI topology, secrets, and health
 check instructions. Actual ACI resource creation remains with the supervisor's
-deployment team; the current developer handoff is the tested image pair.
+deployment team; this developer handoff contains the verified backend image
+and the contract for producing the final matching image pair.
 
 Run the new launch-mode check after pulling this milestone:
 
@@ -40,31 +41,79 @@ Run the new launch-mode check after pulling this milestone:
 .\.venv\Scripts\python.exe tests\test_runtime_mcp_launch.py
 ```
 
+### Latest Local Verification - 2026-08-28
+
+The backend image was rebuilt after expanding deterministic output-rule phrase
+parsing. The local container verification proved:
+
+```text
+backend /health: ok
+backend /health/db: reachable
+frontend /api/gms/health proxy: ok
+backend GitHub MCP launch mode: native
+GITHUB_MCP_READ_ONLY=0 manual mode: write tools offered
+explicit output rule "Do not allow the word 'hello'": compiled to "hello"
+output guard and HTTP authentication regression tests: passed
+```
+
+The corrected backend image currently exists locally as
+`guardrail-be:latest`; it has not yet been pushed to ACR. Rebuild and verify
+the frontend before pushing one matching frontend/backend release pair.
+
 ## Read This First
 
-This file records the exact home-computer project state to continue from on the
-work computer.
+This file records the exact project state needed to continue safely between
+the work and home computers.
 
 Also follow the repository-level rules in `AGENTS.md`, especially the
 requirement to preview exact non-doc code diffs and wait for approval.
 
-Before starting new implementation:
+After pulling on the home computer, use host port `5433` for project Postgres.
+Start the database and run the fast regression checks before new work:
 
 ```powershell
 git pull
 docker compose up -d postgres
-python tests/test_app_auth_http.py
-python tests/test_policy_assignment_api.py
-python tests/test_policy_auto_compile.py
-python tests/test_guardrails_run_http.py
-python tests/test_output_guard.py
-python tests/test_runtime_connector_access.py
-python tests/test_app_connector_api.py
-python tests/test_runtime_connector_credentials.py
-python tests/test_app_policy_scope.py
-python tests/test_tool_guard.py
-python tests/test_nemo_mcp.py
+.\.venv\Scripts\python.exe tests\test_app_auth_http.py
+.\.venv\Scripts\python.exe tests\test_policy_assignment_api.py
+.\.venv\Scripts\python.exe tests\test_policy_auto_compile.py
+.\.venv\Scripts\python.exe tests\test_guardrails_run_http.py
+.\.venv\Scripts\python.exe tests\test_output_guard.py
+.\.venv\Scripts\python.exe tests\test_runtime_connector_access.py
+.\.venv\Scripts\python.exe tests\test_app_connector_api.py
+.\.venv\Scripts\python.exe tests\test_runtime_connector_credentials.py
+.\.venv\Scripts\python.exe tests\test_app_policy_scope.py
+.\.venv\Scripts\python.exe tests\test_tool_guard.py
 ```
+
+Keep `tests/test_nemo_mcp.py` as the slower opt-in live Azure/GitHub check after
+the fast suite is green. Normal scripted runs must use
+`GITHUB_MCP_READ_ONLY=1`.
+
+### Home Computer Direct-Docker Resume
+
+The home computer's host tools use Postgres port `5433`. A backend container
+must instead reach that host database through `host.docker.internal:5433`.
+After substituting the local database username and password, the direct-image
+workflow is:
+
+```powershell
+docker build --platform linux/amd64 -t guardrail-be:latest .
+docker build --platform linux/amd64 --build-arg NEXT_PUBLIC_API_BASE_URL=/api/gms -t guardrail-fe:latest .\frontend
+
+docker rm -f guardrail-be guardrail-fe
+docker run -d --name guardrail-be --env-file .env -e DATABASE_URL="postgresql+psycopg://<user>:<password>@host.docker.internal:5433/nemo_mcp_guardrails" -p 8000:8000 guardrail-be:latest
+docker run -d --name guardrail-fe -e GMS_API_BASE_URL=http://host.docker.internal:8000 -p 80:80 guardrail-fe:latest
+
+Invoke-RestMethod http://127.0.0.1:8000/health
+Invoke-RestMethod http://127.0.0.1:8000/health/db
+Invoke-RestMethod http://127.0.0.1/api/gms/health
+```
+
+Open `http://127.0.0.1/login`. Swagger is available locally at
+`http://127.0.0.1:8000/docs`. If host port `80` is occupied, publish the
+frontend with `-p 3000:80` and use `http://127.0.0.1:3000`; the image still
+listens on port `80` internally.
 
 Before leaving the home computer, make sure this milestone is committed and
 pushed. The work computer cannot see unpushed local files:
@@ -107,8 +156,17 @@ GITHUB_MCP_READ_ONLY=1  # safe default for scripted tests
 GITHUB_MCP_READ_ONLY=0  # manual local write testing
 ```
 
-Restart `scripts/run_api.py` after flipping this value. The committed
-`.env.example` keeps the safe read-only default.
+For a direct Python API run, restart `scripts/run_api.py` after flipping this
+value. For a containerized API, remove and recreate the backend container;
+`docker restart` does not reload values from `--env-file`. Rebuilding the image
+is required only when code or dependencies changed, not for an `.env`-only
+change. Verify the live container value with:
+
+```powershell
+docker exec guardrail-be printenv GITHUB_MCP_READ_ONLY
+```
+
+The committed `.env.example` keeps the safe read-only default.
 
 ## Current Milestone
 
@@ -406,6 +464,8 @@ resource; SharePoint remains absent until it has executable mappings.
 - `src/nemo_mcp_guardrails/database/models.py`: includes `conversation_messages`.
 - `src/nemo_mcp_guardrails/runtime_factory.py`: Azure, NeMo, MCP, and agent construction. It uses the authenticated app's `guardrail_llm_config_id` for NeMo rails and `main_llm_config_id` for the LangChain agent, with `.env` Azure fallback when either ID is missing.
 - `src/nemo_mcp_guardrails/guarded_execution.py`: reusable single-request guardrail workflow.
+- `src/nemo_mcp_guardrails/output_guard.py`: deterministic app-scoped quoted
+  output phrase extraction and matching.
 - `src/nemo_mcp_guardrails/tool_guard.py`: app-scoped execution-level MCP tool guard.
 - `tests/test_nemo_mcp.py`: full read-only integration runner and terminal display.
 - `tests/test_app_auth_http.py`: protected HTTP boundary and runtime-execution reachability test.
@@ -416,6 +476,8 @@ resource; SharePoint remains absent until it has executable mappings.
 - `tests/test_runtime_connector_credentials.py`: env-based GitHub PAT
   reference resolution test.
 - `tests/test_app_policy_scope.py`: real temporary app-assignment scope test.
+- `tests/test_output_guard.py`: isolated explicit output phrase parser and
+  matcher regression test.
 
 ## Verified Current Results
 
@@ -432,6 +494,10 @@ authenticated /run allowed/blocked app-scope HTTP coverage: passed
 runtime connector access enforcement: passed
 Linux AMD64 frontend port-80 image build: passed
 non-root uid=1001 Next.js port-80 /login probe: passed
+Linux AMD64 backend image rebuild after output-guard fix: passed
+backend container API/database/frontend-proxy health: passed
+container-native GitHub MCP readOnly=false manual probe: passed
+explicit output phrase parser regression test: passed
 temporary authentication rows cleanup: passed
 temporary app policy-scope rows cleanup: passed
 App A issue_write blocked / App B issue_write allowed: passed
@@ -460,8 +526,9 @@ Read `docs/open-work-backlog.md` first. It is the source of truth for
 unfinished plans and prevents half-completed ideas from being lost between
 machines.
 
-Immediate top priority: verify and hand off the corrected ACI image pair. The
-frontend management MVP, management JWT/RBAC, named LLM selectors, connector
+Immediate top priority: finish verifying and hand off the corrected ACI image
+pair. The corrected backend image is local and verified but not yet pushed.
+The frontend management MVP, management JWT/RBAC, named LLM selectors, connector
 management, policy management, and Runtime Test are already implemented.
 
 ```text
