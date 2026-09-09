@@ -63,6 +63,7 @@ def main() -> None:
         with TestClient(app) as client:
             missing_auth = client.get("/apps")
             assert missing_auth.status_code == 401, missing_auth.text
+            assert client.get("/apps/summaries").status_code == 401
 
             developer_create_denied = client.post(
                 "/apps",
@@ -125,6 +126,21 @@ def main() -> None:
             list_b = client.get("/apps", headers=_headers(developer_b))
             assert list_b.status_code == 200, list_b.text
             assert created_app_id not in {item["id"] for item in list_b.json()}
+
+            for user in (developer_a, developer_b, admin):
+                summaries = client.get("/apps/summaries", headers=_headers(user))
+                visible = client.get("/apps", headers=_headers(user))
+                assert summaries.status_code == 200, summaries.text
+                assert visible.status_code == 200, visible.text
+                assert {item["id"] for item in summaries.json()} == {
+                    item["id"] for item in visible.json()
+                }
+                assert all(
+                    "api_key" not in item and "api_key_hash" not in item
+                    for item in summaries.json()
+                )
+                if user.id == developer_b.id:
+                    assert summaries.json() == []
 
             denied = client.get(
                 f"/apps/{created_app_id}", headers=_headers(developer_b)

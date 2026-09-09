@@ -77,6 +77,15 @@ def count_app_connector_links(app_id: int) -> int:
         )
 
 
+def assert_connector_summary(client: TestClient, app_id: int, expected: int) -> None:
+    """Verify the summary updates after connector-link mutations."""
+
+    response = client.get("/apps/summaries")
+    assert response.status_code == 200, response.text
+    row = next(item for item in response.json() if item["id"] == app_id)
+    assert row["connector_count"] == expected
+
+
 def main() -> None:
     """Verify app connector management APIs."""
 
@@ -107,6 +116,7 @@ def main() -> None:
             )
             assert create_body["enabled"] is True
             assert create_body["connector_enabled"] is True
+            assert_connector_summary(client, app_id, 1)
             assert count_app_connector_links(app_id) == 1
 
             list_by_id = client.get(f"/apps/{app_id}/connectors")
@@ -123,6 +133,7 @@ def main() -> None:
             assert update_by_name.status_code == 200, update_by_name.text
             assert update_by_name.json()["credential_reference"] == "vault:github/test"
             assert update_by_name.json()["enabled"] is False
+            assert_connector_summary(client, app_id, 0)
 
             upsert_by_client_id = client.post(
                 f"/apps/by-client-id/{client_id}/connectors",
@@ -135,6 +146,7 @@ def main() -> None:
             assert upsert_by_client_id.status_code == 201, upsert_by_client_id.text
             assert upsert_by_client_id.json()["connector_name"] == "github"
             assert upsert_by_client_id.json()["enabled"] is True
+            assert_connector_summary(client, app_id, 1)
             assert count_app_connector_links(app_id) == 1
 
             list_by_client_id = client.get(
@@ -149,6 +161,7 @@ def main() -> None:
             )
             assert update_by_client_id.status_code == 200, update_by_client_id.text
             assert update_by_client_id.json()["enabled"] is False
+            assert_connector_summary(client, app_id, 0)
 
             missing_connector = client.post(
                 f"/apps/{app_id}/connectors",
@@ -161,6 +174,7 @@ def main() -> None:
             )
             assert delete_by_client_id.status_code == 204, delete_by_client_id.text
             assert count_app_connector_links(app_id) == 0
+            assert_connector_summary(client, app_id, 0)
 
             delete_missing = client.delete(
                 f"/apps/by-client-id/{client_id}/connectors/github"

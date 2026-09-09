@@ -103,6 +103,11 @@ export type ClientApp = {
   updated_at: string;
 };
 
+export type ClientAppSummary = ClientApp & {
+  connector_count: number;
+  policy_count: number;
+};
+
 export type AppCreatePayload = {
   name: string;
   client_id?: string;
@@ -416,6 +421,10 @@ export function unlinkManagedUserApp(userId: number, appId: number) {
 
 export function listApps() {
   return apiRequest<ClientApp[]>("/apps");
+}
+
+export function listAppSummaries() {
+  return apiRequest<ClientAppSummary[]>("/apps/summaries");
 }
 
 export function createApp(payload: AppCreatePayload) {

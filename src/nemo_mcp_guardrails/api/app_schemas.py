@@ -64,6 +64,13 @@ class AppRead(BaseModel):
     updated_at: datetime
 
 
+class AppSummaryRead(AppRead):
+    """App-list response with current connector and assignment counts."""
+
+    connector_count: int
+    policy_count: int
+
+
 class AppCreateRead(AppRead):
     """Response body for app creation with one-time API key display."""
 

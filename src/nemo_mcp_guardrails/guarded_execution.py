@@ -9,6 +9,7 @@ from nemoguardrails.rails.llm.options import RailStatus, RailType
 from openai import BadRequestError
 
 from nemo_mcp_guardrails.output_guard import find_blocked_output_phrase
+from nemo_mcp_guardrails.performance import measure_stage
 from nemo_mcp_guardrails.tool_guard import TOOL_GUARD_REFUSAL, ToolGuardViolation
 
 
@@ -311,13 +312,14 @@ async def apply_output_rail(
     """Apply the output rail and return its response and full result."""
 
     try:
-        result = await rails.check_async(
-            [
-                {"role": "user", "content": user_prompt},
-                {"role": "assistant", "content": response},
-            ],
-            rail_types=[RailType.OUTPUT],
-        )
+        with measure_stage("output_rail"):
+            result = await rails.check_async(
+                [
+                    {"role": "user", "content": user_prompt},
+                    {"role": "assistant", "content": response},
+                ],
+                rail_types=[RailType.OUTPUT],
+            )
     except LLMCallException as error:
         if not is_azure_content_filter_error(error):
             raise
@@ -359,10 +361,11 @@ async def execute_guarded_message(
     """Execute one runtime request through rails, agent, tools, and output rails."""
 
     try:
-        input_result = await rails.check_async(
-            [{"role": "user", "content": message}],
-            rail_types=[RailType.INPUT],
-        )
+        with measure_stage("input_rail"):
+            input_result = await rails.check_async(
+                [{"role": "user", "content": message}],
+                rail_types=[RailType.INPUT],
+            )
     except (LLMCallException, BadRequestError) as error:
         if not is_azure_content_filter_error(error):
             raise
@@ -423,14 +426,15 @@ async def execute_guarded_message(
     )
 
     try:
-        agent_result = await agent.ainvoke(
-            {
-                "messages": build_agent_messages(
-                    prompt_for_agent,
-                    conversation_history,
-                )
-            }
-        )
+        with measure_stage("agent_tools"):
+            agent_result = await agent.ainvoke(
+                {
+                    "messages": build_agent_messages(
+                        prompt_for_agent,
+                        conversation_history,
+                    )
+                }
+            )
     except ToolGuardViolation as error:
         return GuardedExecutionResult(
             status="blocked",
@@ -545,7 +549,8 @@ async def execute_guarded_message(
     response = raw_agent_response
     output_result = None
 
-    blocked_phrase = find_blocked_output_phrase(response, blocked_output_phrases)
+    with measure_stage("output_phrase_check"):
+        blocked_phrase = find_blocked_output_phrase(response, blocked_output_phrases)
     if blocked_phrase:
         response = OUTPUT_FILTER_RESPONSE
         output_result = SyntheticRailResult(

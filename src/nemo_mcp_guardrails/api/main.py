@@ -22,6 +22,7 @@ from nemo_mcp_guardrails.api.policy_assignment_resolution import (
 )
 from nemo_mcp_guardrails.api.runtime import router as runtime_router
 from nemo_mcp_guardrails.database.connection import create_database_tables, get_db
+from nemo_mcp_guardrails.performance import RequestTimingMiddleware
 
 
 @asynccontextmanager
@@ -54,6 +55,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.add_middleware(RequestTimingMiddleware)
 
 app.include_router(allowed_test_cases_router)
 app.include_router(apps_router)

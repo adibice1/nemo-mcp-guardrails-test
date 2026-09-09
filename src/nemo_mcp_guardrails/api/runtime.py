@@ -17,6 +17,7 @@ from nemo_mcp_guardrails.database.conversation_store import (
     load_conversation_turns,
 )
 from nemo_mcp_guardrails.guarded_execution import execute_guarded_message
+from nemo_mcp_guardrails.performance import measure_stage
 from nemo_mcp_guardrails.policy_compiler import (
     GITHUB_ACTION_SYNONYMS,
     GITHUB_RESOURCE_SYNONYMS,
@@ -419,9 +420,11 @@ async def run_guardrails(
 ) -> GuardrailsRunResponse:
     """Execute one authenticated request through the guarded runtime."""
 
-    history_context = _build_runtime_history_context(payload, app.id, db)
+    with measure_stage("history_load"):
+        history_context = _build_runtime_history_context(payload, app.id, db)
     try:
-        runtime_parts = await build_guardrails_runtime_parts(app.id)
+        with measure_stage("runtime_setup"):
+            runtime_parts = await build_guardrails_runtime_parts(app.id)
     except ConnectorAccessError as error:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -448,13 +451,14 @@ async def run_guardrails(
         if block_explanation is not None
         else execution_result.response
     )
-    _store_conversation_turns(
-        payload,
-        app_id=app.id,
-        response=runtime_response,
-        history_context=history_context,
-        db=db,
-    )
+    with measure_stage("history_store"):
+        _store_conversation_turns(
+            payload,
+            app_id=app.id,
+            response=runtime_response,
+            history_context=history_context,
+            db=db,
+        )
 
     debug_enabled = _runtime_debug_enabled()
 

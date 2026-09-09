@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import Select, func, select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from nemo_mcp_guardrails.app_auth import generate_unique_api_key, hash_api_key
 from nemo_mcp_guardrails.api.assignment_serializers import (
@@ -21,6 +21,7 @@ from nemo_mcp_guardrails.api.app_schemas import (
     AppCreateRead,
     AppPolicyAssignmentRead,
     AppRead,
+    AppSummaryRead,
     AppUpdate,
     EffectivePolicyAssignmentsRead,
     PolicyAssignmentBulkDelete,
@@ -178,6 +179,14 @@ def _list_policy_assignments_for_app(
     assignments = list(
         db.scalars(
             select(AppPolicyAssignmentRecord)
+            .options(
+                joinedload(AppPolicyAssignmentRecord.app),
+                joinedload(AppPolicyAssignmentRecord.policy).options(
+                    joinedload(PolicyRecord.normalized_connector),
+                    joinedload(PolicyRecord.normalized_action),
+                    joinedload(PolicyRecord.normalized_resource),
+                ),
+            )
             .where(AppPolicyAssignmentRecord.app_id == app_id)
             .order_by(AppPolicyAssignmentRecord.id)
         )
@@ -472,14 +481,27 @@ def _effective_policy_assignments_for_app(
 
     global_assignments = list(
         db.scalars(
-            select(GlobalPolicyAssignmentRecord).order_by(
-                GlobalPolicyAssignmentRecord.id
+            select(GlobalPolicyAssignmentRecord)
+            .options(
+                joinedload(GlobalPolicyAssignmentRecord.policy).options(
+                    joinedload(PolicyRecord.normalized_connector),
+                    joinedload(PolicyRecord.normalized_action),
+                    joinedload(PolicyRecord.normalized_resource),
+                ),
             )
+            .order_by(GlobalPolicyAssignmentRecord.id)
         )
     )
     app_assignments = list(
         db.scalars(
             select(AppPolicyAssignmentRecord)
+            .options(
+                joinedload(AppPolicyAssignmentRecord.policy).options(
+                    joinedload(PolicyRecord.normalized_connector),
+                    joinedload(PolicyRecord.normalized_action),
+                    joinedload(PolicyRecord.normalized_resource),
+                ),
+            )
             .where(AppPolicyAssignmentRecord.app_id == app.id)
             .order_by(AppPolicyAssignmentRecord.id)
         )
@@ -508,12 +530,8 @@ def _effective_policy_assignments_for_app(
     }
 
 
-@router.get("", response_model=list[AppRead])
-def list_apps(
-    user: UserRecord = Depends(require_app_route_access),
-    db: Session = Depends(get_db),
-) -> list[dict[str, object]]:
-    """Return all apps for admins or only the current user's apps."""
+def _app_list_query(user: UserRecord) -> Select[tuple[AppRecord]]:
+    """Build the shared admin/developer visibility filter for app lists."""
 
     query = select(AppRecord).order_by(AppRecord.id)
     if user.system_role != "admin":
@@ -525,9 +543,67 @@ def list_apps(
             )
             .distinct()
         )
-    apps = list(db.scalars(query))
-    return [serialize_app(app) for app in apps]
+    return query
 
+
+@router.get("", response_model=list[AppRead])
+def list_apps(
+    user: UserRecord = Depends(require_app_route_access),
+    db: Session = Depends(get_db),
+) -> list[dict[str, object]]:
+    """Return all apps for admins or only the current user's apps."""
+
+    return [serialize_app(app) for app in db.scalars(_app_list_query(user))]
+
+
+@router.get("/summaries", response_model=list[AppSummaryRead])
+def list_app_summaries(
+    user: UserRecord = Depends(require_app_route_access),
+    db: Session = Depends(get_db),
+) -> list[dict[str, object]]:
+    """Return visible apps and current counts with one data query."""
+
+    connector_counts = (
+        select(
+            AppConnectorRecord.app_id,
+            func.count().label("connector_count"),
+        )
+        .where(AppConnectorRecord.enabled.is_(True))
+        .group_by(AppConnectorRecord.app_id)
+        .subquery()
+    )
+    policy_counts = (
+        select(
+            AppPolicyAssignmentRecord.app_id,
+            func.count().label("policy_count"),
+        )
+        .where(AppPolicyAssignmentRecord.enabled.is_(True))
+        .group_by(AppPolicyAssignmentRecord.app_id)
+        .subquery()
+    )
+    global_count = (
+        select(func.count())
+        .select_from(GlobalPolicyAssignmentRecord)
+        .where(GlobalPolicyAssignmentRecord.enabled.is_(True))
+        .scalar_subquery()
+    )
+    query = (
+        _app_list_query(user)
+        .outerjoin(connector_counts, connector_counts.c.app_id == AppRecord.id)
+        .outerjoin(policy_counts, policy_counts.c.app_id == AppRecord.id)
+        .add_columns(
+            func.coalesce(connector_counts.c.connector_count, 0),
+            func.coalesce(policy_counts.c.policy_count, 0) + global_count,
+        )
+    )
+    return [
+        {
+            **serialize_app(app),
+            "connector_count": connector_count,
+            "policy_count": policy_count,
+        }
+        for app, connector_count, policy_count in db.execute(query)
+    ]
 
 @router.post("", response_model=AppCreateRead, status_code=status.HTTP_201_CREATED)
 def create_app(
