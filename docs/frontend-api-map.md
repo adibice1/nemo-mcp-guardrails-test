@@ -15,6 +15,22 @@ X-App-ID: <client_id>
 X-API-Key: <plaintext app api key>
 ```
 
+## Runtime Logs
+
+These screens require a system administrator's management JWT, not an app
+API key. Backend permission checks apply to both list and detail requests.
+
+| Screen | Method | Endpoint | Purpose |
+| --- | --- | --- | --- |
+| `/logs` | `GET` | `/apps` | Populate the app filter |
+| `/logs` | `GET` | `/runtime-logs` | Read paginated request metadata |
+| `/logs/[requestId]` | `GET` | `/runtime-logs/{request_id}` | Read ordered execution events |
+
+The list uses `app_id`, `outcome`, `limit=25`, and `offset`. Pagination uses
+`has_more`; no total count is available. Timestamps are displayed in UTC.
+No prompt, response, tool-argument, credential, or private-reasoning content
+is included in these log views.
+
 ## Current Frontend Integration State
 
 The frontend policy integration lives in:

@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from nemo_mcp_guardrails.app_auth import authenticate_app
@@ -9,6 +9,7 @@ from nemo_mcp_guardrails.database.models import AppRecord
 
 
 def require_authenticated_app(
+    request: Request,
     x_app_id: Annotated[str | None, Header(alias="X-App-ID")] = None,
     x_api_key: Annotated[str | None, Header(alias="X-API-Key")] = None,
     db: Session = Depends(get_db),
@@ -28,4 +29,5 @@ def require_authenticated_app(
             detail="Invalid app credentials",
         )
 
+    request.state.gms_runtime_app_id = app.id
     return app

@@ -91,6 +91,47 @@ export type ManagementSession = {
   user: ManagementUser;
 };
 
+export const RUNTIME_LOG_OUTCOMES = [
+  "started", "passed", "blocked", "tool_error",
+  "completed", "rejected", "redirected", "error"
+] as const;
+
+export type RuntimeLogOutcome = typeof RUNTIME_LOG_OUTCOMES[number];
+
+export type RuntimeLog = {
+  request_id: string;
+  schema_version: string;
+  app_id: number | null;
+  started_at: string;
+  completed_at: string | null;
+  http_status: number | null;
+  outcome: string;
+  duration_ms: number | null;
+};
+
+export type RuntimeLogEvent = {
+  sequence: number;
+  timestamp: string;
+  event: string;
+  severity: string;
+  stage: string;
+  outcome: string;
+  duration_ms: number | null;
+  tool_name: string | null;
+  reason_code: string | null;
+};
+
+export type RuntimeLogDetail = RuntimeLog & {
+  events: RuntimeLogEvent[];
+};
+
+export type RuntimeLogPage = {
+  items: RuntimeLog[];
+  limit: number;
+  offset: number;
+  has_more: boolean;
+};
+
 export type ClientApp = {
   id: number;
   name: string;
@@ -317,7 +358,14 @@ async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
       detail?: string | { code?: string; policy_id?: number };
     } | null;
     const detail = body?.detail;
-    if (response.status === 401 && detail === "Authentication required") {
+    const currentSession = loadManagementSession();
+    if (
+      response.status === 401 &&
+      detail === "Authentication required" &&
+      currentSession &&
+      headers.get("Authorization") ===
+        `Bearer ${currentSession.access_token}`
+    ) {
       clearManagementSession();
     }
     const message =
@@ -419,8 +467,34 @@ export function unlinkManagedUserApp(userId: number, appId: number) {
   });
 }
 
-export function listApps() {
-  return apiRequest<ClientApp[]>("/apps");
+export function listApps(signal?: AbortSignal) {
+  return apiRequest<ClientApp[]>("/apps", { signal });
+}
+
+export function listRuntimeLogs(
+  filters: {
+    appId?: number;
+    outcome?: RuntimeLogOutcome;
+    offset: number;
+  },
+  signal?: AbortSignal
+) {
+  const query = new URLSearchParams({
+    limit: "25",
+    offset: String(filters.offset)
+  });
+  if (filters.appId !== undefined) {
+    query.set("app_id", String(filters.appId));
+  }
+  if (filters.outcome) query.set("outcome", filters.outcome);
+  return apiRequest<RuntimeLogPage>(`/runtime-logs?${query}`, { signal });
+}
+
+export function getRuntimeLog(requestId: string, signal?: AbortSignal) {
+  return apiRequest<RuntimeLogDetail>(
+    `/runtime-logs/${encodeURIComponent(requestId)}`,
+    { signal }
+  );
 }
 
 export function listAppSummaries() {

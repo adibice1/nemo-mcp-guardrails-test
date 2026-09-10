@@ -16,7 +16,7 @@ import {
 import { cn } from "@/lib/utils";
 
 type AppTopNavProps = {
-  active?: "apps" | "policies" | "user-management" | "settings";
+  active?: "apps" | "policies" | "user-management" | "logs" | "settings";
 };
 
 export function AppTopNav({ active }: AppTopNavProps) {
@@ -29,6 +29,8 @@ export function AppTopNav({ active }: AppTopNavProps) {
       ? "apps"
       : pathname.startsWith("/user-management")
       ? "user-management"
+      : pathname.startsWith("/logs")
+      ? "logs"
       : pathname.startsWith("/settings")
       ? "settings"
       : "policies");
@@ -40,23 +42,34 @@ export function AppTopNav({ active }: AppTopNavProps) {
       return;
     }
     setIsAdmin(session.user.system_role === "admin");
+    let active = true;
 
     getCurrentManagementUser(session.access_token)
       .then((user) => {
+        if (
+          !active ||
+          loadManagementSession()?.access_token !== session.access_token
+        ) return;
         updateStoredManagementUser(user);
         setIsAdmin(user.system_role === "admin");
       })
       .catch((error) => {
+        if (!active) return;
+        const current = loadManagementSession();
+        if (current && current.access_token !== session.access_token) return;
         if (isAuthenticationError(error)) {
           clearManagementSession();
           router.replace("/login");
         }
       });
+    return () => {
+      active = false;
+    };
   }, [router]);
 
   return (
-    <header className="mx-auto flex max-w-[1480px] items-center justify-between">
-      <nav className="flex items-center gap-8 text-[21px] font-extrabold">
+    <header className="mx-auto flex max-w-[1480px] items-start justify-between gap-4">
+      <nav className="flex min-w-0 flex-1 flex-wrap items-center gap-x-6 gap-y-3 text-[17px] font-extrabold sm:text-[21px]">
         <Link
           aria-label="Go to apps"
           className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#1187f6] text-3xl font-black text-[#1f3b9d] shadow-[0_8px_18px_rgba(17,135,246,0.22)]"
@@ -102,6 +115,20 @@ export function AppTopNav({ active }: AppTopNavProps) {
             )}
           </Link>
         )}
+        {isAdmin && (
+          <Link
+            href="/logs"
+            className={cn(
+              "relative pb-2 text-[#a8bcfb]",
+              activeKey === "logs" && "text-gms-blue"
+            )}
+          >
+            Logs
+            {activeKey === "logs" && (
+              <span className="absolute bottom-0 left-0 h-[4px] w-full rounded-full bg-gms-blue shadow-[0_4px_8px_rgba(71,117,255,0.55)]" />
+            )}
+          </Link>
+        )}
         <Link
           href="/settings"
           className={cn(
@@ -117,7 +144,7 @@ export function AppTopNav({ active }: AppTopNavProps) {
       </nav>
       <Link
         aria-label="Open settings"
-        className="h-11 w-11 overflow-hidden rounded-[13px] bg-[#ffc2d5] transition hover:scale-105"
+        className="h-11 w-11 shrink-0 overflow-hidden rounded-[13px] bg-[#ffc2d5] transition hover:scale-105"
         href="/settings"
       >
         <div className="flex h-full w-full items-end justify-center text-[30px]">

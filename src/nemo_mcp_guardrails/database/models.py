@@ -6,6 +6,7 @@ from typing import Any
 from sqlalchemy import (
     Boolean,
     DateTime,
+    Float,
     ForeignKey,
     Integer,
     String,
@@ -652,3 +653,51 @@ class CompiledPolicyRuleRecord(Base):
         server_default=func.now(),
         onupdate=func.now(),
     )
+
+
+class RuntimeLogRecord(Base):
+    """Persist a runtime request independently of conversation history."""
+
+    __tablename__ = "runtime_logs"
+
+    request_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    schema_version: Mapped[str] = mapped_column(String(10), default="1.0")
+    app_id: Mapped[int | None] = mapped_column(
+        ForeignKey("apps.id", ondelete="SET NULL"), index=True,
+    )
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True,
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    http_status: Mapped[int | None] = mapped_column(Integer)
+    outcome: Mapped[str] = mapped_column(String(30), default="started", index=True)
+    duration_ms: Mapped[float | None] = mapped_column(Float)
+
+    events: Mapped[list[RuntimeLogEventRecord]] = relationship(
+        back_populates="request",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="RuntimeLogEventRecord.sequence",
+    )
+
+
+class RuntimeLogEventRecord(Base):
+    """Persist an ordered, content-free execution event."""
+
+    __tablename__ = "runtime_log_events"
+
+    request_id: Mapped[str] = mapped_column(
+        ForeignKey("runtime_logs.request_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    sequence: Mapped[int] = mapped_column(Integer, primary_key=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    event: Mapped[str] = mapped_column(String(50))
+    severity: Mapped[str] = mapped_column(String(10))
+    stage: Mapped[str] = mapped_column(String(20))
+    outcome: Mapped[str] = mapped_column(String(30))
+    duration_ms: Mapped[float | None] = mapped_column(Float)
+    tool_name: Mapped[str | None] = mapped_column(String(200))
+    reason_code: Mapped[str | None] = mapped_column(String(100))
+
+    request: Mapped[RuntimeLogRecord] = relationship(back_populates="events")

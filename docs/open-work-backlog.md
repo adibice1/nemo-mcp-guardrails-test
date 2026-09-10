@@ -382,10 +382,30 @@ Next implementation slice:
 
 ### 11. Audit, Analytics, And Caching
 
-Future enhancements:
+Implemented foundation (2026-09-09):
+
+- Added ORM models for runtime request metadata and ordered execution events.
+- Request-level recording now saves HTTP status, runtime outcome, verified
+  app identity, timestamps, duration, and two request lifecycle events.
+- Execution-event collection records call boundaries, rail decisions, tool
+  guard decisions, and skipped stages without raw content.
+- Offline collector tests cover isolation, privacy, limits, and late callbacks.
+- Admin-only runtime-log list/detail endpoints expose metadata and ordered
+  events through management JWT authentication.
+- Isolated HTTP endpoint tests cover authorization, filters, pagination,
+  validation, and safe response fields.
+- The admin Logs list/detail screens display metadata and execution events,
+  with app/outcome filters, refresh, pagination, and dark-mode styling.
+
+Remaining work:
 
 - Conversation/action audit views.
-- Runtime event logging.
+- Stack the Logs filters on narrow screens; the selected text is cramped.
+  This correction awaits code-preview approval.
+- Log retention and automated frontend regression coverage.
+- PostgreSQL integration verification for the log-reading endpoints.
+- HTTP recorder regression tests for request isolation, error paths, and
+  exclusion of secrets. Record observed events, not private model reasoning.
 - Redis cache for compiled app policy bundles.
 - Background workers for compilation and invalidation.
 

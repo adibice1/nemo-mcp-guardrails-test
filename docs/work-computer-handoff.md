@@ -1,5 +1,54 @@
 # Work/Home Computer Handoff
 
+## Runtime Logging Foundation - 2026-09-09
+
+- Added `RuntimeLogRecord` and `RuntimeLogEventRecord` to the ORM models.
+- `runtime_logs` holds request metadata; `runtime_log_events` holds ordered
+  execution events. Neither table has fields for prompts, responses,
+  credentials, tool arguments, or private model reasoning.
+- Deleting an app preserves its logs with a null app reference. Deleting a
+  runtime log removes its associated events.
+- No database migration or deployment was run for this change. The existing
+  API startup creates the missing tables when the updated backend runs.
+- Request-level recording now covers POST `/v1/guardrails/run`, including
+  rejected requests and handled runtime outcomes. App identity is attached
+  only after successful authentication, using the existing request ID.
+- Request lifecycle events bracket observed rail, agent, and tool events.
+  Classifier verdicts are distinct from call return/exception events.
+  Unreached stages receive `not_run` markers.
+- Each capture retains at most 256 detailed events, plus bounded truncation,
+  skipped-stage, and request lifecycle markers.
+  Persistence runs after the downstream request completes; forced process
+  termination can lose an in-flight log. A failed write emits metadata-only
+  JSON to backend logs without retrying the agent or tools.
+- `tests/test_runtime_events.py` provides offline collector regression checks.
+- Admin-only `GET /runtime-logs` returns paginated request metadata with
+  optional app/outcome filters. `GET /runtime-logs/{request_id}` returns
+  ordered execution events. Both use management JWT authentication.
+- Lists default to 25 records, cap at 100, and limit offsets to 10000.
+  They return `has_more` without a total-count query.
+- `tests/test_runtime_logs_http.py` checks access and query behaviour using
+  an isolated in-memory database and real management tokens.
+- The admin-only frontend `/logs` screen lists requests with app/outcome
+  filters, manual refresh, and 25-record pagination. `/logs/[requestId]`
+  displays metadata and ordered execution events using UTC timestamps.
+- Frontend log requests are cancellable and are not persisted in browser
+  storage. Successful API responses remain `no-store`.
+- The shared API client ignores stale authentication failures from an old
+  session when a different management session has already been established.
+- Frontend verification on 2026-09-10: TypeScript and scoped Next ESLint
+  checks passed. Temporary headless Edge tests with synthetic API responses
+  passed pagination, filtering, details, empty/error/retry states, cancellation,
+  and admin/developer/anonymous access checks. Inline API-client checks passed
+  stale/current 401 handling and session preservation after a 503.
+  Screenshots were inspected at desktop and narrow mobile sizes; mobile filter
+  values are cramped and a stacked-filter correction awaits preview approval.
+  These checks did not contact PostgreSQL, Azure, or GitHub and are not yet
+  committed regression tests. No production image build or deployment ran.
+- Retention, PostgreSQL endpoint verification, HTTP recorder regression
+  coverage, and automated frontend regression coverage remain unfinished.
+  Preview their code before edits.
+
 ## Current Deployment Milestone - 2026-08-28
 
 The backend and frontend are ready to be built as separate Linux AMD64 images

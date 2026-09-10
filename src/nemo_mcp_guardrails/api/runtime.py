@@ -1,7 +1,7 @@
 import os
 from dataclasses import dataclass
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from nemo_mcp_guardrails.api.auth import require_authenticated_app
@@ -415,6 +415,7 @@ def _store_conversation_turns(
 @router.post("/run", response_model=GuardrailsRunResponse)
 async def run_guardrails(
     payload: GuardrailsRunRequest,
+    request: Request,
     app: AppRecord = Depends(require_authenticated_app),
     db: Session = Depends(get_db),
 ) -> GuardrailsRunResponse:
@@ -441,6 +442,7 @@ async def run_guardrails(
         ],
         blocked_output_phrases=runtime_parts.blocked_output_phrases,
     )
+    request.state.gms_runtime_outcome = execution_result.status
     block_explanation = _block_explanation(
         message=payload.message,
         runtime_parts=runtime_parts,

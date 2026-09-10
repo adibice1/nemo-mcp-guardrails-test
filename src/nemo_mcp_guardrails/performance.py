@@ -8,6 +8,7 @@ from uuid import uuid4
 from starlette.datastructures import MutableHeaders
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from nemo_mcp_guardrails.runtime_events import record_runtime_event
 
 _LOGGER = logging.getLogger("uvicorn.error.gms.performance")
 _STAGE_TIMINGS: ContextVar[list[tuple[str, float]] | None] = ContextVar(
@@ -17,18 +18,36 @@ _STAGE_TIMINGS: ContextVar[list[tuple[str, float]] | None] = ContextVar(
 
 @contextmanager
 def measure_stage(name: str) -> Iterator[None]:
-    """Record an internal stage duration without inspecting request data."""
-
+    """Record timings and observed call boundaries without request content."""
     timings = _STAGE_TIMINGS.get()
-    if timings is None:
-        yield
-        return
-
+    stage = {
+        "input_rail": "input",
+        "agent_tools": "agent",
+        "output_rail": "output",
+        "output_phrase_check": "output",
+    }.get(name)
     started = perf_counter()
+
+    if stage:
+        record_runtime_event(f"{name}.started", stage, "started")
     try:
         yield
+    except BaseException:
+        if stage:
+            record_runtime_event(
+                f"{name}.raised", stage, "raised",
+                duration_ms=(perf_counter() - started) * 1000,
+            )
+        raise
+    else:
+        if stage:
+            record_runtime_event(
+                f"{name}.returned", stage, "returned",
+                duration_ms=(perf_counter() - started) * 1000,
+            )
     finally:
-        timings.append((name, (perf_counter() - started) * 1000))
+        if timings is not None:
+            timings.append((name, (perf_counter() - started) * 1000))
 
 
 class RequestTimingMiddleware:
@@ -49,6 +68,7 @@ class RequestTimingMiddleware:
             return
 
         request_id = uuid4().hex
+        scope.setdefault("state", {})["gms_request_id"] = request_id
         timings: list[tuple[str, float]] = []
         token = _STAGE_TIMINGS.set(timings)
         started = perf_counter()
