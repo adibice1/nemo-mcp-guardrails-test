@@ -1,6 +1,11 @@
 # nemo-mcp-guardrails-test
 testing nemo on github mcp
 
+Latest resume point (2026-09-11): read [the work/home handover](work-computer-handoff.md)
+first. Logs/mobile filters and manual retention are implemented; the password
+lifecycle schema is previewed only and awaiting approval. The handover records
+uncommitted files, test limits, and the agreed next password workflow.
+
 Start with `target-architecture.md` for the confirmed production direction and
 terminology. Target `app` means a client application consuming the GMS, while
 target `connector` means GitHub MCP, SharePoint, Outlook, or another external

@@ -45,7 +45,7 @@ export default function LogsPage() {
   return (
     <LogsLayout title="Logs">
       <div className="mt-8 flex flex-wrap items-end gap-4">
-        <label className="min-w-0 flex-1 text-sm font-semibold sm:max-w-xs">
+        <label className="w-full min-w-0 flex-none text-sm font-semibold sm:max-w-xs sm:flex-1">
           App
           <select
             className="detail-input mt-2"
@@ -61,7 +61,7 @@ export default function LogsPage() {
             ))}
           </select>
         </label>
-        <label className="min-w-0 flex-1 text-sm font-semibold sm:max-w-xs">
+        <label className="w-full min-w-0 flex-none text-sm font-semibold sm:max-w-xs sm:flex-1">
           Outcome
           <select
             className="detail-input mt-2 capitalize"

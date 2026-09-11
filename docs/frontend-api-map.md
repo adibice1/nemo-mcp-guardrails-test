@@ -130,7 +130,7 @@ until its executable runtime workflow is implemented.
 
 The Login screen uses real management identities. Public signup is disabled:
 GMS administrators create user accounts from the admin-only User Management
-screen, then issue a one-time temporary password.
+screen, then issue a generated temporary password displayed once.
 
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
@@ -159,7 +159,7 @@ temporary-password reset, and app links.
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
 | `GET` | `/management-users` | Admin list of all GMS users |
-| `POST` | `/management-users` | Admin-created user with one-time temporary password |
+| `POST` | `/management-users` | Admin-created user with a temporary password displayed once |
 | `PUT` | `/management-users/{user_id}` | Update system role or enabled/blocked state |
 | `DELETE` | `/management-users/{user_id}` | Delete one user and their app links; admins cannot delete their own current account |
 | `POST` | `/management-users/{user_id}/password` | Generate a replacement temporary password |
@@ -169,6 +169,20 @@ temporary-password reset, and app links.
 
 Temporary passwords are returned only in the create/reset responses. Admins
 must copy them before closing the notice.
+
+### Pending Password Lifecycle - 2026-09-11
+
+The existing reset endpoint accepts developer and admin targets. One-time
+display does not imply credential expiry, forced replacement, or JWT revocation;
+these are not implemented. No self-service password-change endpoint exists yet.
+
+The agreed next flow requires recipients to replace generated credentials
+before normal GMS access, with backend-enforced restrictions. Settings will
+also support voluntary changes after current-password verification. Admin
+reset remains the fallback for forgotten passwords. Endpoint paths and payloads
+for the new flow are not finalized; do not wire frontend calls to assumed APIs.
+The schema-only first preview is still awaiting approval. See
+`work-computer-handoff.md` and section 6 of `open-work-backlog.md`.
 
 ## Apps
 

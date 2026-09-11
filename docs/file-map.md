@@ -18,6 +18,9 @@ excluded.
 | Policies are missing, duplicated, or assigned to the wrong app | `src/nemo_mcp_guardrails/database/policy_loader.py`, `src/nemo_mcp_guardrails/policy_service.py`, `src/nemo_mcp_guardrails/api/apps.py` |
 | Compiled NeMo rule is stale or incorrect | `src/nemo_mcp_guardrails/policy_rule_service.py`, `src/nemo_mcp_guardrails/policy_compiler.py`, `src/nemo_mcp_guardrails/prompt_rule_compiler.py` |
 | Runtime returns an incorrect status or a 500 | `src/nemo_mcp_guardrails/api/runtime.py`, `src/nemo_mcp_guardrails/guarded_execution.py` |
+| Runtime logs are missing or look wrong | `src/nemo_mcp_guardrails/runtime_logging.py`, `src/nemo_mcp_guardrails/runtime_events.py`, `src/nemo_mcp_guardrails/api/runtime_logs.py`, `frontend/app/logs/` |
+| Retention preview/deletion is wrong | `scripts/cleanup_runtime_logs.py`, `tests/test_runtime_logs_http.py` |
+| Password reset or planned first-login setup | `src/nemo_mcp_guardrails/api/management_users.py`, `src/nemo_mcp_guardrails/api/management_auth.py`, `docs/work-computer-handoff.md` |
 | App credentials are rejected | `src/nemo_mcp_guardrails/api/auth.py`, `src/nemo_mcp_guardrails/app_auth.py` |
 | MCP action is incorrectly allowed or blocked | `src/nemo_mcp_guardrails/tool_guard.py`, `src/nemo_mcp_guardrails/runtime_factory.py` |
 | Output text is incorrectly allowed or blocked | `src/nemo_mcp_guardrails/output_guard.py`, `src/nemo_mcp_guardrails/guarded_execution.py`, `config/prompts.yml` |
@@ -39,6 +42,8 @@ excluded.
 - `src/nemo_mcp_guardrails/policy_service.py` - Canonicalizes policies and resolves equivalent, reusable, or duplicate definitions.
 - `src/nemo_mcp_guardrails/prompt_rule_compiler.py` - Injects app-scoped compiled DB rules into the NeMo prompt configuration.
 - `src/nemo_mcp_guardrails/runtime_factory.py` - Builds app-scoped LLMs, NeMo rails, connector credentials, GitHub MCP tools, and the agent.
+- `src/nemo_mcp_guardrails/runtime_events.py` - Captures bounded request-scoped execution metadata without raw content or private reasoning.
+- `src/nemo_mcp_guardrails/runtime_logging.py` - Records runtime HTTP lifecycle and execution events independently of runtime transactions.
 - `src/nemo_mcp_guardrails/tool_guard.py` - Blocks restricted MCP calls before execution, including custom-resource argument matching.
 - `src/nemo_mcp_guardrails/helper/__init__.py` - Marks the helper directory as a Python package.
 - `src/nemo_mcp_guardrails/helper/utility.py` - Reserved helper module; it currently contains no implementation.
@@ -52,6 +57,8 @@ excluded.
 - `src/nemo_mcp_guardrails/api/management_auth_schemas.py` - Defines management authentication request, user, and token response schemas.
 - `src/nemo_mcp_guardrails/api/runtime.py` - Implements authenticated auth-check/run endpoints, history trimming/storage, and runtime response assembly.
 - `src/nemo_mcp_guardrails/api/runtime_schemas.py` - Defines runtime conversation, request, and response Pydantic models.
+- `src/nemo_mcp_guardrails/api/runtime_logs.py` - Provides admin-only filtered log lists and ordered request-event details.
+- `src/nemo_mcp_guardrails/api/runtime_log_schemas.py` - Defines metadata-only log list/detail responses.
 - `src/nemo_mcp_guardrails/api/llm_configs.py` - Lists and creates Azure LLM configuration metadata without exposing credential references.
 - `src/nemo_mcp_guardrails/api/policies.py` - Implements reusable policy CRUD, compile preview, and compiled-rule refresh endpoints.
 - `src/nemo_mcp_guardrails/api/policy_schemas.py` - Defines policy, assignment-resolution, metadata, test-case, and compile-response schemas.
@@ -84,12 +91,16 @@ excluded.
 - `frontend/app/apps/page.tsx` - Loads, creates, deletes, sorts, and paginates the user's client applications.
 - `frontend/app/apps/[clientId]/page.tsx` - Loads one app and coordinates its overview, connectors, LLM, policies, and runtime tabs.
 - `frontend/app/user-management/page.tsx` - Lets system admins create users, reset temporary passwords, and link users to apps.
+- `frontend/app/logs/page.tsx` - Lists runtime logs with app/outcome filters, refresh, pagination, and stacked mobile filters.
+- `frontend/app/logs/[requestId]/page.tsx` - Displays request metadata and ordered execution events for administrators.
 - `frontend/app/settings/page.tsx` - Wraps the account settings form in the shared GMS navigation/layout.
 - `frontend/app/api/gms/[...path]/route.ts` - Proxies same-origin frontend API requests to FastAPI using the runtime server URL.
 
 ## Frontend Components
 
-- `frontend/components/shared/app-top-nav.tsx` - Renders the shared Apps, Policies, admin-only User Management, and Settings navigation.
+- `frontend/components/shared/app-top-nav.tsx` - Renders shared navigation including admin-only User Management and Logs.
+- `frontend/components/logs/use-admin-log-data.ts` - Loads admin data with cancellation, retry, and stale-session protection.
+- `frontend/components/logs/log-ui.tsx` - Supplies the Logs layout, outcome badges, and UTC/duration formatting.
 - `frontend/components/shared/auth-illustration.tsx` - Renders the decorative login/signup illustration.
 - `frontend/components/shared/form-field.tsx` - Provides the reusable labeled authentication form field.
 - `frontend/components/policies/create-policy-modal.tsx` - Implements the input/output policy builder and cascading dropdown UI.
@@ -136,12 +147,15 @@ excluded.
 - `docs/containerisation.md` - Documents direct image builds, local verification,
   ACR publishing, and the public-frontend-80/private-backend-8000 ACI layout.
 - `scripts/run_api.py` - Starts the FastAPI/Uvicorn development server.
+- `scripts/cleanup_runtime_logs.py` - Previews or explicitly deletes one batch of up to 500 expired completed requests and their events.
 - `scripts/migrate_management_auth.py` - Adds the system-wide developer/admin role to existing user tables.
 - `scripts/backfill_existing_app_users.py` - Idempotently links existing demo users to pre-RBAC apps.
 - `AGENTS.md` - Stores project terminology, current architecture, safety rules, and agent handoff instructions.
 
 ## Tests, Scripts, And Deeper Explanations
 
+- `tests/test_runtime_events.py` - Checks event isolation, privacy, capture limits, and late callbacks offline.
+- `tests/test_runtime_logs_http.py` - Checks log access/query behavior and retention against an isolated SQLite database.
 - Use `docs/testing-notes.md` for test/debug scripts and their commands.
 - `tests/test_management_rbac_http.py` proves admin-created apps, developer isolation, app-developer links, and system-admin overrides.
 - Use `docs/policy-schema-design.md` for schema and migration details.

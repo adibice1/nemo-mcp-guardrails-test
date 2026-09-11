@@ -198,6 +198,22 @@ def main() -> None:
                     db.get(UserRecord, admin_id).enabled = False
                     db.commit()
                 assert client.get("/runtime-logs", headers=admin).status_code == 401
+            from pathlib import Path
+            from runpy import run_path
+            cleanup = run_path(str(Path(__file__).resolve().parents[1] / "scripts/cleanup_runtime_logs.py"))["cleanup"]
+            with sessions.begin() as db:
+                db.get(RuntimeLogRecord, first_id).completed_at = timestamp.replace(year=2020)
+                db.get(RuntimeLogRecord, anonymous_id).completed_at = None
+            with sessions.begin() as db:
+                assert cleanup(db, timestamp.replace(year=2020), True) == 0
+                assert cleanup(db, timestamp) == 1
+                assert db.query(RuntimeLogRecord).count() == 3
+                assert cleanup(db, timestamp, True) == 1
+            with sessions.begin() as db:
+                assert {row.request_id for row in db.query(RuntimeLogRecord)} == {second_id, anonymous_id}
+                assert db.query(RuntimeLogEventRecord).filter_by(request_id=first_id).count() == 0
+                assert db.query(RuntimeLogEventRecord).count() == 4
+                assert cleanup(db, timestamp, True) == 0
         finally:
             app.dependency_overrides.clear()
             engine.dispose()

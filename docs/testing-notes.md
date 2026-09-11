@@ -1,5 +1,45 @@
 # Testing Notes
 
+## Logging And Retention Handoff - 2026-09-11
+
+Run from the repository root in PowerShell:
+
+```powershell
+.\.venv\Scripts\python.exe tests\test_runtime_events.py
+.\.venv\Scripts\python.exe tests\test_runtime_logs_http.py
+.\.venv\Scripts\python.exe -m py_compile scripts\cleanup_runtime_logs.py tests\test_runtime_logs_http.py
+```
+
+These checks passed in the preceding implementation turn. The event suite
+contains six checks. The HTTP test uses isolated SQLite and real management
+JWTs, and now also checks retention dry-run, cutoff preservation, unfinished
+requests, event deletion, and repeat invocation. An additional temporary inline
+test, not a committed test file, checked 501 requests with SQLite foreign keys
+enabled: the 500-row batch cap, request/event rollback, and subsequent batches.
+
+The cleanup command uses the real database selected by `.env`/`DATABASE_URL`:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\cleanup_runtime_logs.py --days 30
+```
+
+Without `--apply` this is read-only and reports at most one batch of 500.
+With `--apply` it permanently deletes that batch and associated events in one
+transaction. It uses completion time, retains null/exact-cutoff values, and
+accepts 1-3650 days. Do not run apply on production or shorten retention merely
+to produce a deletion during testing. Use a dedicated test database/fixtures.
+No real cleanup has been performed by the agent; PostgreSQL behavior and Azure
+scheduling remain unverified. Thirty days is a default, not an approved
+organisation-wide retention requirement.
+
+Frontend synthetic-response checks passed for Logs workflows; the mobile filter
+fix additionally passed layout checks at 320/390/1440 pixels. These browser
+checks are not committed regression tests. The user reported their local tests
+looked fine, but detailed PostgreSQL verification evidence was not supplied.
+
+The password lifecycle is still a pending schema-only preview. Do not try to
+run `tests/test_password_lifecycle_schema.py` yet: it has not been created.
+
 ## Target Runtime Note
 
 The current scripts test one GitHub prototype path. The confirmed production

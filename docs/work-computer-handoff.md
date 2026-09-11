@@ -1,5 +1,72 @@
 # Work/Home Computer Handoff
 
+## Resume Here - 2026-09-11
+
+The current priority is the password lifecycle, not further retention work.
+This handover update is documentation-only. The password Stage 1 code was
+previewed in chat but has NOT been approved or applied; no password migration
+has run. Do not interpret the request to update docs as code approval.
+
+Confirmed workflow for developers and administrators:
+
+1. An admin creates an account and GMS generates its temporary password.
+2. The recipient uses it to choose a personal password before accessing normal
+   GMS features. The backend must enforce this restricted setup flow.
+3. An admin can regenerate a temporary password for a forgotten password;
+   the recipient repeats the required replacement step.
+4. Users who know their password can change it voluntarily through Settings
+   by verifying their current password.
+
+Already implemented: User Management's Reset Password action and
+`POST /management-users/{user_id}/password` can target either role. The secret
+is displayed only once, but that does NOT currently make it single-use or
+expiring. Required replacement, self-service change, and invalidation of old
+JWTs after a password reset are not implemented.
+
+Pending Stage 1 preview (schema only):
+
+- Add `UserRecord.must_change_password` with false defaults,
+  `temporary_password_expires_at` as nullable timezone-aware datetime, and
+  `session_version` with zero defaults in `database/models.py`.
+- Extend `scripts/migrate_management_auth.py` with idempotent PostgreSQL
+  column additions; leave existing passwords/accounts unchanged.
+- Add `tests/test_password_lifecycle_schema.py`, an isolated SQLite defaults
+  check for both roles. This file does not exist yet.
+- Once approved, migrate an existing database before starting backend code
+  that expects these columns. Schema defaults alone enforce nothing.
+
+Later stages must cover authenticated change/setup APIs, restricted temporary
+sessions, expiry, atomic password/version updates, validation of JWT versions
+on every protected management request, and frontend first-login/Settings
+screens. Account creation and admin reset must set required replacement and
+expiry explicitly; replacing or resetting credentials must invalidate prior
+sessions. Include negative tests for direct-API bypass and both user roles.
+
+Security direction discussed: random temporary credentials, approved secure
+delivery and verified reset requesters, password-only minimum length of 15,
+support for at least 64 characters, common/compromised-password blocking,
+rate limiting, reviewed salted password hashing, HTTPS, and metadata-only
+account audit events. Do not add arbitrary composition rules or routine
+password rotation. These controls are targets, not a compliance claim.
+Temporary expiry duration and production throttling/deployment details still
+need selection. MFA for admins is a production priority. Email recovery and
+notifications remain unimplemented; recovery for the only admin is unresolved.
+
+Reference guidance discussed in chat:
+- [NIST password requirements](https://pages.nist.gov/800-63-4/sp800-63b/authenticators/)
+- [OWASP recovery guidance](https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html)
+
+Preview every proposed code file in the final chat response using unified
+diffs, filename/line references, and a per-file summary. Wait for approval
+before non-doc edits. Do not create preview markdown files. List commands run
+in the final response; never expose `.env` values or passwords.
+
+Before moving machines, review `git status --short`: the mobile-filter/docs
+changes, retention-test additions, and new `scripts/cleanup_runtime_logs.py`
+are still uncommitted at handover. The cleanup script is untracked and must
+be included when the user chooses to commit/transfer this work. No commit,
+image rebuild, registry push, or Azure deployment was performed here.
+
 ## Runtime Logging Foundation - 2026-09-09
 
 - Added `RuntimeLogRecord` and `RuntimeLogEventRecord` to the ORM models.
@@ -41,11 +108,27 @@
   passed pagination, filtering, details, empty/error/retry states, cancellation,
   and admin/developer/anonymous access checks. Inline API-client checks passed
   stale/current 401 handling and session preservation after a 503.
-  Screenshots were inspected at desktop and narrow mobile sizes; mobile filter
-  values are cramped and a stacked-filter correction awaits preview approval.
+  Screenshots were inspected at desktop and narrow mobile sizes; cramped mobile
+  filter values were identified. The approved correction was applied on
+  2026-09-11: App and Outcome filters stack below the `sm` breakpoint while
+  preserving the side-by-side desktop layout.
+  The correction passed TypeScript, scoped ESLint, and isolated headless Edge
+  layout checks at 320, 390, and 1440 pixels, with screenshots inspected.
   These checks did not contact PostgreSQL, Azure, or GitHub and are not yet
   committed regression tests. No production image build or deployment ran.
-- Retention, PostgreSQL endpoint verification, HTTP recorder regression
+- Manual retention: `python scripts/cleanup_runtime_logs.py --days 30`
+  previews up to 500 expired completed requests; add `--apply` to delete
+  those requests and their events. Repeat for further batches. No scheduler.
+  Age uses `completed_at < UTC cutoff`; null completion times and exact-cutoff
+  records are retained. `--days` accepts 1 through 3650, defaulting to 30.
+  Do not shorten retention just to force deletion of real logs during testing.
+- Retention verification (2026-09-11): `tests/test_runtime_logs_http.py`
+  passed with dry-run, cutoff, unfinished-request, and event-cleanup checks;
+  all six `tests/test_runtime_events.py` checks passed. An additional inline
+  SQLite test with foreign keys enabled verified the 500-request cap,
+  rollback of request/event deletion, and repeated batches. No cleanup was
+  run against the real database; PostgreSQL retention verification is pending.
+- Scheduled retention, PostgreSQL endpoint verification, HTTP recorder regression
   coverage, and automated frontend regression coverage remain unfinished.
   Preview their code before edits.
 
