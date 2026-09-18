@@ -419,7 +419,9 @@ Implemented foundation (2026-09-09):
 
 Remaining work:
 
-- Conversation/action audit views.
+- User Logs: implement request-linked capture, admin-only content APIs, and
+  Traffic Logs / User Logs sub-tabs. Storage alone does not record messages.
+- Keep suppressed output, private reasoning, and credentials out of log exports.
 - Schedule and verify the manual retention command in Azure; add automated frontend regression coverage.
 - PostgreSQL integration verification for the log-reading endpoints.
 - PostgreSQL retention verification using disposable fixtures, including

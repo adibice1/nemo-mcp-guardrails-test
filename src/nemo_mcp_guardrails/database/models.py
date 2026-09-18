@@ -672,6 +672,9 @@ class RuntimeLogRecord(Base):
     http_status: Mapped[int | None] = mapped_column(Integer)
     outcome: Mapped[str] = mapped_column(String(30), default="started", index=True)
     duration_ms: Mapped[float | None] = mapped_column(Float)
+    user_log: Mapped[RuntimeUserLogRecord | None] = relationship(
+        cascade="all, delete-orphan", passive_deletes=True,
+    )
 
     events: Mapped[list[RuntimeLogEventRecord]] = relationship(
         back_populates="request",
@@ -701,3 +704,16 @@ class RuntimeLogEventRecord(Base):
     reason_code: Mapped[str | None] = mapped_column(String(100))
 
     request: Mapped[RuntimeLogRecord] = relationship(back_populates="events")
+
+
+class RuntimeUserLogRecord(Base):
+    """Store submitted input and the final user-visible response per request."""
+
+    __tablename__ = "runtime_user_logs"
+
+    request_id: Mapped[str] = mapped_column(
+        ForeignKey("runtime_logs.request_id", ondelete="CASCADE"), primary_key=True,
+    )
+    conversation_id: Mapped[str | None] = mapped_column(Text)
+    input_text: Mapped[str] = mapped_column(Text)
+    response_text: Mapped[str | None] = mapped_column(Text)

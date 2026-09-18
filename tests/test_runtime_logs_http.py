@@ -29,6 +29,7 @@ def main() -> None:
             Base,
             LlmConfigRecord,
             RuntimeLogEventRecord,
+            RuntimeUserLogRecord,
             RuntimeLogRecord,
             UserRecord,
         )
@@ -40,12 +41,15 @@ def main() -> None:
             poolclass=StaticPool,
         )
         sessions = sessionmaker(bind=engine, expire_on_commit=False)
+        with engine.connect() as connection:
+            connection.exec_driver_sql("PRAGMA foreign_keys=ON")
         Base.metadata.create_all(engine, tables=[
             UserRecord.__table__,
             LlmConfigRecord.__table__,
             AppRecord.__table__,
             RuntimeLogRecord.__table__,
             RuntimeLogEventRecord.__table__,
+            RuntimeUserLogRecord.__table__,
         ])
         app = FastAPI()
         app.include_router(router)
@@ -106,6 +110,12 @@ def main() -> None:
                         outcome=outcome,
                         duration_ms=10,
                     )
+                    if request_id != anonymous_id:
+                        record.user_log = RuntimeUserLogRecord(
+                            conversation_id="shared-conversation",
+                            input_text=f"private-input-{request_id}",
+                            response_text=f"private-response-{request_id}",
+                        )
                     record.events = [
                         RuntimeLogEventRecord(
                             sequence=sequence,
@@ -208,11 +218,15 @@ def main() -> None:
                 assert cleanup(db, timestamp.replace(year=2020), True) == 0
                 assert cleanup(db, timestamp) == 1
                 assert db.query(RuntimeLogRecord).count() == 3
+                assert db.query(RuntimeUserLogRecord).count() == 2
                 assert cleanup(db, timestamp, True) == 1
             with sessions.begin() as db:
                 assert {row.request_id for row in db.query(RuntimeLogRecord)} == {second_id, anonymous_id}
                 assert db.query(RuntimeLogEventRecord).filter_by(request_id=first_id).count() == 0
                 assert db.query(RuntimeLogEventRecord).count() == 4
+                assert db.get(RuntimeUserLogRecord, first_id) is None
+                assert db.query(RuntimeUserLogRecord).count() == 1
+                assert db.get(RuntimeUserLogRecord, second_id).input_text == f"private-input-{second_id}"
                 assert cleanup(db, timestamp, True) == 0
         finally:
             app.dependency_overrides.clear()

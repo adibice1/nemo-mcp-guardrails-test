@@ -1,5 +1,16 @@
 # Work/Home Computer Handoff
 
+## User Logs Foundation - 2026-09-18
+- Current priority: Traffic Logs / User Logs sub-tabs; password work is paused.
+- Storage foundation only: runtime_user_logs links input/final response to a
+  traffic request. Existing API startup creates the new table; no backfill.
+- Capture, admin-only content APIs, UI, and PostgreSQL verification remain pending.
+- Verification: the isolated `tests/test_runtime_logs_http.py` passed with
+  SQLite foreign keys enabled, covering traffic-response content exclusion,
+  dry-run preservation, and cascading retention deletion of message pairs.
+  All six `tests/test_runtime_events.py` checks and Python compilation passed.
+  No real database migration, live message capture, or deployment was run.
+
 ## Resume Here - 2026-09-11
 
 The current priority is the password lifecycle, not further retention work.
