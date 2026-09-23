@@ -475,6 +475,7 @@ export function listRuntimeLogs(
   filters: {
     appId?: number;
     outcome?: RuntimeLogOutcome;
+    userContentOnly?: boolean;
     offset: number;
   },
   signal?: AbortSignal
@@ -487,6 +488,7 @@ export function listRuntimeLogs(
     query.set("app_id", String(filters.appId));
   }
   if (filters.outcome) query.set("outcome", filters.outcome);
+  if (filters.userContentOnly) query.set("user_content_only", "true");
   return apiRequest<RuntimeLogPage>(`/runtime-logs?${query}`, { signal });
 }
 
@@ -495,6 +497,15 @@ export function getRuntimeLog(requestId: string, signal?: AbortSignal) {
     `/runtime-logs/${encodeURIComponent(requestId)}`,
     { signal }
   );
+}
+
+export function getRuntimeUserLog(requestId: string, signal?: AbortSignal) {
+  return apiRequest<{
+    request_id: string;
+    conversation_id: string | null;
+    input_text: string;
+    response_text: string | null;
+  }>(`/runtime-logs/${encodeURIComponent(requestId)}/user-content`, { signal });
 }
 
 export function listAppSummaries() {

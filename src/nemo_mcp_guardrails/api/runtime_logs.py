@@ -6,6 +6,7 @@ from nemo_mcp_guardrails.api.runtime_log_schemas import (
     RuntimeLogDetailRead,
     RuntimeLogPageRead,
     RuntimeLogRead,
+    RuntimeUserLogRead,
     RuntimeOutcome,
 )
 from nemo_mcp_guardrails.database.connection import get_db
@@ -25,6 +26,7 @@ def list_runtime_logs(
     response: Response,
     app_id: int | None = Query(default=None, ge=1),
     outcome: RuntimeOutcome | None = Query(default=None),
+    user_content_only: bool = Query(default=False),
     limit: int = Query(default=25, ge=1, le=100),
     offset: int = Query(default=0, ge=0, le=10000),
     db: Session = Depends(get_db),
@@ -32,6 +34,8 @@ def list_runtime_logs(
     """List runtime requests across apps for an authenticated administrator."""
     response.headers["Cache-Control"] = "no-store"
     query = select(RuntimeLogRecord)
+    if user_content_only:
+        query = query.where(RuntimeLogRecord.user_log.has())
     if app_id is not None:
         query = query.where(RuntimeLogRecord.app_id == app_id)
     if outcome is not None:
@@ -70,3 +74,21 @@ def get_runtime_log(
     if record is None:
         raise HTTPException(status_code=404, detail="Runtime log not found")
     return RuntimeLogDetailRead.model_validate(record)
+
+
+@router.get("/{request_id}/user-content", response_model=RuntimeUserLogRead)
+def get_runtime_user_log(
+    response: Response,
+    request_id: str = Path(pattern=r"^[0-9a-f]{32}$"),
+    db: Session = Depends(get_db),
+) -> RuntimeUserLogRead:
+    """Read captured message content for an authenticated administrator."""
+    response.headers["Cache-Control"] = "no-store"
+    record = db.scalar(
+        select(RuntimeLogRecord)
+        .where(RuntimeLogRecord.request_id == request_id)
+        .options(selectinload(RuntimeLogRecord.user_log))
+    )
+    if record is None or record.user_log is None:
+        raise HTTPException(status_code=404, detail="User log not found")
+    return RuntimeUserLogRead.model_validate(record.user_log)

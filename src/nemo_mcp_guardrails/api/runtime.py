@@ -420,6 +420,11 @@ async def run_guardrails(
     db: Session = Depends(get_db),
 ) -> GuardrailsRunResponse:
     """Execute one authenticated request through the guarded runtime."""
+    request.state.gms_user_log = {
+        "conversation_id": payload.conversation_id,
+        "input_text": payload.message,
+        "response_text": None,
+    }
 
     with measure_stage("history_load"):
         history_context = _build_runtime_history_context(payload, app.id, db)
@@ -464,7 +469,7 @@ async def run_guardrails(
 
     debug_enabled = _runtime_debug_enabled()
 
-    return GuardrailsRunResponse(
+    response = GuardrailsRunResponse(
         status=execution_result.status,
         app_id=app.id,
         client_id=app.client_id,
@@ -514,3 +519,5 @@ async def run_guardrails(
             else None
         ),
     )
+    request.state.gms_user_log["response_text"] = response.response
+    return response

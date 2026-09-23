@@ -1,15 +1,46 @@
 # Work/Home Computer Handoff
 
-## User Logs Foundation - 2026-09-18
+## User Logs Capture - 2026-09-23
 - Current priority: Traffic Logs / User Logs sub-tabs; password work is paused.
-- Storage foundation only: runtime_user_logs links input/final response to a
+- Storage foundation: runtime_user_logs links input/final response to a
   traffic request. Existing API startup creates the new table; no backfill.
-- Capture, admin-only content APIs, UI, and PostgreSQL verification remain pending.
+- Capture now links authenticated input and the final response to traffic logs,
+  including requests without conversation IDs. Failed requests retain a null
+  response; unauthenticated/invalid-body requests do not capture message content.
+- Content is excluded from the persistence-failure logger, but submitted text
+  may itself contain sensitive information. Admins can retrieve captured content
+  through GET /runtime-logs/{request_id}/user-content. UI and PostgreSQL checks remain pending.
+- GET /runtime-logs?user_content_only=true lists only requests with captured
+  content, retaining app/outcome filters and pagination without returning text.
+- The Logs page now switches between Traffic Logs and User Logs using that filter.
+  User Log rows show captured input and final response above execution details.
+- User Log detail verification: TypeScript and targeted lint passed; the
+  `?view=user` route returned HTTP 200. Temporary inline render checks passed
+  for content fetching only in user mode, abort-signal propagation, escaped
+  text, null/empty responses, traffic-mode exclusion, and error rendering.
+  These mocked checks are not permanent tests or authenticated browser checks.
+  The detail page's Logs link still returns to the default Traffic Logs view.
+- Frontend tab verification: TypeScript and targeted ESLint checks passed.
+  `/logs` returned HTTP 200 with both tab labels on the local dev server at
+  port 3001. The standard lint script prompted for configuration; targeted lint
+  used the installed ESLint API with `next/core-web-vitals` without adding files.
+  Desktop/mobile visual checks and authenticated switching remain unverified:
+  the in-app browser connection failed and no local Playwright runner was installed.
 - Verification: the isolated `tests/test_runtime_logs_http.py` passed with
   SQLite foreign keys enabled, covering traffic-response content exclusion,
   dry-run preservation, and cascading retention deletion of message pairs.
+  The content endpoint also passed real-JWT access checks, exact response-field
+  and no-store checks, and 404 checks for missing requests or absent content.
+  The user-content-only listing passed filtering, pagination, empty-result,
+  invalid-boolean, no-store, and message-content exclusion checks in SQLite.
   All six `tests/test_runtime_events.py` checks and Python compilation passed.
-  No real database migration, live message capture, or deployment was run.
+  All four `tests/test_request_timing.py` checks also passed. Temporary inline
+  fake-runtime checks verified authenticated capture, final blocked/tool-error
+  responses, missing/shared conversation IDs, invalid credentials/body rejection,
+  runtime failures, concurrent request isolation, interrupted/non-2xx response
+  suppression, and metadata-only persistence-failure logging. These additional
+  checks were not saved as permanent regression tests.
+  No real database migration, live Azure/GitHub calls, or deployment was run.
 
 ## Resume Here - 2026-09-11
 

@@ -54,3 +54,14 @@ class RuntimeLogPageRead(BaseModel):
     limit: int
     offset: int
     has_more: bool
+
+
+class RuntimeUserLogRead(BaseModel):
+    """Expose the submitted input and final user-visible response."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    request_id: str
+    conversation_id: str | None
+    input_text: str
+    response_text: str | None

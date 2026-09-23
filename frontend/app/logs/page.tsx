@@ -18,6 +18,7 @@ const PAGE_SIZE = 25;
 
 export default function LogsPage() {
   const [filters, setFilters] = useState({
+    view: "traffic" as "traffic" | "user",
     appId: "",
     outcome: "" as RuntimeLogOutcome | "",
     offset: 0
@@ -27,7 +28,8 @@ export default function LogsPage() {
     (signal: AbortSignal) => listRuntimeLogs({
       appId: filters.appId ? Number(filters.appId) : undefined,
       outcome: filters.outcome || undefined,
-      offset: filters.offset
+      offset: filters.offset,
+      userContentOnly: filters.view === "user"
     }, signal),
     [filters]
   );
@@ -44,6 +46,23 @@ export default function LogsPage() {
 
   return (
     <LogsLayout title="Logs">
+      <div role="group" aria-label="Log views" className="mt-6 grid grid-cols-2 border-b border-gms-line">
+        {(["traffic", "user"] as const).map((view) => (
+          <button
+            key={view}
+            type="button"
+            aria-pressed={filters.view === view}
+            onClick={() => setFilters((current) => ({ ...current, view, offset: 0 }))}
+            className={`min-h-[44px] border-b-2 px-3 py-3 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-gms-blue ${
+              filters.view === view
+                ? "border-gms-blue text-gms-blue"
+                : "border-transparent text-gms-muted hover:text-gms-blue"
+            }`}
+          >
+            {view === "traffic" ? "Traffic Logs" : "User Logs"}
+          </button>
+        ))}
+      </div>
       <div className="mt-8 flex flex-wrap items-end gap-4">
         <label className="w-full min-w-0 flex-none text-sm font-semibold sm:max-w-xs sm:flex-1">
           App
@@ -107,7 +126,7 @@ export default function LogsPage() {
         <>
           {records.length === 0 ? (
             <p role="status" className="py-12 text-center text-sm text-gms-muted">
-              No runtime logs found.
+              {filters.view === "user" ? "No user logs found." : "No traffic logs found."}
             </p>
           ) : (
             <div className="mt-8 overflow-x-auto">
@@ -123,7 +142,7 @@ export default function LogsPage() {
                   {records.map((record) => (
                     <li key={record.request_id}>
                       <Link
-                        href={`/logs/${record.request_id}`}
+                        href={`/logs/${record.request_id}${filters.view === "user" ? "?view=user" : ""}`}
                         prefetch={false}
                         aria-label={`Open request ${record.request_id}, ${appName(record.app_id)}, ${record.outcome}`}
                         className="grid min-h-[62px] grid-cols-[220px_1fr_220px_130px_110px] items-center gap-4 rounded-md border border-gms-line px-4 py-3 text-sm text-gms-text transition hover:border-gms-blue hover:bg-gms-blue hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-gms-blue dark:bg-[#20242c]"

@@ -17,6 +17,7 @@ _LOGGER = logging.getLogger("uvicorn.error.gms.audit")
 def _persist_runtime_log(
     values: dict[str, Any],
     detailed_events: list[dict[str, Any]],
+    user_log: dict[str, Any] | None = None,
 ) -> None:
     """Save metadata independently of the runtime transaction."""
     try:
@@ -24,6 +25,7 @@ def _persist_runtime_log(
         from nemo_mcp_guardrails.database.models import (
             RuntimeLogEventRecord,
             RuntimeLogRecord,
+            RuntimeUserLogRecord,
         )
 
         severity = (
@@ -32,6 +34,8 @@ def _persist_runtime_log(
             else "INFO"
         )
         record = RuntimeLogRecord(**values)
+        if user_log is not None and values["app_id"] is not None:
+            record.user_log = RuntimeUserLogRecord(**user_log)
         record.events = [
             RuntimeLogEventRecord(
                 sequence=1,
@@ -99,6 +103,7 @@ class RuntimeLogMiddleware:
         request_id = state.get("gms_request_id") or uuid4().hex
         state["gms_runtime_app_id"] = None
         state["gms_runtime_outcome"] = None
+        state["gms_user_log"] = None
         started_at = datetime.now(timezone.utc)
         started = perf_counter()
         http_status = 500
@@ -140,7 +145,12 @@ class RuntimeLogMiddleware:
                 "outcome": outcome,
                 "duration_ms": (perf_counter() - started) * 1000,
             }
+            user_log = state["gms_user_log"] if values["app_id"] is not None else None
+            if user_log is not None:
+                user_log = dict(user_log)
+                if not completed or not 200 <= http_status < 300:
+                    user_log["response_text"] = None
             with CancelScope(shield=True):
                 await run_in_threadpool(
-                    _persist_runtime_log, values, detailed_events
+                    _persist_runtime_log, values, detailed_events, user_log
                 )

@@ -135,7 +135,7 @@ def main() -> None:
 
             admin, developer, disabled = headers
             with TestClient(app) as client:
-                for url in ["/runtime-logs", f"/runtime-logs/{first_id}"]:
+                for url in ["/runtime-logs", f"/runtime-logs/{first_id}", f"/runtime-logs/{first_id}/user-content"]:
                     for credentials, expected in [
                         ({}, 401),
                         ({"Authorization": "Bearer invalid-token"}, 401),
@@ -183,10 +183,32 @@ def main() -> None:
                 for invalid in [
                     {"limit": 0}, {"limit": 101}, {"offset": -1},
                     {"offset": 10001}, {"app_id": 0}, {"outcome": "unknown"},
+                    {"user_content_only": "invalid"},
                 ]:
                     assert client.get(
                         "/runtime-logs", headers=admin, params=invalid,
                     ).status_code == 422
+
+                for filters, expected_ids, has_more in [
+                    ({}, [second_id, first_id], False),
+                    ({"limit": 1}, [second_id], True),
+                    ({"limit": 1, "offset": 1}, [first_id], False),
+                    ({"app_id": app_ids[0]}, [first_id], False),
+                    ({"outcome": "blocked"}, [second_id], False),
+                    ({"outcome": "rejected"}, [], False),
+                    ({"app_id": app_ids[0], "outcome": "blocked"}, [], False),
+                    ({"offset": 10}, [], False),
+                ]:
+                    response = client.get(
+                        "/runtime-logs", headers=admin,
+                        params={"user_content_only": True, **filters},
+                    )
+                    assert response.status_code == 200, response.text
+                    assert response.headers["cache-control"] == "no-store"
+                    page = response.json()
+                    assert [item["request_id"] for item in page["items"]] == expected_ids
+                    assert page["has_more"] is has_more
+                    assert "private-" not in response.text
 
                 detail = client.get(f"/runtime-logs/{first_id}", headers=admin)
                 assert detail.status_code == 200, detail.text
@@ -200,6 +222,16 @@ def main() -> None:
                     "/runtime-logs/not-a-request-id", headers=admin,
                 ).status_code == 422
 
+                content = client.get(f"/runtime-logs/{first_id}/user-content", headers=admin)
+                assert content.status_code == 200, content.text
+                assert content.headers["cache-control"] == "no-store"
+                assert content.json() == dict(
+                    request_id=first_id, conversation_id="shared-conversation",
+                    input_text=f"private-input-{first_id}",
+                    response_text=f"private-response-{first_id}",
+                )
+                for missing in [anonymous_id, "0" * 32]:
+                    assert client.get(f"/runtime-logs/{missing}/user-content", headers=admin).status_code == 404
                 with sessions() as db:
                     db.get(UserRecord, admin_id).system_role = "developer"
                     db.commit()

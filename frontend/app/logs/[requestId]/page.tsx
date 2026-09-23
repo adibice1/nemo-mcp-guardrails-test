@@ -3,20 +3,26 @@
 import Link from "next/link";
 import { useCallback } from "react";
 import { ArrowLeft, RefreshCw } from "lucide-react";
-import { getRuntimeLog } from "@/lib/api-client";
+import { getRuntimeLog, getRuntimeUserLog } from "@/lib/api-client";
 import { useAdminLogData } from "@/components/logs/use-admin-log-data";
 import {
   LogsLayout, LogStatus, logDuration, logTime
 } from "@/components/logs/log-ui";
 
 export default function RuntimeLogDetailPage({
-  params
+  params, searchParams
 }: {
   params: { requestId: string };
+  searchParams?: { view?: string };
 }) {
+  const userView = searchParams?.view === "user";
   const load = useCallback(
-    (signal: AbortSignal) => getRuntimeLog(params.requestId, signal),
-    [params.requestId]
+    async (signal: AbortSignal) => {
+      const record = await getRuntimeLog(params.requestId, signal);
+      const userContent = userView ? await getRuntimeUserLog(params.requestId, signal) : null;
+      return { ...record, userContent };
+    },
+    [params.requestId, userView]
   );
   const { data, loading, error, retry } = useAdminLogData(load);
 
@@ -64,6 +70,20 @@ export default function RuntimeLogDetailPage({
               </div>
             ))}
           </dl>
+          {data.userContent && (
+            <dl className="mt-8 space-y-6 text-sm">
+              {[
+                ["Conversation ID", data.userContent.conversation_id ?? "Not provided"],
+                ["Input", data.userContent.input_text],
+                ["Response", data.userContent.response_text ?? "No response recorded"]
+              ].map(([label, value]) => (
+                <div key={label} className="min-w-0">
+                  <dt className="font-semibold text-gms-muted">{label}</dt>
+                  <dd className="mt-2 whitespace-pre-wrap [overflow-wrap:anywhere] text-gms-text">{value}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
           <h2 className="mt-10 text-xl font-bold text-gms-text">Execution Events</h2>
           {data.events.length === 0 ? (
             <p className="mt-4 text-sm text-gms-muted">No execution events recorded.</p>
