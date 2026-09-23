@@ -3,26 +3,29 @@
 import Link from "next/link";
 import { useCallback } from "react";
 import { ArrowLeft, RefreshCw } from "lucide-react";
-import { getRuntimeLog, getRuntimeUserLog } from "@/lib/api-client";
+import {
+  ApiRequestError, getRuntimeLog, getRuntimeUserLog
+} from "@/lib/api-client";
 import { useAdminLogData } from "@/components/logs/use-admin-log-data";
 import {
   LogsLayout, LogStatus, logDuration, logTime
 } from "@/components/logs/log-ui";
 
-export default function RuntimeLogDetailPage({
-  params, searchParams
-}: {
+export default function RuntimeLogDetailPage({ params }: {
   params: { requestId: string };
-  searchParams?: { view?: string };
 }) {
-  const userView = searchParams?.view === "user";
   const load = useCallback(
     async (signal: AbortSignal) => {
       const record = await getRuntimeLog(params.requestId, signal);
-      const userContent = userView ? await getRuntimeUserLog(params.requestId, signal) : null;
+      let userContent = null;
+      try {
+        userContent = await getRuntimeUserLog(params.requestId, signal);
+      } catch (error) {
+        if (!(error instanceof ApiRequestError) || error.status !== 404) throw error;
+      }
       return { ...record, userContent };
     },
-    [params.requestId, userView]
+    [params.requestId]
   );
   const { data, loading, error, retry } = useAdminLogData(load);
 

@@ -22,14 +22,14 @@ export function LogsLayout({
 }
 
 export function LogStatus({ value }: { value: string }) {
-  const blocked = ["blocked", "error", "tool_error", "rejected"].includes(value);
+  const blocked = ["blocked", "error", "failed", "tool_error", "rejected"].includes(value);
   const warning = ["raised", "modified", "truncated"].includes(value);
   return (
     <span
       className={cn(
         "inline-flex max-w-full items-center rounded-md px-2 py-1 text-xs font-semibold capitalize",
         "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200",
-        value === "passed" &&
+        ["passed", "succeeded"].includes(value) &&
           "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200",
         blocked &&
           "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200",

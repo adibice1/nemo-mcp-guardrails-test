@@ -717,3 +717,32 @@ class RuntimeUserLogRecord(Base):
     conversation_id: Mapped[str | None] = mapped_column(Text)
     input_text: Mapped[str] = mapped_column(Text)
     response_text: Mapped[str | None] = mapped_column(Text)
+
+
+class ManagementAuditLogRecord(Base):
+    """Persist one sanitized GMS management mutation."""
+
+    __tablename__ = "management_audit_logs"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    request_id: Mapped[str] = mapped_column(String(32), index=True)
+    occurred_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        index=True,
+    )
+    actor_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    actor_email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    actor_role: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    action: Mapped[str] = mapped_column(String(100), index=True)
+    entity_type: Mapped[str] = mapped_column(String(100), index=True)
+    target_path: Mapped[str] = mapped_column(String(500))
+    http_method: Mapped[str] = mapped_column(String(10))
+    http_status: Mapped[int] = mapped_column(Integer)
+    outcome: Mapped[str] = mapped_column(String(20), index=True)
+    client_ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(String(500), nullable=True)

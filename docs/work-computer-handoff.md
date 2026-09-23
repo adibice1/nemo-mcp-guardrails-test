@@ -1,7 +1,9 @@
 # Work/Home Computer Handoff
 
-## User Logs Capture - 2026-09-23
-- Current priority: Traffic Logs / User Logs sub-tabs; password work is paused.
+## Traffic And Audit Logs - 2026-09-23
+- The admin Logs screen now has `Traffic Logs` and `Audit Logs` tabs. The old
+  separate User Logs tab was removed because its prompt/response belongs to the
+  same runtime request as the traffic metadata and execution events.
 - Storage foundation: runtime_user_logs links input/final response to a
   traffic request. Existing API startup creates the new table; no backfill.
 - Capture now links authenticated input and the final response to traffic logs,
@@ -9,23 +11,30 @@
   response; unauthenticated/invalid-body requests do not capture message content.
 - Content is excluded from the persistence-failure logger, but submitted text
   may itself contain sensitive information. Admins can retrieve captured content
-  through GET /runtime-logs/{request_id}/user-content. UI and PostgreSQL checks remain pending.
+  through GET /runtime-logs/{request_id}/user-content.
 - GET /runtime-logs?user_content_only=true lists only requests with captured
   content, retaining app/outcome filters and pagination without returning text.
-- The Logs page now switches between Traffic Logs and User Logs using that filter.
-  User Log rows show captured input and final response above execution details.
-- User Log detail verification: TypeScript and targeted lint passed; the
-  `?view=user` route returned HTTP 200. Temporary inline render checks passed
-  for content fetching only in user mode, abort-signal propagation, escaped
-  text, null/empty responses, traffic-mode exclusion, and error rendering.
-  These mocked checks are not permanent tests or authenticated browser checks.
-  The detail page's Logs link still returns to the default Traffic Logs view.
-- Frontend tab verification: TypeScript and targeted ESLint checks passed.
-  `/logs` returned HTTP 200 with both tab labels on the local dev server at
-  port 3001. The standard lint script prompted for configuration; targeted lint
-  used the installed ESLint API with `next/core-web-vitals` without adding files.
-  Desktop/mobile visual checks and authenticated switching remain unverified:
-  the in-app browser connection failed and no local Playwright runner was installed.
+- Every Traffic Log detail now attempts to load its captured input/final
+  response and renders it above execution events. A request without captured
+  content still renders normally.
+- `management_audit_logs` is an append-only metadata table for management
+  mutations. Central middleware records successful, rejected, and failed
+  POST/PUT/PATCH/DELETE requests for apps, policies, assignments, connectors,
+  users, LLM configurations, allowed test cases, and profile changes.
+- Audit records snapshot the actor email/role and retain request ID, action,
+  entity, path, method, status, outcome, client IP, user agent, and timestamp.
+  Request/response bodies, passwords, API keys, credentials, and private model
+  reasoning are deliberately not captured.
+- Admin-only `GET /audit-logs` supports entity/outcome filters and bounded
+  pagination. The frontend Audit Logs tab displays these records alongside the
+  existing Traffic Logs view.
+- `tests/test_management_audit_http.py` uses an isolated SQLite database and
+  real JWT permission checks to verify successful, rejected, and failed capture,
+  exclusions, filters, pagination, actor attribution, and secret omission.
+- Local PostgreSQL now has the `management_audit_logs` table because an existing
+  API test started the real application lifespan after this model was added.
+  There is no backfill. Run API tests sequentially during schema creation;
+  simultaneous `create_all` startup processes can race on a brand-new table.
 - Verification: the isolated `tests/test_runtime_logs_http.py` passed with
   SQLite foreign keys enabled, covering traffic-response content exclusion,
   dry-run preservation, and cascading retention deletion of message pairs.
@@ -501,6 +510,30 @@ frontend/lib/api-client.ts
 frontend/app/policies/page.tsx
 frontend/.env.example
 ```
+
+## Frontend Initial-Load Optimisation
+
+- The Policies page loads apps and assignments first, reducing its initial
+  backend request set from four requests to two.
+- Policy definitions and builder mappings are fetched only when Create or Edit
+  is opened, then reused for the current Policies page session.
+- Editing fetches only the selected reusable policy definition instead of the
+  complete policy catalogue.
+- Backend runtime construction caching is implemented independently below so
+  frontend lazy loading and runtime-object reuse can be tuned separately.
+
+## Backend Runtime Cache
+
+- Repeated requests reuse each app's NeMo rails, Azure clients, guarded MCP
+  tools, and LangChain agent for five minutes by default.
+- One lightweight database revision query detects policy, assignment,
+  connector, app, compiled-rule, connector-metadata, or LLM changes before a
+  cached runtime is reused. Relevant changes therefore rebuild immediately.
+- Concurrent cold requests for one app share a single build, and least-recently
+  used entries are capped at 32 apps by default.
+- Set `NEMO_RUNTIME_CACHE_TTL_SECONDS=0` to disable reuse while debugging.
+- Compare the existing `runtime_setup` entry in `Server-Timing` between cold
+  and warm requests when validating Azure performance.
 
 The normal-developer Apps workflow is now implemented:
 

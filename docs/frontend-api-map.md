@@ -25,11 +25,15 @@ API key. Backend permission checks apply to both list and detail requests.
 | `/logs` | `GET` | `/apps` | Populate the app filter |
 | `/logs` | `GET` | `/runtime-logs` | Read paginated request metadata |
 | `/logs/[requestId]` | `GET` | `/runtime-logs/{request_id}` | Read ordered execution events |
+| `/logs/[requestId]` | `GET` | `/runtime-logs/{request_id}/user-content` | Read captured input and final response when available |
+| `/logs` Audit Logs tab | `GET` | `/audit-logs` | Read sanitized management mutation metadata |
 
 The list uses `app_id`, `outcome`, `limit=25`, and `offset`. Pagination uses
 `has_more`; no total count is available. Timestamps are displayed in UTC.
-No prompt, response, tool-argument, credential, or private-reasoning content
-is included in these log views.
+Traffic detail combines the prompt/final response with request metadata and
+execution events. Audit list filtering uses `entity_type`, `outcome`,
+`limit=25`, and `offset`. Audit records never include request/response bodies,
+passwords, API keys, tool arguments, credentials, or private model reasoning.
 
 ## Current Frontend Integration State
 

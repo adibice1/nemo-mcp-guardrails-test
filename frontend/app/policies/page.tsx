@@ -15,11 +15,11 @@ import {
   editAppPolicyAssignment,
   editGlobalPolicyAssignment,
   getEffectivePolicyAssignments,
+  getPolicy,
   hasApiBaseUrl,
   listApps,
   listGlobalPolicyAssignments,
   listPolicyOptions,
-  listPolicies,
   resolvePolicyForApp,
   resolvePolicyGlobally,
   type ClientApp,
@@ -54,10 +54,15 @@ export default function PoliciesPage() {
   const [globalAssignments, setGlobalAssignments] = useState<
     GlobalPolicyAssignment[]
   >([]);
-  const [policyDefinitions, setPolicyDefinitions] = useState<PolicyRecord[]>([]);
+  const [editingDefinition, setEditingDefinition] =
+    useState<PolicyRecord | null>(null);
   const [policyOptions, setPolicyOptions] = useState<PolicyConnectorOption[]>(
-    mockPolicyOptions
+    hasApiBaseUrl() ? [] : mockPolicyOptions
   );
+  const [policyOptionsLoaded, setPolicyOptionsLoaded] = useState(
+    !hasApiBaseUrl()
+  );
+  const [builderLoading, setBuilderLoading] = useState(false);
   const [apiStatus, setApiStatus] = useState<ApiStatus>(
     hasApiBaseUrl() ? "loading" : "mock"
   );
@@ -89,26 +94,12 @@ export default function PoliciesPage() {
       try {
         setApiStatus("loading");
         setApiError("");
-        const [
-          nextApps,
-          nextGlobalAssignments,
-          nextPolicyDefinitions,
-          nextPolicyOptions
-        ] =
-          await Promise.all([
+        const [nextApps, nextGlobalAssignments] = await Promise.all([
           listApps(),
-          listGlobalPolicyAssignments(),
-          listPolicies(),
-          listPolicyOptions()
+          listGlobalPolicyAssignments()
         ]);
         setApps(nextApps);
         setGlobalAssignments(nextGlobalAssignments);
-        setPolicyDefinitions(nextPolicyDefinitions);
-        setPolicyOptions(
-          nextPolicyOptions.filter(
-            (option) => option.value.toLowerCase() === "github"
-          )
-        );
         if (
           selectedApp &&
           !nextApps.some((app) => app.display_label === selectedApp)
@@ -118,7 +109,7 @@ export default function PoliciesPage() {
         }
         setPolicies(
           nextGlobalAssignments.map((assignment) =>
-            mapGlobalAssignmentToPolicyRow(assignment, nextPolicyDefinitions)
+            mapGlobalAssignmentToPolicyRow(assignment)
           )
         );
         setApiStatus("ready");
@@ -144,7 +135,7 @@ export default function PoliciesPage() {
     if (!selectedApp) {
       setPolicies(
         globalAssignments.map((assignment) =>
-          mapGlobalAssignmentToPolicyRow(assignment, policyDefinitions)
+          mapGlobalAssignmentToPolicyRow(assignment)
         )
       );
       return;
@@ -170,17 +161,10 @@ export default function PoliciesPage() {
         const effective = await getEffectivePolicyAssignments(app.client_id);
         setPolicies([
           ...effective.global_assignments.map((assignment) =>
-            mapEffectiveAssignmentToPolicyRow(
-              assignment,
-              policyDefinitions
-            )
+            mapEffectiveAssignmentToPolicyRow(assignment)
           ),
           ...effective.app_assignments.map((assignment) =>
-            mapEffectiveAssignmentToPolicyRow(
-              assignment,
-              policyDefinitions,
-              app.display_label
-            )
+            mapEffectiveAssignmentToPolicyRow(assignment, app.display_label)
           )
         ]);
         setApiStatus("ready");
@@ -193,41 +177,66 @@ export default function PoliciesPage() {
     }
 
     void loadAppPolicies(selectedAppRecord);
-  }, [apps, backendLoaded, globalAssignments, policyDefinitions, selectedApp]);
+  }, [apps, backendLoaded, globalAssignments, selectedApp]);
 
   async function reloadPolicyData() {
-    const [nextApps, nextGlobalAssignments, nextPolicyDefinitions] =
-      await Promise.all([
-        listApps(),
-        listGlobalPolicyAssignments(),
-        listPolicies()
-      ]);
+    const [nextApps, nextGlobalAssignments] = await Promise.all([
+      listApps(),
+      listGlobalPolicyAssignments()
+    ]);
 
     setApps(nextApps);
     setGlobalAssignments(nextGlobalAssignments);
-    setPolicyDefinitions(nextPolicyDefinitions);
 
     const app = nextApps.find((item) => item.display_label === selectedApp);
     if (selectedApp && app) {
       const effective = await getEffectivePolicyAssignments(app.client_id);
       setPolicies([
         ...effective.global_assignments.map((assignment) =>
-          mapEffectiveAssignmentToPolicyRow(assignment, nextPolicyDefinitions)
+          mapEffectiveAssignmentToPolicyRow(assignment)
         ),
         ...effective.app_assignments.map((assignment) =>
-          mapEffectiveAssignmentToPolicyRow(
-            assignment,
-            nextPolicyDefinitions,
-            app.display_label
-          )
+          mapEffectiveAssignmentToPolicyRow(assignment, app.display_label)
         )
       ]);
     } else {
       setPolicies(
         nextGlobalAssignments.map((assignment) =>
-          mapGlobalAssignmentToPolicyRow(assignment, nextPolicyDefinitions)
+          mapGlobalAssignmentToPolicyRow(assignment)
         )
       );
+    }
+  }
+
+  async function loadPolicyBuilderOptions() {
+    if (!hasApiBaseUrl() || policyOptionsLoaded) {
+      return policyOptions;
+    }
+
+    const nextPolicyOptions = (await listPolicyOptions()).filter(
+      (option) => option.value.toLowerCase() === "github"
+    );
+    setPolicyOptions(nextPolicyOptions);
+    setPolicyOptionsLoaded(true);
+    return nextPolicyOptions;
+  }
+
+  async function handleOpenCreatePolicy() {
+    setBuilderLoading(true);
+    setApiError("");
+    try {
+      await loadPolicyBuilderOptions();
+      setEditingPolicy(null);
+      setEditingDefinition(null);
+      setModalOpen(true);
+    } catch (error) {
+      showWarning(
+        error instanceof Error
+          ? error.message
+          : "Could not load policy builder options."
+      );
+    } finally {
+      setBuilderLoading(false);
     }
   }
 
@@ -298,7 +307,7 @@ export default function PoliciesPage() {
     return true;
   }
 
-  function handleEditPolicy(policy: PolicyRow) {
+  async function handleEditPolicy(policy: PolicyRow) {
     if (policy.scope === "global" && selectedApp) {
       setNotice({
         tone: "warning",
@@ -306,8 +315,31 @@ export default function PoliciesPage() {
       });
       return;
     }
-    setEditingPolicy(policy);
-    setModalOpen(true);
+
+    if (!hasApiBaseUrl() || policy.policyId === undefined) {
+      setEditingDefinition(null);
+      setEditingPolicy(policy);
+      setModalOpen(true);
+      return;
+    }
+
+    setBuilderLoading(true);
+    setApiError("");
+    try {
+      const [definition] = await Promise.all([
+        getPolicy(policy.policyId),
+        loadPolicyBuilderOptions()
+      ]);
+      setEditingDefinition(definition);
+      setEditingPolicy(policy);
+      setModalOpen(true);
+    } catch (error) {
+      showWarning(
+        error instanceof Error ? error.message : "Could not load this policy."
+      );
+    } finally {
+      setBuilderLoading(false);
+    }
   }
 
   async function handleUpdatePolicy(draft: PolicyDraft): Promise<boolean> {
@@ -554,15 +586,13 @@ export default function PoliciesPage() {
             </label>
 
             <button
-              className="inline-flex h-10 w-full items-center justify-center gap-3 rounded-md bg-gms-blue px-4 text-sm font-medium text-white shadow-button lg:w-[170px]"
+              className="inline-flex h-10 w-full items-center justify-center gap-3 rounded-md bg-gms-blue px-4 text-sm font-medium text-white shadow-button disabled:cursor-wait disabled:opacity-60 lg:w-[170px]"
               type="button"
-              onClick={() => {
-                setEditingPolicy(null);
-                setModalOpen(true);
-              }}
+              disabled={builderLoading}
+              onClick={() => void handleOpenCreatePolicy()}
             >
               <Plus className="h-5 w-5" />
-              Create Policy
+              {builderLoading ? "Loading..." : "Create Policy"}
             </button>
           </div>
         </div>
@@ -599,7 +629,7 @@ export default function PoliciesPage() {
         appName={selectedApp || null}
         initialPolicy={
           editingPolicy
-            ? policyRowToDraft(editingPolicy, policyDefinitions)
+            ? policyRowToDraft(editingPolicy, editingDefinition)
             : null
         }
         isAdmin={isAdmin}
@@ -608,6 +638,7 @@ export default function PoliciesPage() {
         policyOptions={policyOptions}
         onClose={() => {
           setEditingPolicy(null);
+          setEditingDefinition(null);
           setModalOpen(false);
         }}
         onSubmit={editingPolicy ? handleUpdatePolicy : handleCreatePolicy}
@@ -646,8 +677,7 @@ export default function PoliciesPage() {
 }
 
 function mapGlobalAssignmentToPolicyRow(
-  assignment: GlobalPolicyAssignment,
-  definitions: PolicyRecord[]
+  assignment: GlobalPolicyAssignment
 ): PolicyRow {
   return {
     id: `global-${assignment.id}`,
@@ -655,11 +685,7 @@ function mapGlobalAssignmentToPolicyRow(
     assignmentId: assignment.id,
     scope: "global",
     connector: assignment.connector ?? "Policy",
-    name: assignment.display_name?.trim() || getPolicyDisplayName(
-      assignment.policy_id,
-      assignment.policy_label,
-      definitions
-    ),
+    name: assignment.display_name?.trim() || assignment.policy_label,
     created: assignment.created_at,
     global: true,
     app: null
@@ -668,7 +694,6 @@ function mapGlobalAssignmentToPolicyRow(
 
 function mapEffectiveAssignmentToPolicyRow(
   assignment: EffectivePolicyAssignment,
-  definitions: PolicyRecord[],
   appName: string | null = null
 ): PolicyRow {
   return {
@@ -677,26 +702,11 @@ function mapEffectiveAssignmentToPolicyRow(
     assignmentId: assignment.assignment_id,
     scope: assignment.scope,
     connector: assignment.connector ?? "Policy",
-    name: assignment.display_name?.trim() || getPolicyDisplayName(
-      assignment.policy_id,
-      assignment.policy_label,
-      definitions
-    ),
+    name: assignment.display_name?.trim() || assignment.policy_label,
     created: assignment.created_at,
     global: assignment.scope === "global",
     app: assignment.scope === "app" ? appName : null
   };
-}
-
-function getPolicyDisplayName(
-  policyId: number,
-  fallback: string,
-  definitions: PolicyRecord[]
-) {
-  return (
-    definitions.find((policy) => policy.id === policyId)?.description?.trim() ||
-    fallback
-  );
 }
 
 function toApiKey(value: string) {
@@ -741,9 +751,8 @@ function getSelectedApp(apps: ClientApp[], selectedApp: string) {
 
 function policyRowToDraft(
   row: PolicyRow,
-  definitions: PolicyRecord[]
+  definition: PolicyRecord | null
 ): PolicyDraft {
-  const definition = definitions.find((policy) => policy.id === row.policyId);
   const customResource = definition?.conditions?.custom_resource;
   return {
     policyType: definition?.policy_type === "output" ? "output" : "input",

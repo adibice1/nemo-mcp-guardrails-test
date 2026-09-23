@@ -1,5 +1,8 @@
+import asyncio
 import os
+from collections import OrderedDict
 from dataclasses import dataclass
+from time import monotonic
 from typing import Any
 
 from dotenv import load_dotenv
@@ -7,15 +10,22 @@ from langchain.agents import create_agent
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain_openai import AzureChatOpenAI
 from nemoguardrails import LLMRails
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import joinedload
 
 from nemo_mcp_guardrails.database.connection import SessionLocal
 from nemo_mcp_guardrails.database.models import (
     AppConnectorRecord,
+    AppPolicyAssignmentRecord,
     AppRecord,
+    CompiledPolicyRuleRecord,
+    ConnectorActionRecord,
     ConnectorRecord,
+    ConnectorResourceRecord,
+    ConnectorToolMappingRecord,
+    GlobalPolicyAssignmentRecord,
     LlmConfigRecord,
+    PolicyRecord,
 )
 from nemo_mcp_guardrails.database.policy_loader import (
     LoadedInputPolicy,
@@ -102,6 +112,94 @@ class GuardrailsRuntimeParts:
     output_rail_enabled: bool
     blocked_output_phrases: tuple[str, ...]
     tool_bundle: McpToolBundle
+
+
+RuntimeRevision = tuple[Any, ...]
+
+
+@dataclass(frozen=True)
+class RuntimeCacheEntry:
+    """Store one reusable app runtime and its database revision."""
+
+    revision: RuntimeRevision
+    expires_at: float
+    parts: GuardrailsRuntimeParts
+
+
+_RUNTIME_PARTS_CACHE: OrderedDict[int, RuntimeCacheEntry] = OrderedDict()
+_RUNTIME_BUILD_LOCKS: dict[int, asyncio.Lock] = {}
+
+
+def _runtime_cache_ttl_seconds() -> float:
+    """Return the configured non-negative runtime cache lifetime."""
+
+    try:
+        value = float(os.getenv("NEMO_RUNTIME_CACHE_TTL_SECONDS", "300"))
+    except ValueError as error:
+        raise RuntimeError(
+            "NEMO_RUNTIME_CACHE_TTL_SECONDS must be a number"
+        ) from error
+    if value < 0:
+        raise RuntimeError("NEMO_RUNTIME_CACHE_TTL_SECONDS cannot be negative")
+    return value
+
+
+def _runtime_cache_max_apps() -> int:
+    """Return the maximum number of app runtimes retained in memory."""
+
+    try:
+        value = int(os.getenv("NEMO_RUNTIME_CACHE_MAX_APPS", "32"))
+    except ValueError as error:
+        raise RuntimeError(
+            "NEMO_RUNTIME_CACHE_MAX_APPS must be an integer"
+        ) from error
+    if value < 1:
+        raise RuntimeError("NEMO_RUNTIME_CACHE_MAX_APPS must be at least 1")
+    return value
+
+
+def _revision_pair(model: Any, *conditions: Any) -> tuple[Any, Any]:
+    """Return count and latest-update subqueries for one runtime table."""
+
+    return (
+        select(func.count(model.id)).where(*conditions).scalar_subquery(),
+        select(func.max(model.updated_at)).where(*conditions).scalar_subquery(),
+    )
+
+
+def load_runtime_revision(app_id: int) -> RuntimeRevision:
+    """Return one query fingerprint covering runtime-relevant state."""
+
+    columns = [
+        select(AppRecord.updated_at)
+        .where(AppRecord.id == app_id)
+        .scalar_subquery(),
+        *_revision_pair(
+            AppConnectorRecord,
+            AppConnectorRecord.app_id == app_id,
+        ),
+        *_revision_pair(
+            AppPolicyAssignmentRecord,
+            AppPolicyAssignmentRecord.app_id == app_id,
+        ),
+        *_revision_pair(GlobalPolicyAssignmentRecord),
+        *_revision_pair(PolicyRecord),
+        *_revision_pair(CompiledPolicyRuleRecord),
+        *_revision_pair(ConnectorRecord),
+        *_revision_pair(ConnectorActionRecord),
+        *_revision_pair(ConnectorResourceRecord),
+        *_revision_pair(ConnectorToolMappingRecord),
+        *_revision_pair(LlmConfigRecord),
+    ]
+    with SessionLocal() as db:
+        return tuple(db.execute(select(*columns)).one())
+
+
+def clear_guardrails_runtime_cache() -> None:
+    """Clear reusable runtime objects, primarily for tests."""
+
+    _RUNTIME_PARTS_CACHE.clear()
+    _RUNTIME_BUILD_LOCKS.clear()
 
 
 def resolve_env_credential(
@@ -363,8 +461,10 @@ def github_mcp_client_config(environment: RuntimeEnvironment) -> dict[str, Any]:
     )
 
 
-async def build_guardrails_runtime_parts(app_id: int) -> GuardrailsRuntimeParts:
-    """Build rails, agent, and guarded tools for one authenticated app."""
+async def _build_guardrails_runtime_parts_uncached(
+    app_id: int,
+) -> GuardrailsRuntimeParts:
+    """Build uncached rails, agent, and guarded tools for one app."""
 
     github_connector = load_app_connector_config(app_id, "github")
     environment = load_runtime_environment(
@@ -415,3 +515,38 @@ async def build_guardrails_runtime_parts(app_id: int) -> GuardrailsRuntimeParts:
         blocked_output_phrases=blocked_output_phrases,
         tool_bundle=tool_bundle,
     )
+
+
+async def build_guardrails_runtime_parts(app_id: int) -> GuardrailsRuntimeParts:
+    """Reuse an app runtime until its database revision or TTL changes."""
+
+    ttl = _runtime_cache_ttl_seconds()
+    if ttl == 0:
+        return await _build_guardrails_runtime_parts_uncached(app_id)
+
+    revision = load_runtime_revision(app_id)
+    now = monotonic()
+    cached = _RUNTIME_PARTS_CACHE.get(app_id)
+    if cached and cached.revision == revision and cached.expires_at > now:
+        _RUNTIME_PARTS_CACHE.move_to_end(app_id)
+        return cached.parts
+
+    lock = _RUNTIME_BUILD_LOCKS.setdefault(app_id, asyncio.Lock())
+    async with lock:
+        revision = load_runtime_revision(app_id)
+        now = monotonic()
+        cached = _RUNTIME_PARTS_CACHE.get(app_id)
+        if cached and cached.revision == revision and cached.expires_at > now:
+            _RUNTIME_PARTS_CACHE.move_to_end(app_id)
+            return cached.parts
+
+        parts = await _build_guardrails_runtime_parts_uncached(app_id)
+        _RUNTIME_PARTS_CACHE[app_id] = RuntimeCacheEntry(
+            revision=revision,
+            expires_at=now + ttl,
+            parts=parts,
+        )
+        _RUNTIME_PARTS_CACHE.move_to_end(app_id)
+        while len(_RUNTIME_PARTS_CACHE) > _runtime_cache_max_apps():
+            _RUNTIME_PARTS_CACHE.popitem(last=False)
+        return parts

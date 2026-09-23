@@ -132,6 +132,35 @@ export type RuntimeLogPage = {
   has_more: boolean;
 };
 
+export const AUDIT_LOG_OUTCOMES = [
+  "succeeded", "rejected", "failed"
+] as const;
+
+export type AuditLogOutcome = typeof AUDIT_LOG_OUTCOMES[number];
+
+export type AuditLog = {
+  id: string;
+  request_id: string;
+  occurred_at: string;
+  actor_user_id: number | null;
+  actor_email: string | null;
+  actor_role: string | null;
+  action: string;
+  entity_type: string;
+  target_path: string;
+  http_method: string;
+  http_status: number;
+  outcome: AuditLogOutcome;
+  client_ip: string | null;
+};
+
+export type AuditLogPage = {
+  items: AuditLog[];
+  limit: number;
+  offset: number;
+  has_more: boolean;
+};
+
 export type ClientApp = {
   id: number;
   name: string;
@@ -506,6 +535,23 @@ export function getRuntimeUserLog(requestId: string, signal?: AbortSignal) {
     input_text: string;
     response_text: string | null;
   }>(`/runtime-logs/${encodeURIComponent(requestId)}/user-content`, { signal });
+}
+
+export function listAuditLogs(
+  filters: {
+    entityType?: string;
+    outcome?: AuditLogOutcome;
+    offset: number;
+  },
+  signal?: AbortSignal
+) {
+  const query = new URLSearchParams({
+    limit: "25",
+    offset: String(filters.offset)
+  });
+  if (filters.entityType) query.set("entity_type", filters.entityType);
+  if (filters.outcome) query.set("outcome", filters.outcome);
+  return apiRequest<AuditLogPage>(`/audit-logs?${query}`, { signal });
 }
 
 export function listAppSummaries() {

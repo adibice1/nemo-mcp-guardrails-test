@@ -317,7 +317,8 @@ Follow-up:
   the frontend flows. Test both roles and direct-API bypass attempts.
 - Confirm temporary expiry, secure delivery/identity verification, production
   HTTPS and MFA, and sole-admin recovery. Email recovery remains deferred.
-- Add richer admin audit/logging screens after supervisor confirmation.
+- Expand audit coverage only when new management mutation route families are
+  added; the current admin Traffic Logs and Audit Logs screens are implemented.
 
 ## Later Backend Work
 
@@ -381,6 +382,9 @@ Current implementation:
   interaction notes.
 - `frontend/` contains the Figma-matched implementation, a read/write
   API-backed `/policies` adapter, and functional app list/detail routes.
+- `/policies` now loads apps and assignment summaries first. Policy definitions
+  and builder options are loaded lazily when Create or Edit is opened, reducing
+  the initial backend request set from four requests to two.
 - `/user-management` provides admin-only user creation, password reset,
   enable/block, role changes, and app-developer links.
 - The app LLM tab uses a readable LLM-config catalogue and named selectors.
@@ -391,8 +395,8 @@ Next implementation slice:
   definition deletion to also remove assignment references.
 - Add LLM configuration update/delete and ownership controls after the
   organization confirms its provider-administration workflow.
-- Keep richer audit/logging screens as post-presentation work pending
-  supervisor confirmation.
+- Keep the audit route classifier synchronized with new management mutation
+  route families.
 
 ### 11. Audit, Analytics, And Caching
 
@@ -410,6 +414,15 @@ Implemented foundation (2026-09-09):
   validation, and safe response fields.
 - The admin Logs list/detail screens display metadata and execution events,
   with app/outcome filters, refresh, pagination, and dark-mode styling.
+- Traffic detail also displays the captured user input and corresponding final
+  response when content exists; this replaces the separate User Logs view.
+- Central management audit middleware records sanitized metadata for app,
+  policy, assignment, connector, user, LLM-config, allowed-test and profile
+  mutations. Admin-only `/audit-logs` supports entity/outcome filtering and
+  pagination, and the frontend exposes it as the Audit Logs tab.
+- `tests/test_management_audit_http.py` covers successful/rejected/failed actions,
+  actor attribution, excluded runtime/read requests, RBAC, filters,
+  pagination, and request-body secret omission in isolated SQLite.
 - Logs filters stack on narrow screens (2026-09-11); desktop filters remain
   side by side.
 - Manual retention is implemented in `scripts/cleanup_runtime_logs.py`:
@@ -419,15 +432,29 @@ Implemented foundation (2026-09-09):
 
 Remaining work:
 
-- User Logs: verify authenticated navigation, content errors, and mobile layout.
-  Render captured content as plain text; it may contain sensitive user submissions.
+- Verify authenticated Traffic/Audit navigation and mobile layout against the
+  deployed backend. Captured traffic content is plain text and may contain
+  sensitive user submissions.
 - Keep suppressed output, private reasoning, and credentials out of log exports.
+- Add an approved retention policy for `management_audit_logs`; runtime cleanup
+  currently covers only runtime traffic records.
+- Replace startup `create_all` schema evolution with a deployment migration
+  step before running multiple backend replicas; simultaneous first startup can
+  race while creating a brand-new table.
 - Schedule and verify the manual retention command in Azure; add automated frontend regression coverage.
 - PostgreSQL integration verification for the log-reading endpoints.
 - PostgreSQL retention verification using disposable fixtures, including
   cutoff boundaries, event deletion, transaction rollback, and repeated batches.
 - HTTP recorder regression tests for request isolation, error paths, and
   exclusion of secrets. Record observed events, not private model reasoning.
+- Verify lazy policy-builder loading against an authenticated deployed backend
+  and compare browser request timings before and after the change.
+- Per-app runtime bundle caching is implemented with database-revision
+  invalidation, a five-minute default TTL, concurrent-build deduplication, and
+  a 32-app default in-process LRU limit.
+- Verify cold-versus-warm Azure timings and tune runtime cache TTL/capacity.
+- Consider shared Redis revision coordination only when multiple backend
+  replicas need cache invalidation beyond the database fingerprint.
 - Redis cache for compiled app policy bundles.
 - Background workers for compilation and invalidation.
 
