@@ -148,7 +148,7 @@ function TrafficLogs() {
           <div className="min-w-[850px]">
             <div
               aria-hidden="true"
-              className="grid grid-cols-[220px_1fr_220px_130px_110px] gap-4 px-4 text-sm text-gms-muted"
+              className="grid grid-cols-[220px_1fr_220px_130px_110px] gap-4 px-4 text-center text-sm text-gms-muted"
             >
               <span>Request</span><span>App</span><span>Started (UTC)</span>
               <span>Outcome</span><span>Duration</span>
@@ -160,12 +160,12 @@ function TrafficLogs() {
                     href={`/logs/${record.request_id}`}
                     prefetch={false}
                     aria-label={`Open request ${record.request_id}, ${appName(record.app_id)}, ${record.outcome}`}
-                    className="grid min-h-[62px] grid-cols-[220px_1fr_220px_130px_110px] items-center gap-4 rounded-md border border-gms-line px-4 py-3 text-sm text-gms-text transition hover:border-gms-blue hover:bg-gms-blue hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-gms-blue dark:bg-[#20242c]"
+                    className="grid min-h-[62px] grid-cols-[220px_1fr_220px_130px_110px] items-center gap-4 rounded-md border border-gms-line px-4 py-3 text-center text-sm text-gms-text transition hover:border-gms-blue hover:bg-gms-blue hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-gms-blue dark:bg-[#20242c]"
                   >
                     <span className="break-all font-mono text-xs">{record.request_id}</span>
                     <span className="min-w-0 break-words font-semibold">{appName(record.app_id)}</span>
                     <span className="text-xs">{logTime(record.started_at)}</span>
-                    <span><LogStatus value={record.outcome} /></span>
+                    <span className="justify-self-center"><LogStatus value={record.outcome} /></span>
                     <span>{logDuration(record.duration_ms)}</span>
                   </Link>
                 </li>
@@ -254,11 +254,11 @@ function AuditLogs() {
         emptyMessage="No audit logs found."
       />
       {!logs.loading && !logs.error && records.length > 0 && (
-        <div className="mt-8 overflow-x-auto">
-          <div className="min-w-[980px]">
+        <div className="mt-8">
+          <div className="w-full min-w-0">
             <div
               aria-hidden="true"
-              className="grid grid-cols-[190px_1fr_180px_250px_130px] gap-4 px-4 text-sm text-gms-muted"
+              className="grid grid-cols-[minmax(0,1.25fr)_minmax(0,2fr)_minmax(0,1fr)_minmax(0,1.1fr)_96px] gap-3 px-3 text-center text-xs text-gms-muted lg:text-sm"
             >
               <span>Actor</span><span>Action</span><span>Entity</span>
               <span>Time (UTC)</span><span>Outcome</span>
@@ -267,20 +267,22 @@ function AuditLogs() {
               {records.map((record) => (
                 <li
                   key={record.id}
-                  className="grid min-h-[68px] grid-cols-[190px_1fr_180px_250px_130px] items-center gap-4 rounded-md border border-gms-line px-4 py-3 text-sm text-gms-text dark:bg-[#20242c]"
+                  className="grid min-h-[68px] grid-cols-[minmax(0,1.25fr)_minmax(0,2fr)_minmax(0,1fr)_minmax(0,1.1fr)_96px] items-center gap-3 rounded-md border border-gms-line px-3 py-3 text-center text-xs text-gms-text dark:bg-[#20242c] lg:text-sm"
                 >
-                  <span className="min-w-0 break-words font-semibold">
+                  <span className="min-w-0 break-words text-center font-semibold">
                     {record.actor_email ?? "Unauthenticated"}
                   </span>
-                  <span className="break-words font-mono text-xs">
+                  <span className="break-words text-center font-mono text-xs">
                     {record.action}
                     <span className="mt-1 block break-all font-sans text-gms-muted">
                       {record.http_method} {record.target_path}
                     </span>
                   </span>
-                  <span className="capitalize">{record.entity_type.replaceAll("_", " ")}</span>
-                  <span className="text-xs">{logTime(record.occurred_at)}</span>
-                  <span><LogStatus value={record.outcome} /></span>
+                  <span className="text-center capitalize">{record.entity_type.replaceAll("_", " ")}</span>
+                  <span className="min-w-0 break-words text-center text-xs">
+                    {logTime(record.occurred_at)}
+                  </span>
+                  <span className="justify-self-center"><LogStatus value={record.outcome} /></span>
                 </li>
               ))}
             </ul>

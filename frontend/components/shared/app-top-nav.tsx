@@ -72,10 +72,12 @@ export function AppTopNav({ active }: AppTopNavProps) {
       <nav className="flex min-w-0 flex-1 flex-wrap items-center gap-x-6 gap-y-3 text-[17px] font-extrabold sm:text-[21px]">
         <Link
           aria-label="Go to apps"
-          className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#1187f6] text-3xl font-black text-[#1f3b9d] shadow-[0_8px_18px_rgba(17,135,246,0.22)]"
+          className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#1187f6] text-3xl font-black leading-none text-[#1f3b9d] shadow-[0_8px_18px_rgba(17,135,246,0.22)]"
           href="/apps"
         >
-          G
+          <span aria-hidden="true" className="-translate-y-px">
+            G
+          </span>
         </Link>
         <Link
           href="/apps"

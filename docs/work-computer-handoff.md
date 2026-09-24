@@ -28,6 +28,17 @@
 - Admin-only `GET /audit-logs` supports entity/outcome filters and bounded
   pagination. The frontend Audit Logs tab displays these records alongside the
   existing Traffic Logs view.
+- Traffic and Audit table headers and values are centered on the same grid.
+  Audit columns now share the available width proportionally and wrap long
+  emails/request paths, so the table does not require horizontal scrolling.
+- The Policies table also uses a compact fluid grid. All policy, scope, date,
+  and action columns remain visible while long values wrap within their cells.
+  The inactive triple-dot control was removed; policy rows open summaries and
+  retain only the functional Edit and Delete actions.
+  Connector-independent rows display `None` in Policy Connector instead of
+  `Global` or generic `Policy`; their separate Global badge remains unchanged.
+  The Global column reserves a small right-side gap before Edit/Delete so the
+  scope badge and action controls do not appear clumped together.
 - `tests/test_management_audit_http.py` uses an isolated SQLite database and
   real JWT permission checks to verify successful, rejected, and failed capture,
   exclusions, filters, pagination, actor attribution, and secret omission.
@@ -566,6 +577,10 @@ The Settings dark-mode toggle now applies an app-wide Tailwind `dark` class.
 Saving writes `gms:theme` to browser `localStorage`; `app/layout.tsx` restores
 the class before rendering to reduce theme flashing.
 
+The browser tab icon is `frontend/app/icon.svg`. Next.js discovers it through
+the App Router icon convention; it mirrors the optically centered blue G used
+in the top navigation.
+
 The policy builder loads valid connector/action/resource choices from
 `GET /policy-options`; the frontend filters this to GitHub for the current
 demo. In the policy table, global assignments use a globe icon, app-specific
@@ -670,6 +685,8 @@ resource; SharePoint remains absent until it has executable mappings.
 - `src/nemo_mcp_guardrails/database/conversation_store.py`: conversation history load/append helpers.
 - `src/nemo_mcp_guardrails/database/models.py`: includes `conversation_messages`.
 - `src/nemo_mcp_guardrails/runtime_factory.py`: Azure, NeMo, MCP, and agent construction. It uses the authenticated app's `guardrail_llm_config_id` for NeMo rails and `main_llm_config_id` for the LangChain agent, with `.env` Azure fallback when either ID is missing.
+- `docs/llm-provider-guide.md`: developer workflow for selecting Azure
+  deployments and the implementation checklist for local/non-Azure providers.
 - `src/nemo_mcp_guardrails/guarded_execution.py`: reusable single-request guardrail workflow.
 - `src/nemo_mcp_guardrails/output_guard.py`: deterministic app-scoped quoted
   output phrase extraction and matching.

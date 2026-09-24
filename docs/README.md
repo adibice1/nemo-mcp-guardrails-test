@@ -86,6 +86,8 @@ Start here for current project context:
 - `testing-notes.md`: verified tests and commands
 - `next-steps.md`: recommended next work item
 - `runtime-flow-map.md`: concise file/function runtime flow map
+- `llm-provider-guide.md`: selecting Azure models and adding local or
+  non-Azure LangChain provider adapters
 - `policy-schema-design.md`: normalized schema design and migration plan
 - `PROJECT_SUMMARY.md`: broader product/architecture summary and handoff notes
 - `troubleshooting.md`: known setup and NeMo/GitHub MCP issues
