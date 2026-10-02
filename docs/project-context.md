@@ -147,7 +147,9 @@ The system successfully:
   `guardrail_llm_config_id` is used for NeMo rails, and
   `main_llm_config_id` is used for the LangChain agent. Missing config IDs use
   the `.env` Azure OpenAI deployment. Non-Azure provider rows are allowed as
-  future metadata but are not executable yet.
+  future metadata but are not executable yet. See
+  `docs/llm-provider-guide.md` for the current Azure workflow and provider
+  adapter requirements.
 - Uses `src/nemo_mcp_guardrails/guarded_execution.py` for reusable
   single-request input-rail, agent/guarded-tool, and output-rail coordination.
 - Provides a Next.js 13 frontend scaffold under `frontend/` for `/login`,
@@ -408,8 +410,9 @@ python scripts/migrate_client_app_foundation.py
 
 The `apps` table starts empty by design. App CRUD, centralized API-key hashing,
 reusable app authentication, and the first protected HTTP runtime endpoint now
-exist. User login, admin-route authorization, and LLM-secret handling do not
-exist yet.
+exist. Management login, role-aware authorization, and environment-based LLM
+credential references are implemented. Production secrets-manager resolution
+and non-Azure provider adapters remain future work.
 
 ## Current Runtime App Scope
 

@@ -106,6 +106,8 @@ Current backend/API state:
   builds the NeMo rails model; `main_llm_config_id` builds the LangChain agent
   model. Missing IDs fall back to `.env` Azure OpenAI settings. Other providers
   remain target metadata until provider adapters are implemented.
+- `docs/llm-provider-guide.md` documents the supported Azure selection workflow,
+  credential boundaries, local-model networking, and provider-adapter checklist.
 - Runtime conversations are persisted in `conversation_messages` when
   `conversation_id` is supplied. Stored history wins on later requests; client
   `conversation_history` bootstraps a new conversation. Older turns are trimmed

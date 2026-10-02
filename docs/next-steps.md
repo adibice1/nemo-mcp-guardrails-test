@@ -317,6 +317,7 @@ Once normalized policy loading is stable:
 - `docs/frontend-screen-plan.md`
 - `docs/frontend-demo-flow.md`
 - `docs/runtime-flow-map.md`
+- `docs/llm-provider-guide.md`
 - `docs/project-context.md`
 - `docs/policy-schema-design.md`
 - `docs/testing-notes.md`

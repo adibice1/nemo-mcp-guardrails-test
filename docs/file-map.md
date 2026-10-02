@@ -28,6 +28,8 @@ excluded.
 | Database cannot connect | `src/nemo_mcp_guardrails/database/connection.py`, `.env`, `docker-compose.yml` |
 | Docker frontend/backend is unhealthy | `Dockerfile`, `frontend/Dockerfile`, `docker-compose.yml`, `docs/containerisation.md` |
 | Apps list/detail UI is wrong | `frontend/app/apps/page.tsx`, `frontend/app/apps/[clientId]/page.tsx`, `frontend/components/apps/` |
+| LLM provider or model selection is wrong | `docs/llm-provider-guide.md`, `src/nemo_mcp_guardrails/runtime_factory.py`, `src/nemo_mcp_guardrails/api/llm_configs.py` |
+| Browser-tab or navigation G icon is wrong | `frontend/app/icon.svg`, `frontend/components/shared/app-top-nav.tsx` |
 
 ## Backend Core
 
@@ -82,6 +84,7 @@ excluded.
 
 ## Frontend Routes
 
+- `frontend/app/icon.svg` - Supplies the blue G browser-tab favicon through the Next.js App Router icon convention.
 - `frontend/app/layout.tsx` - Defines the root HTML layout, global CSS import, metadata, and saved-theme restoration.
 - `frontend/app/globals.css` - Contains the shared Tailwind layers and nearly all custom GMS visual styling.
 - `frontend/app/page.tsx` - Redirects the frontend root route to `/policies`.
@@ -160,4 +163,5 @@ excluded.
 - `tests/test_management_rbac_http.py` proves admin-created apps, developer isolation, app-developer links, and system-admin overrides.
 - Use `docs/policy-schema-design.md` for schema and migration details.
 - Use `docs/runtime-flow-map.md` when one-line descriptions are not enough and function-level execution order is needed.
+- Use `docs/llm-provider-guide.md` for Azure model selection and the adapter checklist for local or non-Azure models.
 - Use `docs/troubleshooting.md` for known local setup, Postgres, DBeaver, NeMo, and GitHub MCP failures.
