@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from nemo_mcp_guardrails.api.assignment_serializers import (
     serialize_global_policy_assignment,
@@ -38,9 +38,15 @@ def list_global_policy_assignments(
 
     assignments = list(
         db.scalars(
-            select(GlobalPolicyAssignmentRecord).order_by(
-                GlobalPolicyAssignmentRecord.id
+            select(GlobalPolicyAssignmentRecord)
+            .options(
+                joinedload(GlobalPolicyAssignmentRecord.policy).options(
+                    joinedload(PolicyRecord.normalized_connector),
+                    joinedload(PolicyRecord.normalized_action),
+                    joinedload(PolicyRecord.normalized_resource),
+                ),
             )
+            .order_by(GlobalPolicyAssignmentRecord.id)
         )
     )
     return [

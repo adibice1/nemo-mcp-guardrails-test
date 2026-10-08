@@ -9,6 +9,8 @@ from nemoguardrails.rails.llm.options import RailStatus, RailType
 from openai import BadRequestError
 
 from nemo_mcp_guardrails.output_guard import find_blocked_output_phrase
+from nemo_mcp_guardrails.performance import measure_stage
+from nemo_mcp_guardrails.runtime_events import record_runtime_event
 from nemo_mcp_guardrails.tool_guard import TOOL_GUARD_REFUSAL, ToolGuardViolation
 
 
@@ -244,6 +246,19 @@ def get_rail_source(rail_result: Any | None) -> str | None:
     return str(status)
 
 
+def _record_rail_result(stage: str, result: Any) -> None:
+    """Record the classifier outcome without its input or response content."""
+    outcome = {
+        RailStatus.PASSED: "passed",
+        RailStatus.BLOCKED: "blocked",
+        RailStatus.MODIFIED: "modified",
+    }.get(result.status, "unknown")
+    record_runtime_event(
+        "rail.completed", stage, outcome,
+        reason_code=get_rail_source(result),
+    )
+
+
 def extract_azure_filter_categories(payload: object) -> tuple[str, ...]:
     """Extract filtered Azure categories from nested response metadata."""
 
@@ -311,13 +326,14 @@ async def apply_output_rail(
     """Apply the output rail and return its response and full result."""
 
     try:
-        result = await rails.check_async(
-            [
-                {"role": "user", "content": user_prompt},
-                {"role": "assistant", "content": response},
-            ],
-            rail_types=[RailType.OUTPUT],
-        )
+        with measure_stage("output_rail"):
+            result = await rails.check_async(
+                [
+                    {"role": "user", "content": user_prompt},
+                    {"role": "assistant", "content": response},
+                ],
+                rail_types=[RailType.OUTPUT],
+            )
     except LLMCallException as error:
         if not is_azure_content_filter_error(error):
             raise
@@ -325,20 +341,25 @@ async def apply_output_rail(
         categories = extract_azure_filter_categories(get_azure_error_payload(error))
 
         if not contains_obvious_secret_value(response):
-            return response, SyntheticRailResult(
+            result = SyntheticRailResult(
                 status=RailStatus.PASSED,
                 content=response,
                 source="azure_content_filter_fallback_passed",
                 categories=categories,
             )
+            _record_rail_result("output", result)
+            return response, result
 
-        return OUTPUT_FILTER_RESPONSE, SyntheticRailResult(
+        result = SyntheticRailResult(
             status=RailStatus.BLOCKED,
             content=OUTPUT_FILTER_RESPONSE,
             source="azure_content_filter",
             categories=categories,
         )
+        _record_rail_result("output", result)
+        return OUTPUT_FILTER_RESPONSE, result
 
+    _record_rail_result("output", result)
     if result.status == RailStatus.BLOCKED:
         return TOOL_GUARD_REFUSAL, result
 
@@ -359,10 +380,11 @@ async def execute_guarded_message(
     """Execute one runtime request through rails, agent, tools, and output rails."""
 
     try:
-        input_result = await rails.check_async(
-            [{"role": "user", "content": message}],
-            rail_types=[RailType.INPUT],
-        )
+        with measure_stage("input_rail"):
+            input_result = await rails.check_async(
+                [{"role": "user", "content": message}],
+                rail_types=[RailType.INPUT],
+            )
     except (LLMCallException, BadRequestError) as error:
         if not is_azure_content_filter_error(error):
             raise
@@ -374,6 +396,7 @@ async def execute_guarded_message(
             source="azure_input_content_filter",
             categories=categories,
         )
+        _record_rail_result("input", input_result)
         return GuardedExecutionResult(
             status="blocked",
             response=TOOL_GUARD_REFUSAL,
@@ -389,6 +412,7 @@ async def execute_guarded_message(
             input_rail_categories=categories,
         )
 
+    _record_rail_result("input", input_result)
     if input_result.status == RailStatus.BLOCKED:
         response = TOOL_GUARD_REFUSAL
         output_result = None
@@ -423,15 +447,20 @@ async def execute_guarded_message(
     )
 
     try:
-        agent_result = await agent.ainvoke(
-            {
-                "messages": build_agent_messages(
-                    prompt_for_agent,
-                    conversation_history,
-                )
-            }
-        )
+        with measure_stage("agent_tools"):
+            agent_result = await agent.ainvoke(
+                {
+                    "messages": build_agent_messages(
+                        prompt_for_agent,
+                        conversation_history,
+                    )
+                }
+            )
     except ToolGuardViolation as error:
+        record_runtime_event(
+            "agent.blocked", "agent", "blocked",
+            reason_code="gms_tool_guard",
+        )
         return GuardedExecutionResult(
             status="blocked",
             response=TOOL_GUARD_REFUSAL,
@@ -456,6 +485,10 @@ async def execute_guarded_message(
             ),
         )
     except ToolException as error:
+        record_runtime_event(
+            "agent.failed", "agent", "error",
+            reason_code="tool_invocation_error",
+        )
         response = TOOL_ERROR_RESPONSE
         output_result = None
 
@@ -493,6 +526,10 @@ async def execute_guarded_message(
         if not is_azure_content_filter_error(error):
             raise
 
+        record_runtime_event(
+            "agent.blocked", "agent", "blocked",
+            reason_code="azure_agent_content_filter",
+        )
         output_result = SyntheticRailResult(
             status=RailStatus.BLOCKED,
             content=OUTPUT_FILTER_RESPONSE,
@@ -517,6 +554,10 @@ async def execute_guarded_message(
 
     azure_categories = get_agent_content_filter_categories(agent_result)
     if azure_categories is not None:
+        record_runtime_event(
+            "agent.blocked", "agent", "blocked",
+            reason_code="azure_agent_content_filter",
+        )
         output_result = SyntheticRailResult(
             status=RailStatus.BLOCKED,
             content=OUTPUT_FILTER_RESPONSE,
@@ -545,7 +586,8 @@ async def execute_guarded_message(
     response = raw_agent_response
     output_result = None
 
-    blocked_phrase = find_blocked_output_phrase(response, blocked_output_phrases)
+    with measure_stage("output_phrase_check"):
+        blocked_phrase = find_blocked_output_phrase(response, blocked_output_phrases)
     if blocked_phrase:
         response = OUTPUT_FILTER_RESPONSE
         output_result = SyntheticRailResult(
@@ -553,11 +595,17 @@ async def execute_guarded_message(
             content=OUTPUT_FILTER_RESPONSE,
             source="deterministic_output_phrase",
         )
+        _record_rail_result("output", output_result)
     elif output_rail_enabled:
         response, output_result = await apply_output_rail(
             rails,
             prompt_for_agent,
             response,
+        )
+    else:
+        record_runtime_event(
+            "output.rail.skipped", "output", "not_run",
+            reason_code="disabled",
         )
 
     status = (

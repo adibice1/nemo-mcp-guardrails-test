@@ -1,7 +1,7 @@
 import os
 from dataclasses import dataclass
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from nemo_mcp_guardrails.api.auth import require_authenticated_app
@@ -17,6 +17,7 @@ from nemo_mcp_guardrails.database.conversation_store import (
     load_conversation_turns,
 )
 from nemo_mcp_guardrails.guarded_execution import execute_guarded_message
+from nemo_mcp_guardrails.performance import measure_stage
 from nemo_mcp_guardrails.policy_compiler import (
     GITHUB_ACTION_SYNONYMS,
     GITHUB_RESOURCE_SYNONYMS,
@@ -414,14 +415,22 @@ def _store_conversation_turns(
 @router.post("/run", response_model=GuardrailsRunResponse)
 async def run_guardrails(
     payload: GuardrailsRunRequest,
+    request: Request,
     app: AppRecord = Depends(require_authenticated_app),
     db: Session = Depends(get_db),
 ) -> GuardrailsRunResponse:
     """Execute one authenticated request through the guarded runtime."""
+    request.state.gms_user_log = {
+        "conversation_id": payload.conversation_id,
+        "input_text": payload.message,
+        "response_text": None,
+    }
 
-    history_context = _build_runtime_history_context(payload, app.id, db)
+    with measure_stage("history_load"):
+        history_context = _build_runtime_history_context(payload, app.id, db)
     try:
-        runtime_parts = await build_guardrails_runtime_parts(app.id)
+        with measure_stage("runtime_setup"):
+            runtime_parts = await build_guardrails_runtime_parts(app.id)
     except ConnectorAccessError as error:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -438,6 +447,7 @@ async def run_guardrails(
         ],
         blocked_output_phrases=runtime_parts.blocked_output_phrases,
     )
+    request.state.gms_runtime_outcome = execution_result.status
     block_explanation = _block_explanation(
         message=payload.message,
         runtime_parts=runtime_parts,
@@ -448,17 +458,18 @@ async def run_guardrails(
         if block_explanation is not None
         else execution_result.response
     )
-    _store_conversation_turns(
-        payload,
-        app_id=app.id,
-        response=runtime_response,
-        history_context=history_context,
-        db=db,
-    )
+    with measure_stage("history_store"):
+        _store_conversation_turns(
+            payload,
+            app_id=app.id,
+            response=runtime_response,
+            history_context=history_context,
+            db=db,
+        )
 
     debug_enabled = _runtime_debug_enabled()
 
-    return GuardrailsRunResponse(
+    response = GuardrailsRunResponse(
         status=execution_result.status,
         app_id=app.id,
         client_id=app.client_id,
@@ -508,3 +519,5 @@ async def run_guardrails(
             else None
         ),
     )
+    request.state.gms_user_log["response_text"] = response.response
+    return response

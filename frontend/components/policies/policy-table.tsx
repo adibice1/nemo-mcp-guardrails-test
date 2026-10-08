@@ -1,6 +1,6 @@
 "use client";
 
-import { Edit2, Folder, Globe2, MoreVertical, Trash2 } from "lucide-react";
+import { Edit2, Folder, Globe2, Trash2 } from "lucide-react";
 import { FaMicrosoft } from "react-icons/fa6";
 import { SiGithub } from "react-icons/si";
 import { type PolicyRow } from "@/lib/mock-data";
@@ -42,9 +42,9 @@ export function PolicyTable({
 
   return (
     <div className="mt-6">
-      <div className="overflow-x-auto pb-2">
-        <div className="min-w-[980px]">
-          <div className="grid grid-cols-[46px_66px_180px_minmax(180px,1fr)_180px_150px_90px_94px_34px] items-center px-1 text-sm text-gms-muted">
+      <div className="pb-2">
+        <div className="w-full min-w-0">
+          <div className="grid grid-cols-[34px_44px_minmax(0,1fr)_minmax(0,1.6fr)_minmax(0,1fr)_104px_44px_44px] items-center px-1 text-center text-xs text-gms-muted xl:text-sm">
             <span />
             <span />
             <span>Policy Connector</span>
@@ -63,7 +63,6 @@ export function PolicyTable({
             />
             <span>Edit</span>
             <span>Delete</span>
-            <span />
           </div>
 
           <div className="mt-3 space-y-3">
@@ -149,7 +148,7 @@ function SortableHeader({
 
   return (
     <button
-      className="inline-flex items-center gap-2 text-left transition hover:text-gms-blue"
+      className="inline-flex w-full items-center justify-center gap-2 text-center transition hover:text-gms-blue"
       type="button"
       onClick={onClick}
     >
@@ -176,7 +175,7 @@ function PolicyRowItem({
 }) {
   return (
     <div
-      className="group grid min-h-[56px] cursor-pointer grid-cols-[46px_66px_180px_minmax(180px,1fr)_180px_150px_90px_94px_34px] items-center rounded-md border border-gms-line bg-white px-1 text-sm text-gms-text shadow-[0_1px_2px_rgba(55,70,110,0.04)] transition hover:border-gms-blue hover:bg-gms-blue hover:text-white dark:bg-[#20242c]"
+      className="group grid min-h-[56px] cursor-pointer grid-cols-[34px_44px_minmax(0,1fr)_minmax(0,1.6fr)_minmax(0,1fr)_104px_44px_44px] items-center rounded-md border border-gms-line bg-white px-1 text-center text-xs text-gms-text shadow-[0_1px_2px_rgba(55,70,110,0.04)] transition hover:border-gms-blue hover:bg-gms-blue hover:text-white dark:bg-[#20242c] xl:text-sm"
       role="button"
       tabIndex={0}
       onClick={() => onOpen(policy)}
@@ -193,19 +192,19 @@ function PolicyRowItem({
       <span className="flex justify-center">
         <ConnectorIcon connector={policy.connector} global={policy.global} />
       </span>
-      <span className="font-medium text-gms-blue group-hover:text-white">
-        {policy.connector}
+      <span className="min-w-0 break-words font-medium text-gms-blue group-hover:text-white">
+        {connectorLabel(policy.connector)}
       </span>
-      <span>{policy.name}</span>
-      <span>{formatPolicyDate(policy.created)}</span>
-      <span>
+      <span className="min-w-0 break-words">{policy.name}</span>
+      <span className="min-w-0 break-words">{formatPolicyDate(policy.created)}</span>
+      <span className="flex justify-center">
         {policy.global && (
           <span className="inline-flex h-9 min-w-[88px] items-center justify-center rounded-md bg-gms-blue px-5 text-white shadow-button group-hover:bg-white group-hover:text-gms-blue">
             Global
           </span>
         )}
       </span>
-      <span>
+      <span className="flex justify-center">
         <button
           className="flex h-8 w-8 items-center justify-center rounded-full bg-gms-blue-soft text-gms-blue group-hover:bg-[#c8d7ff] group-hover:text-[#2f63e8]"
           type="button"
@@ -218,7 +217,7 @@ function PolicyRowItem({
           <Edit2 className="h-4 w-4" />
         </button>
       </span>
-      <span>
+      <span className="flex justify-center">
         <button
           className={cn(
             "flex h-8 w-8 items-center justify-center rounded-full bg-[#fff0f1] text-gms-danger",
@@ -234,16 +233,15 @@ function PolicyRowItem({
           <Trash2 className="h-4 w-4" />
         </button>
       </span>
-      <button
-        className="text-[#d7deea] group-hover:text-white"
-        type="button"
-        aria-label={`More actions for ${policy.name}`}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <MoreVertical className="h-6 w-6" />
-      </button>
     </div>
   );
+}
+
+function connectorLabel(connector: string) {
+  const connectorKey = connector.trim().toLowerCase();
+  return ["", "global", "policy"].includes(connectorKey)
+    ? "None"
+    : connector;
 }
 
 function ConnectorIcon({

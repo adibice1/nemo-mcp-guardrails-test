@@ -20,16 +20,10 @@ The terminology migration is complete. `apps` now represent GMS client
 applications, while connector metadata lives in `connectors`,
 `connector_actions`, `connector_resources`, and `connector_tool_mappings`.
 
-## Current Handoff - 2026-08-27
+## Current Handoff - 2026-08-28
 
 For the shortest exact continuation guide, read
 `docs/work-computer-handoff.md` first.
-
-Committed runtime/config checkpoint: `2e74c65`. The frontend Linux AMD64 image
-and non-root port-80 listener are verified. The next machine must verify the
-complete Compose stack and `/api/gms` proxy on port `80`, then build/tag/push
-the final matching ACR image pair. Actual ACI creation remains with the
-supervisor's deployment team.
 
 The current prototype is DB-backed through the main guardrail path. Enabled
 Postgres policies feed runtime tool guarding, generated blocked tests, compiled
@@ -47,6 +41,13 @@ The frontend listens directly on `80` because ACI does not provide Docker-style
 port translation. Its non-root Node process receives only
 `NET_BIND_SERVICE`. External PostgreSQL and runtime-injected secrets remain
 part of the deployment contract.
+
+The corrected Linux AMD64 backend image was rebuilt and verified locally on
+2026-08-28. API, database, and frontend-proxy health checks passed; the native
+GitHub MCP executable also exposed write tools in a controlled
+`GITHUB_MCP_READ_ONLY=0` manual probe. The image has not yet been pushed to
+ACR, so the immediate deployment task is to rebuild/verify the matching
+frontend image and push both images with one release tag.
 
 Current implemented flow:
 
@@ -105,6 +106,8 @@ Current backend/API state:
   builds the NeMo rails model; `main_llm_config_id` builds the LangChain agent
   model. Missing IDs fall back to `.env` Azure OpenAI settings. Other providers
   remain target metadata until provider adapters are implemented.
+- `docs/llm-provider-guide.md` documents the supported Azure selection workflow,
+  credential boundaries, local-model networking, and provider-adapter checklist.
 - Runtime conversations are persisted in `conversation_messages` when
   `conversation_id` is supplied. Stored history wins on later requests; client
   `conversation_history` bootstraps a new conversation. Older turns are trimmed
@@ -200,7 +203,8 @@ github update file block -> create_or_update_file
 
 Normal full-run GitHub MCP tests should stay in read-only mode with
 `GITHUB_MCP_READ_ONLY=1`. Manual local write testing can set
-`GITHUB_MCP_READ_ONLY=0` in `.env` and restart the API. Future write-capable
+`GITHUB_MCP_READ_ONLY=0` in `.env` and restart a direct Python API, or recreate
+the backend container so Docker reloads `--env-file`. Future write-capable
 scripted testing should be a separate opt-in harness with a throwaway
 repository and limited token.
 

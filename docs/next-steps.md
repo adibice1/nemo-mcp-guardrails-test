@@ -170,21 +170,16 @@ docs/open-work-backlog.md
 Recommended deployment slice from the current state:
 
 ```text
-1. On the work computer, pull the docs-only handoff commit and confirm a clean tree.
-2. Run `docker compose up -d --build` with frontend host/container port 80.
-3. Verify frontend `/login`, backend `/health` and `/health/db`, and `/api/gms/health`.
-4. Verify management login, policy CRUD, and one allowed/blocked Runtime Test.
-5. Build final Linux AMD64 `guardrail-be` and `guardrail-fe` images directly.
-6. Push a matching immutable-tagged image pair to `guardrail.azurecr.io`.
-7. Give the deployment team the public-80/private-8000 ACI contract.
-8. Validate the same workflow after ACI deployment.
-9. Add GitHub Actions after the manual handoff works.
+1. Rebuild the Linux AMD64 `guardrail-fe` image for the release pair; the
+   corrected `guardrail-be:latest` image was rebuilt and verified on 2026-08-28.
+2. Reconfirm frontend container port 80 as the non-root `nextjs` user.
+3. Reconfirm the same-origin `/api/gms` proxy reaches private backend port 8000.
+4. Tag and push the matching image pair to `guardrail.azurecr.io`; the
+   2026-08-28 corrected backend image is still local at handoff time.
+5. Give the deployment team the public-80/private-8000 ACI contract.
+6. Validate login, policy CRUD, and one guarded GitHub request after deployment.
+7. Add immutable Git-SHA tags and GitHub Actions after the manual handoff works.
 ```
-
-Already completed on the home computer: the Linux AMD64 frontend image built,
-ran as non-root `uid=1001(nextjs)`, listened on `0.0.0.0:80`, and served its
-internal `/login` probe. The complete post-change Compose/proxy workflow is the
-remaining local proof; do not repeat frontend implementation work first.
 
 ACI must expose only frontend port `80`. The frontend image listens directly
 on `80`; it does not depend on unsupported ACI `80 -> 3000` remapping. Backend
@@ -322,6 +317,7 @@ Once normalized policy loading is stable:
 - `docs/frontend-screen-plan.md`
 - `docs/frontend-demo-flow.md`
 - `docs/runtime-flow-map.md`
+- `docs/llm-provider-guide.md`
 - `docs/project-context.md`
 - `docs/policy-schema-design.md`
 - `docs/testing-notes.md`

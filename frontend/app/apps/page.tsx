@@ -16,10 +16,8 @@ import { AppTopNav } from "@/components/shared/app-top-nav";
 import {
   createApp,
   deleteApp,
-  getEffectivePolicyAssignments,
   hasApiBaseUrl,
-  listAppConnectors,
-  listApps
+  listAppSummaries
 } from "@/lib/api-client";
 import { loadManagementSession } from "@/lib/management-auth";
 
@@ -45,22 +43,14 @@ export default function AppsPage() {
     try {
       setLoading(true);
       setError("");
-      const records = await listApps();
-      const summaries = await Promise.all(
-        records.map(async (app) => {
-          const [connectors, policies] = await Promise.all([
-            listAppConnectors(app.client_id),
-            getEffectivePolicyAssignments(app.client_id)
-          ]);
-          return {
-            ...app,
-            connectorCount: connectors.filter((connector) => connector.enabled)
-              .length,
-            policyCount: policies.enabled_assignment_count
-          };
-        })
+      const records = await listAppSummaries();
+      setApps(
+        records.map((app) => ({
+          ...app,
+          connectorCount: app.connector_count,
+          policyCount: app.policy_count
+        }))
       );
-      setApps(summaries);
     } catch (loadError) {
       setError(
         loadError instanceof Error

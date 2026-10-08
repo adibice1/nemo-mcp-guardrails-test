@@ -1,6 +1,11 @@
 # nemo-mcp-guardrails-test
 testing nemo on github mcp
 
+Latest resume point (2026-09-11): read [the work/home handover](work-computer-handoff.md)
+first. Logs/mobile filters and manual retention are implemented; the password
+lifecycle schema is previewed only and awaiting approval. The handover records
+uncommitted files, test limits, and the agreed next password workflow.
+
 Start with `target-architecture.md` for the confirmed production direction and
 terminology. Target `app` means a client application consuming the GMS, while
 target `connector` means GitHub MCP, SharePoint, Outlook, or another external
@@ -71,7 +76,7 @@ Current handoff status:
 Start here for current project context:
 
 - `file-map.md`: one-line backend/frontend file index and symptom lookup
-- `work-computer-handoff.md`: exact 2026-08-27 work-computer deployment handoff
+- `work-computer-handoff.md`: exact 2026-08-21 deployment continuation point
 - `open-work-backlog.md`: active unfinished work tracker
 - `project-context.md`: current architecture and implementation state
 - `frontend-api-map.md`: endpoint map for the Next.js frontend
@@ -81,6 +86,8 @@ Start here for current project context:
 - `testing-notes.md`: verified tests and commands
 - `next-steps.md`: recommended next work item
 - `runtime-flow-map.md`: concise file/function runtime flow map
+- `llm-provider-guide.md`: selecting Azure models and adding local or
+  non-Azure LangChain provider adapters
 - `policy-schema-design.md`: normalized schema design and migration plan
 - `PROJECT_SUMMARY.md`: broader product/architecture summary and handoff notes
 - `troubleshooting.md`: known setup and NeMo/GitHub MCP issues

@@ -10,7 +10,7 @@ The GMS backend prototype now has these core runtime pieces:
 - App authentication for runtime endpoints with `X-App-ID` and `X-API-Key`.
 - Management login and `/management-auth/me` now use scrypt password hashes and
   signed JWT bearer tokens. Public signup is disabled; system admins create
-  users from `/management-users` and issue one-time temporary passwords.
+  users from `/management-users` and issue temporary passwords displayed once.
 - Existing users receive `name` and unique `username` values backfilled from
   email. Settings loads the authenticated profile, saves those fields through
   `PUT /management-auth/me`, and Logout returns to the real Login page.
@@ -28,8 +28,9 @@ The GMS backend prototype now has these core runtime pieces:
   `AZURE_OPENAI_API_KEY` fallback.
 - Controlled runtime responses for connector tool errors and Azure output
   content-filter failures.
-- App-scoped deterministic checks for explicit quoted output prohibitions such
-  as `Cannot say 'hello'`; broad rules such as `No profanities` remain NeMo
+- App-scoped deterministic checks cover explicit quoted output prohibitions
+  such as `Cannot say 'hello'`, `Do not allow the word 'hello'`, and common
+  `don't`/`dont` wording. Broad rules such as `No profanities` remain NeMo
   semantic classifications.
 - Runtime responses expose `output_rail_source` and Azure-reported filtered
   categories. The frontend distinguishes `blocked (Azure: category)` from
@@ -71,7 +72,7 @@ The GMS backend prototype now has these core runtime pieces:
   Connectors, LLM, Policies, and Runtime Test tabs backed by FastAPI. App
   creation is system-admin-only.
 - The admin-only User Management workflow is implemented: `/user-management`
-  lists users, creates accounts with one-time temporary passwords, resets
+  lists users, creates accounts with temporary passwords displayed once, resets
   passwords, blocks/enables users, changes system role, and links users to apps
   as app developers.
 - App API keys are now backend-generated. Create and regenerate responses show
@@ -299,10 +300,25 @@ Current state:
   mutation are restricted to system admins.
 - The frontend automatically sends its saved JWT and hides or disables
   admin-only global-policy and guardrail-LLM controls for developers.
+- Admin creation/reset already returns a generated password for either role.
+  One-time display is not enforced single-use authentication; old JWTs are
+  not currently revoked by a password reset.
 
 Follow-up:
 
-- Add richer admin audit/logging screens after supervisor confirmation.
+- Current priority (2026-09-11): implement required personal-password setup
+  after admin creation/reset, plus voluntary password changes in Settings.
+- Stage 1 schema preview is awaiting approval, NOT applied: add
+  `must_change_password`, `temporary_password_expires_at`, and `session_version`,
+  extend the management-auth migration, and add isolated schema-default tests.
+  See `work-computer-handoff.md` for exact scope and existing-account defaults.
+- Then enforce restricted setup, credential expiry, JWT-version invalidation,
+  current-password verification, strong password validation, throttling, and
+  the frontend flows. Test both roles and direct-API bypass attempts.
+- Confirm temporary expiry, secure delivery/identity verification, production
+  HTTPS and MFA, and sole-admin recovery. Email recovery remains deferred.
+- Expand audit coverage only when new management mutation route families are
+  added; the current admin Traffic Logs and Audit Logs screens are implemented.
 
 ## Later Backend Work
 
@@ -366,6 +382,9 @@ Current implementation:
   interaction notes.
 - `frontend/` contains the Figma-matched implementation, a read/write
   API-backed `/policies` adapter, and functional app list/detail routes.
+- `/policies` now loads apps and assignment summaries first. Policy definitions
+  and builder options are loaded lazily when Create or Edit is opened, reducing
+  the initial backend request set from four requests to two.
 - `/user-management` provides admin-only user creation, password reset,
   enable/block, role changes, and app-developer links.
 - The app LLM tab uses a readable LLM-config catalogue and named selectors.
@@ -376,15 +395,66 @@ Next implementation slice:
   definition deletion to also remove assignment references.
 - Add LLM configuration update/delete and ownership controls after the
   organization confirms its provider-administration workflow.
-- Keep richer audit/logging screens as post-presentation work pending
-  supervisor confirmation.
+- Keep the audit route classifier synchronized with new management mutation
+  route families.
 
 ### 11. Audit, Analytics, And Caching
 
-Future enhancements:
+Implemented foundation (2026-09-09):
 
-- Conversation/action audit views.
-- Runtime event logging.
+- Added ORM models for runtime request metadata and ordered execution events.
+- Request-level recording now saves HTTP status, runtime outcome, verified
+  app identity, timestamps, duration, and two request lifecycle events.
+- Execution-event collection records call boundaries, rail decisions, tool
+  guard decisions, and skipped stages without raw content.
+- Offline collector tests cover isolation, privacy, limits, and late callbacks.
+- Admin-only runtime-log list/detail endpoints expose metadata and ordered
+  events through management JWT authentication.
+- Isolated HTTP endpoint tests cover authorization, filters, pagination,
+  validation, and safe response fields.
+- The admin Logs list/detail screens display metadata and execution events,
+  with app/outcome filters, refresh, pagination, and dark-mode styling.
+- Traffic detail also displays the captured user input and corresponding final
+  response when content exists; this replaces the separate User Logs view.
+- Central management audit middleware records sanitized metadata for app,
+  policy, assignment, connector, user, LLM-config, allowed-test and profile
+  mutations. Admin-only `/audit-logs` supports entity/outcome filtering and
+  pagination, and the frontend exposes it as the Audit Logs tab.
+- `tests/test_management_audit_http.py` covers successful/rejected/failed actions,
+  actor attribution, excluded runtime/read requests, RBAC, filters,
+  pagination, and request-body secret omission in isolated SQLite.
+- Logs filters stack on narrow screens (2026-09-11); desktop filters remain
+  side by side.
+- Manual retention is implemented in `scripts/cleanup_runtime_logs.py`:
+  dry-run by default, 30-day default retention, at most 500 completed requests
+  per invocation, and atomic deletion of requests plus their events on `--apply`.
+  SQLite checks passed; no live database cleanup was performed.
+
+Remaining work:
+
+- Verify authenticated Traffic/Audit navigation and mobile layout against the
+  deployed backend. Captured traffic content is plain text and may contain
+  sensitive user submissions.
+- Keep suppressed output, private reasoning, and credentials out of log exports.
+- Add an approved retention policy for `management_audit_logs`; runtime cleanup
+  currently covers only runtime traffic records.
+- Replace startup `create_all` schema evolution with a deployment migration
+  step before running multiple backend replicas; simultaneous first startup can
+  race while creating a brand-new table.
+- Schedule and verify the manual retention command in Azure; add automated frontend regression coverage.
+- PostgreSQL integration verification for the log-reading endpoints.
+- PostgreSQL retention verification using disposable fixtures, including
+  cutoff boundaries, event deletion, transaction rollback, and repeated batches.
+- HTTP recorder regression tests for request isolation, error paths, and
+  exclusion of secrets. Record observed events, not private model reasoning.
+- Verify lazy policy-builder loading against an authenticated deployed backend
+  and compare browser request timings before and after the change.
+- Per-app runtime bundle caching is implemented with database-revision
+  invalidation, a five-minute default TTL, concurrent-build deduplication, and
+  a 32-app default in-process LRU limit.
+- Verify cold-versus-warm Azure timings and tune runtime cache TTL/capacity.
+- Consider shared Redis revision coordination only when multiple backend
+  replicas need cache invalidation beyond the database fingerprint.
 - Redis cache for compiled app policy bundles.
 - Background workers for compilation and invalidation.
 
@@ -403,19 +473,15 @@ Current local milestone:
   `NET_BIND_SERVICE` so it can bind the HTTP port.
 - The Linux AMD64 frontend port-80 image build and non-root `/login` runtime
   probe passed on 2026-08-21.
+- The corrected Linux AMD64 backend image rebuild, API/database/proxy health,
+  and native GitHub MCP manual write-mode capability probe passed on
+  2026-08-28. That backend image is still local and has not been pushed to ACR.
 - The target hosting service is Azure Container Instances, not OpenShift.
 
-2026-08-27 work-computer handoff boundary:
+Next deployment work:
 
-- Runtime/config changes are committed in `2e74c65`.
-- Full Compose startup and frontend `/api/gms` proxy verification after the
-  port-80 change are still pending.
-- ACR push and deployed ACI validation are still pending.
-
-Next deployment work, in order:
-
-- Run and verify the complete local Compose stack on frontend port `80`.
-- Build final Linux AMD64 `guardrail-be` and `guardrail-fe` images directly.
+- Rebuild and locally test the matching `guardrail-fe` release image, then
+  reconfirm the already-corrected `guardrail-be` image.
 - Push a matching image pair to `guardrail.azurecr.io`.
 - Let the deployment team create a two-container ACI group with frontend
   public port `80`, private backend port `8000`, frontend

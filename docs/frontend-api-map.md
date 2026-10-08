@@ -15,6 +15,26 @@ X-App-ID: <client_id>
 X-API-Key: <plaintext app api key>
 ```
 
+## Runtime Logs
+
+These screens require a system administrator's management JWT, not an app
+API key. Backend permission checks apply to both list and detail requests.
+
+| Screen | Method | Endpoint | Purpose |
+| --- | --- | --- | --- |
+| `/logs` | `GET` | `/apps` | Populate the app filter |
+| `/logs` | `GET` | `/runtime-logs` | Read paginated request metadata |
+| `/logs/[requestId]` | `GET` | `/runtime-logs/{request_id}` | Read ordered execution events |
+| `/logs/[requestId]` | `GET` | `/runtime-logs/{request_id}/user-content` | Read captured input and final response when available |
+| `/logs` Audit Logs tab | `GET` | `/audit-logs` | Read sanitized management mutation metadata |
+
+The list uses `app_id`, `outcome`, `limit=25`, and `offset`. Pagination uses
+`has_more`; no total count is available. Timestamps are displayed in UTC.
+Traffic detail combines the prompt/final response with request metadata and
+execution events. Audit list filtering uses `entity_type`, `outcome`,
+`limit=25`, and `offset`. Audit records never include request/response bodies,
+passwords, API keys, tool arguments, credentials, or private model reasoning.
+
 ## Current Frontend Integration State
 
 The frontend policy integration lives in:
@@ -114,7 +134,7 @@ until its executable runtime workflow is implemented.
 
 The Login screen uses real management identities. Public signup is disabled:
 GMS administrators create user accounts from the admin-only User Management
-screen, then issue a one-time temporary password.
+screen, then issue a generated temporary password displayed once.
 
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
@@ -143,7 +163,7 @@ temporary-password reset, and app links.
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
 | `GET` | `/management-users` | Admin list of all GMS users |
-| `POST` | `/management-users` | Admin-created user with one-time temporary password |
+| `POST` | `/management-users` | Admin-created user with a temporary password displayed once |
 | `PUT` | `/management-users/{user_id}` | Update system role or enabled/blocked state |
 | `DELETE` | `/management-users/{user_id}` | Delete one user and their app links; admins cannot delete their own current account |
 | `POST` | `/management-users/{user_id}/password` | Generate a replacement temporary password |
@@ -153,6 +173,20 @@ temporary-password reset, and app links.
 
 Temporary passwords are returned only in the create/reset responses. Admins
 must copy them before closing the notice.
+
+### Pending Password Lifecycle - 2026-09-11
+
+The existing reset endpoint accepts developer and admin targets. One-time
+display does not imply credential expiry, forced replacement, or JWT revocation;
+these are not implemented. No self-service password-change endpoint exists yet.
+
+The agreed next flow requires recipients to replace generated credentials
+before normal GMS access, with backend-enforced restrictions. Settings will
+also support voluntary changes after current-password verification. Admin
+reset remains the fallback for forgotten passwords. Endpoint paths and payloads
+for the new flow are not finalized; do not wire frontend calls to assumed APIs.
+The schema-only first preview is still awaiting approval. See
+`work-computer-handoff.md` and section 6 of `open-work-backlog.md`.
 
 ## Apps
 

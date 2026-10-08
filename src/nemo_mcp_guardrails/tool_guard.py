@@ -1,11 +1,13 @@
 import re
 from dataclasses import dataclass
+from time import perf_counter
 from typing import Any
 
 from langchain_core.tools import StructuredTool, ToolException
 
 from nemo_mcp_guardrails.database.policy_loader import load_input_policy_objects
 from nemo_mcp_guardrails.policy_compiler import compile_policy
+from nemo_mcp_guardrails.runtime_events import record_runtime_event
 
 STATIC_BLOCKED_GITHUB_MCP_TOOLS: frozenset[str] = frozenset()
 
@@ -148,18 +150,60 @@ def guard_mcp_tool(
         effective_rules = (ToolGuardRule(blocked_tool_names),)
 
     async def guarded_coroutine(**kwargs: Any) -> Any:
-        """Block restricted tools and forward allowed calls to the real MCP tool."""
+        """Record guard decisions and invocation metadata without arguments."""
+        guard_started = perf_counter()
+        record_runtime_event(
+            "tool_guard.started", "tool_guard", "started",
+            tool_name=tool.name,
+        )
+        try:
+            for rule in effective_rules:
+                if tool.name not in rule.tool_names:
+                    continue
+                if rule.custom_resource is None or custom_resource_matches(
+                    rule.custom_resource,
+                    kwargs,
+                ):
+                    record_runtime_event(
+                        "tool_guard.completed", "tool_guard", "blocked",
+                        duration_ms=(perf_counter() - guard_started) * 1000,
+                        tool_name=tool.name, reason_code="gms_tool_guard",
+                    )
+                    raise ToolGuardViolation(tool.name)
+        except ToolGuardViolation:
+            raise
+        except BaseException:
+            record_runtime_event(
+                "tool_guard.raised", "tool_guard", "raised",
+                duration_ms=(perf_counter() - guard_started) * 1000,
+                tool_name=tool.name,
+            )
+            raise
 
-        for rule in effective_rules:
-            if tool.name not in rule.tool_names:
-                continue
-            if rule.custom_resource is None or custom_resource_matches(
-                rule.custom_resource,
-                kwargs,
-            ):
-                raise ToolGuardViolation(tool.name)
-
-        return await tool.ainvoke(kwargs)
+        record_runtime_event(
+            "tool_guard.completed", "tool_guard", "passed",
+            duration_ms=(perf_counter() - guard_started) * 1000,
+            tool_name=tool.name, reason_code="gms_tool_guard",
+        )
+        tool_started = perf_counter()
+        record_runtime_event(
+            "tool.started", "tool", "started", tool_name=tool.name,
+        )
+        try:
+            result = await tool.ainvoke(kwargs)
+        except BaseException:
+            record_runtime_event(
+                "tool.raised", "tool", "raised",
+                duration_ms=(perf_counter() - tool_started) * 1000,
+                tool_name=tool.name, reason_code="tool_invocation_error",
+            )
+            raise
+        record_runtime_event(
+            "tool.returned", "tool", "returned",
+            duration_ms=(perf_counter() - tool_started) * 1000,
+            tool_name=tool.name,
+        )
+        return result
 
     return StructuredTool.from_function(
         coroutine=guarded_coroutine,

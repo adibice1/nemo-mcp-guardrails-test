@@ -6,6 +6,7 @@ from typing import Any
 from sqlalchemy import (
     Boolean,
     DateTime,
+    Float,
     ForeignKey,
     Integer,
     String,
@@ -652,3 +653,96 @@ class CompiledPolicyRuleRecord(Base):
         server_default=func.now(),
         onupdate=func.now(),
     )
+
+
+class RuntimeLogRecord(Base):
+    """Persist a runtime request independently of conversation history."""
+
+    __tablename__ = "runtime_logs"
+
+    request_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    schema_version: Mapped[str] = mapped_column(String(10), default="1.0")
+    app_id: Mapped[int | None] = mapped_column(
+        ForeignKey("apps.id", ondelete="SET NULL"), index=True,
+    )
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True,
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    http_status: Mapped[int | None] = mapped_column(Integer)
+    outcome: Mapped[str] = mapped_column(String(30), default="started", index=True)
+    duration_ms: Mapped[float | None] = mapped_column(Float)
+    user_log: Mapped[RuntimeUserLogRecord | None] = relationship(
+        cascade="all, delete-orphan", passive_deletes=True,
+    )
+
+    events: Mapped[list[RuntimeLogEventRecord]] = relationship(
+        back_populates="request",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="RuntimeLogEventRecord.sequence",
+    )
+
+
+class RuntimeLogEventRecord(Base):
+    """Persist an ordered, content-free execution event."""
+
+    __tablename__ = "runtime_log_events"
+
+    request_id: Mapped[str] = mapped_column(
+        ForeignKey("runtime_logs.request_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    sequence: Mapped[int] = mapped_column(Integer, primary_key=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    event: Mapped[str] = mapped_column(String(50))
+    severity: Mapped[str] = mapped_column(String(10))
+    stage: Mapped[str] = mapped_column(String(20))
+    outcome: Mapped[str] = mapped_column(String(30))
+    duration_ms: Mapped[float | None] = mapped_column(Float)
+    tool_name: Mapped[str | None] = mapped_column(String(200))
+    reason_code: Mapped[str | None] = mapped_column(String(100))
+
+    request: Mapped[RuntimeLogRecord] = relationship(back_populates="events")
+
+
+class RuntimeUserLogRecord(Base):
+    """Store submitted input and the final user-visible response per request."""
+
+    __tablename__ = "runtime_user_logs"
+
+    request_id: Mapped[str] = mapped_column(
+        ForeignKey("runtime_logs.request_id", ondelete="CASCADE"), primary_key=True,
+    )
+    conversation_id: Mapped[str | None] = mapped_column(Text)
+    input_text: Mapped[str] = mapped_column(Text)
+    response_text: Mapped[str | None] = mapped_column(Text)
+
+
+class ManagementAuditLogRecord(Base):
+    """Persist one sanitized GMS management mutation."""
+
+    __tablename__ = "management_audit_logs"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    request_id: Mapped[str] = mapped_column(String(32), index=True)
+    occurred_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        index=True,
+    )
+    actor_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    actor_email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    actor_role: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    action: Mapped[str] = mapped_column(String(100), index=True)
+    entity_type: Mapped[str] = mapped_column(String(100), index=True)
+    target_path: Mapped[str] = mapped_column(String(500))
+    http_method: Mapped[str] = mapped_column(String(10))
+    http_status: Mapped[int] = mapped_column(Integer)
+    outcome: Mapped[str] = mapped_column(String(20), index=True)
+    client_ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(String(500), nullable=True)

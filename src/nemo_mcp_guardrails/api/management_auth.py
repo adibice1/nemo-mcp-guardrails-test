@@ -1,5 +1,5 @@
 import jwt
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -40,6 +40,7 @@ def _user_response(user: UserRecord) -> ManagementUserRead:
 
 
 def require_management_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: Session = Depends(get_db),
 ) -> UserRecord:
@@ -65,6 +66,11 @@ def require_management_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication required",
         )
+    request.state.gms_management_actor = {
+        "user_id": user.id,
+        "email": user.email,
+        "role": user.system_role,
+    }
     return user
 
 

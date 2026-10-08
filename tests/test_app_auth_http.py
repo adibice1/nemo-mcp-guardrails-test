@@ -81,6 +81,7 @@ class FakePromptRuleConfig:
 
     input_rule_count = 0
     output_rule_count = 1
+    prompt_rules: tuple[object, ...] = ()
 
 
 class FakeRuntimeParts:

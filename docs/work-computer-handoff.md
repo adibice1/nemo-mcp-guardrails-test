@@ -1,37 +1,200 @@
 # Work/Home Computer Handoff
 
-## Work Computer Start Here - 2026-08-27
+## Traffic And Audit Logs - 2026-09-23
+- The admin Logs screen now has `Traffic Logs` and `Audit Logs` tabs. The old
+  separate User Logs tab was removed because its prompt/response belongs to the
+  same runtime request as the traffic metadata and execution events.
+- Storage foundation: runtime_user_logs links input/final response to a
+  traffic request. Existing API startup creates the new table; no backfill.
+- Capture now links authenticated input and the final response to traffic logs,
+  including requests without conversation IDs. Failed requests retain a null
+  response; unauthenticated/invalid-body requests do not capture message content.
+- Content is excluded from the persistence-failure logger, but submitted text
+  may itself contain sensitive information. Admins can retrieve captured content
+  through GET /runtime-logs/{request_id}/user-content.
+- GET /runtime-logs?user_content_only=true lists only requests with captured
+  content, retaining app/outcome filters and pagination without returning text.
+- Every Traffic Log detail now attempts to load its captured input/final
+  response and renders it above execution events. A request without captured
+  content still renders normally.
+- `management_audit_logs` is an append-only metadata table for management
+  mutations. Central middleware records successful, rejected, and failed
+  POST/PUT/PATCH/DELETE requests for apps, policies, assignments, connectors,
+  users, LLM configurations, allowed test cases, and profile changes.
+- Audit records snapshot the actor email/role and retain request ID, action,
+  entity, path, method, status, outcome, client IP, user agent, and timestamp.
+  Request/response bodies, passwords, API keys, credentials, and private model
+  reasoning are deliberately not captured.
+- Admin-only `GET /audit-logs` supports entity/outcome filters and bounded
+  pagination. The frontend Audit Logs tab displays these records alongside the
+  existing Traffic Logs view.
+- Traffic and Audit table headers and values are centered on the same grid.
+  Audit columns now share the available width proportionally and wrap long
+  emails/request paths, so the table does not require horizontal scrolling.
+- The Policies table also uses a compact fluid grid. All policy, scope, date,
+  and action columns remain visible while long values wrap within their cells.
+  The inactive triple-dot control was removed; policy rows open summaries and
+  retain only the functional Edit and Delete actions.
+  Connector-independent rows display `None` in Policy Connector instead of
+  `Global` or generic `Policy`; their separate Global badge remains unchanged.
+  The Global column reserves a small right-side gap before Edit/Delete so the
+  scope badge and action controls do not appear clumped together.
+- `tests/test_management_audit_http.py` uses an isolated SQLite database and
+  real JWT permission checks to verify successful, rejected, and failed capture,
+  exclusions, filters, pagination, actor attribution, and secret omission.
+- Local PostgreSQL now has the `management_audit_logs` table because an existing
+  API test started the real application lifespan after this model was added.
+  There is no backfill. Run API tests sequentially during schema creation;
+  simultaneous `create_all` startup processes can race on a brand-new table.
+- Verification: the isolated `tests/test_runtime_logs_http.py` passed with
+  SQLite foreign keys enabled, covering traffic-response content exclusion,
+  dry-run preservation, and cascading retention deletion of message pairs.
+  The content endpoint also passed real-JWT access checks, exact response-field
+  and no-store checks, and 404 checks for missing requests or absent content.
+  The user-content-only listing passed filtering, pagination, empty-result,
+  invalid-boolean, no-store, and message-content exclusion checks in SQLite.
+  All six `tests/test_runtime_events.py` checks and Python compilation passed.
+  All four `tests/test_request_timing.py` checks also passed. Temporary inline
+  fake-runtime checks verified authenticated capture, final blocked/tool-error
+  responses, missing/shared conversation IDs, invalid credentials/body rejection,
+  runtime failures, concurrent request isolation, interrupted/non-2xx response
+  suppression, and metadata-only persistence-failure logging. These additional
+  checks were not saved as permanent regression tests.
+  No real database migration, live Azure/GitHub calls, or deployment was run.
 
-The runtime/configuration milestone is committed as `2e74c65` (`ACI changes`).
-The home-computer worktree was clean before this documentation-only handoff
-refresh. Commit and push this refresh before changing computers so the work
-computer receives the instructions below.
+## Resume Here - 2026-09-11
 
-Do not begin another frontend/backend feature slice yet. The immediate task is
-to complete the full port-80 Compose/proxy verification and then hand a matching
-image pair to the ACR/ACI deployment owner.
+The current priority is the password lifecycle, not further retention work.
+This handover update is documentation-only. The password Stage 1 code was
+previewed in chat but has NOT been approved or applied; no password migration
+has run. Do not interpret the request to update docs as code approval.
 
-Verified already:
+Confirmed workflow for developers and administrators:
 
-```text
-Next.js production build
-Linux AMD64 frontend image build
-non-root uid=1001(nextjs) process listening on 0.0.0.0:80
-internal frontend /login probe
-Compose rendering frontend target/published port 80
-```
+1. An admin creates an account and GMS generates its temporary password.
+2. The recipient uses it to choose a personal password before accessing normal
+   GMS features. The backend must enforce this restricted setup flow.
+3. An admin can regenerate a temporary password for a forgotten password;
+   the recipient repeats the required replacement step.
+4. Users who know their password can change it voluntarily through Settings
+   by verifying their current password.
 
-Still pending after the port change:
+Already implemented: User Management's Reset Password action and
+`POST /management-users/{user_id}/password` can target either role. The secret
+is displayed only once, but that does NOT currently make it single-use or
+expiring. Required replacement, self-service change, and invalidation of old
+JWTs after a password reset are not implemented.
 
-```text
-full docker compose up -d --build run
-frontend -> /api/gms -> backend proxy health on the complete stack
-management login, policy CRUD, and guarded GitHub Runtime Test through port 80
-final matching backend/frontend image build and ACR push
-deployed ACI validation (owned by the supervisor's deployment team)
-```
+Pending Stage 1 preview (schema only):
 
-## Current Deployment Milestone
+- Add `UserRecord.must_change_password` with false defaults,
+  `temporary_password_expires_at` as nullable timezone-aware datetime, and
+  `session_version` with zero defaults in `database/models.py`.
+- Extend `scripts/migrate_management_auth.py` with idempotent PostgreSQL
+  column additions; leave existing passwords/accounts unchanged.
+- Add `tests/test_password_lifecycle_schema.py`, an isolated SQLite defaults
+  check for both roles. This file does not exist yet.
+- Once approved, migrate an existing database before starting backend code
+  that expects these columns. Schema defaults alone enforce nothing.
+
+Later stages must cover authenticated change/setup APIs, restricted temporary
+sessions, expiry, atomic password/version updates, validation of JWT versions
+on every protected management request, and frontend first-login/Settings
+screens. Account creation and admin reset must set required replacement and
+expiry explicitly; replacing or resetting credentials must invalidate prior
+sessions. Include negative tests for direct-API bypass and both user roles.
+
+Security direction discussed: random temporary credentials, approved secure
+delivery and verified reset requesters, password-only minimum length of 15,
+support for at least 64 characters, common/compromised-password blocking,
+rate limiting, reviewed salted password hashing, HTTPS, and metadata-only
+account audit events. Do not add arbitrary composition rules or routine
+password rotation. These controls are targets, not a compliance claim.
+Temporary expiry duration and production throttling/deployment details still
+need selection. MFA for admins is a production priority. Email recovery and
+notifications remain unimplemented; recovery for the only admin is unresolved.
+
+Reference guidance discussed in chat:
+- [NIST password requirements](https://pages.nist.gov/800-63-4/sp800-63b/authenticators/)
+- [OWASP recovery guidance](https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html)
+
+Preview every proposed code file in the final chat response using unified
+diffs, filename/line references, and a per-file summary. Wait for approval
+before non-doc edits. Do not create preview markdown files. List commands run
+in the final response; never expose `.env` values or passwords.
+
+Before moving machines, review `git status --short`: the mobile-filter/docs
+changes, retention-test additions, and new `scripts/cleanup_runtime_logs.py`
+are still uncommitted at handover. The cleanup script is untracked and must
+be included when the user chooses to commit/transfer this work. No commit,
+image rebuild, registry push, or Azure deployment was performed here.
+
+## Runtime Logging Foundation - 2026-09-09
+
+- Added `RuntimeLogRecord` and `RuntimeLogEventRecord` to the ORM models.
+- `runtime_logs` holds request metadata; `runtime_log_events` holds ordered
+  execution events. Neither table has fields for prompts, responses,
+  credentials, tool arguments, or private model reasoning.
+- Deleting an app preserves its logs with a null app reference. Deleting a
+  runtime log removes its associated events.
+- No database migration or deployment was run for this change. The existing
+  API startup creates the missing tables when the updated backend runs.
+- Request-level recording now covers POST `/v1/guardrails/run`, including
+  rejected requests and handled runtime outcomes. App identity is attached
+  only after successful authentication, using the existing request ID.
+- Request lifecycle events bracket observed rail, agent, and tool events.
+  Classifier verdicts are distinct from call return/exception events.
+  Unreached stages receive `not_run` markers.
+- Each capture retains at most 256 detailed events, plus bounded truncation,
+  skipped-stage, and request lifecycle markers.
+  Persistence runs after the downstream request completes; forced process
+  termination can lose an in-flight log. A failed write emits metadata-only
+  JSON to backend logs without retrying the agent or tools.
+- `tests/test_runtime_events.py` provides offline collector regression checks.
+- Admin-only `GET /runtime-logs` returns paginated request metadata with
+  optional app/outcome filters. `GET /runtime-logs/{request_id}` returns
+  ordered execution events. Both use management JWT authentication.
+- Lists default to 25 records, cap at 100, and limit offsets to 10000.
+  They return `has_more` without a total-count query.
+- `tests/test_runtime_logs_http.py` checks access and query behaviour using
+  an isolated in-memory database and real management tokens.
+- The admin-only frontend `/logs` screen lists requests with app/outcome
+  filters, manual refresh, and 25-record pagination. `/logs/[requestId]`
+  displays metadata and ordered execution events using UTC timestamps.
+- Frontend log requests are cancellable and are not persisted in browser
+  storage. Successful API responses remain `no-store`.
+- The shared API client ignores stale authentication failures from an old
+  session when a different management session has already been established.
+- Frontend verification on 2026-09-10: TypeScript and scoped Next ESLint
+  checks passed. Temporary headless Edge tests with synthetic API responses
+  passed pagination, filtering, details, empty/error/retry states, cancellation,
+  and admin/developer/anonymous access checks. Inline API-client checks passed
+  stale/current 401 handling and session preservation after a 503.
+  Screenshots were inspected at desktop and narrow mobile sizes; cramped mobile
+  filter values were identified. The approved correction was applied on
+  2026-09-11: App and Outcome filters stack below the `sm` breakpoint while
+  preserving the side-by-side desktop layout.
+  The correction passed TypeScript, scoped ESLint, and isolated headless Edge
+  layout checks at 320, 390, and 1440 pixels, with screenshots inspected.
+  These checks did not contact PostgreSQL, Azure, or GitHub and are not yet
+  committed regression tests. No production image build or deployment ran.
+- Manual retention: `python scripts/cleanup_runtime_logs.py --days 30`
+  previews up to 500 expired completed requests; add `--apply` to delete
+  those requests and their events. Repeat for further batches. No scheduler.
+  Age uses `completed_at < UTC cutoff`; null completion times and exact-cutoff
+  records are retained. `--days` accepts 1 through 3650, defaulting to 30.
+  Do not shorten retention just to force deletion of real logs during testing.
+- Retention verification (2026-09-11): `tests/test_runtime_logs_http.py`
+  passed with dry-run, cutoff, unfinished-request, and event-cleanup checks;
+  all six `tests/test_runtime_events.py` checks passed. An additional inline
+  SQLite test with foreign keys enabled verified the 500-request cap,
+  rollback of request/event deletion, and repeated batches. No cleanup was
+  run against the real database; PostgreSQL retention verification is pending.
+- Scheduled retention, PostgreSQL endpoint verification, HTTP recorder regression
+  coverage, and automated frontend regression coverage remain unfinished.
+  Preview their code before edits.
+
+## Current Deployment Milestone - 2026-08-28
 
 The backend and frontend are ready to be built as separate Linux AMD64 images
 for Azure Container Registry and Azure Container Instances:
@@ -63,7 +226,8 @@ for TLS, a custom domain, WAF behavior, or other production ingress features.
 Read `docs/containerisation.md` before building, pushing, or changing ports. It
 contains direct `docker run`, ACR tag/push, ACI topology, secrets, and health
 check instructions. Actual ACI resource creation remains with the supervisor's
-deployment team; the current developer handoff is the tested image pair.
+deployment team; this developer handoff contains the verified backend image
+and the contract for producing the final matching image pair.
 
 Run the new launch-mode check after pulling this milestone:
 
@@ -71,58 +235,87 @@ Run the new launch-mode check after pulling this milestone:
 .\.venv\Scripts\python.exe tests\test_runtime_mcp_launch.py
 ```
 
+### Latest Local Verification - 2026-08-28
+
+The backend image was rebuilt after expanding deterministic output-rule phrase
+parsing. The local container verification proved:
+
+```text
+backend /health: ok
+backend /health/db: reachable
+frontend /api/gms/health proxy: ok
+backend GitHub MCP launch mode: native
+GITHUB_MCP_READ_ONLY=0 manual mode: write tools offered
+explicit output rule "Do not allow the word 'hello'": compiled to "hello"
+output guard and HTTP authentication regression tests: passed
+```
+
+The corrected backend image currently exists locally as
+`guardrail-be:latest`; it has not yet been pushed to ACR. Rebuild and verify
+the frontend before pushing one matching frontend/backend release pair.
+
 ## Read This First
 
-This file records the exact home-computer project state to continue from on the
-work computer.
+This file records the exact project state needed to continue safely between
+the work and home computers.
 
 Also follow the repository-level rules in `AGENTS.md`, especially the
 requirement to preview exact non-doc code diffs and wait for approval.
 
-On the work computer, first synchronize and confirm the handoff:
+After pulling on the home computer, use host port `5433` for project Postgres.
+Start the database and run the fast regression checks before new work:
 
 ```powershell
 git pull
-git log -1 --oneline
-git status
+docker compose up -d postgres
+.\.venv\Scripts\python.exe tests\test_app_auth_http.py
+.\.venv\Scripts\python.exe tests\test_policy_assignment_api.py
+.\.venv\Scripts\python.exe tests\test_policy_auto_compile.py
+.\.venv\Scripts\python.exe tests\test_guardrails_run_http.py
+.\.venv\Scripts\python.exe tests\test_output_guard.py
+.\.venv\Scripts\python.exe tests\test_runtime_connector_access.py
+.\.venv\Scripts\python.exe tests\test_app_connector_api.py
+.\.venv\Scripts\python.exe tests\test_runtime_connector_credentials.py
+.\.venv\Scripts\python.exe tests\test_app_policy_scope.py
+.\.venv\Scripts\python.exe tests\test_tool_guard.py
 ```
 
-Expected: the latest handoff commit is present and `git status` is clean.
+Keep `tests/test_nemo_mcp.py` as the slower opt-in live Azure/GitHub check after
+the fast suite is green. Normal scripted runs must use
+`GITHUB_MCP_READ_ONLY=1`.
 
-Then run the complete containerized stack before starting new implementation:
+### Home Computer Direct-Docker Resume
+
+The home computer's host tools use Postgres port `5433`. A backend container
+must instead reach that host database through `host.docker.internal:5433`.
+After substituting the local database username and password, the direct-image
+workflow is:
 
 ```powershell
-docker compose up -d --build
-docker compose ps
+docker build --platform linux/amd64 -t guardrail-be:latest .
+docker build --platform linux/amd64 --build-arg NEXT_PUBLIC_API_BASE_URL=/api/gms -t guardrail-fe:latest .\frontend
+
+docker rm -f guardrail-be guardrail-fe
+docker run -d --name guardrail-be --env-file .env -e DATABASE_URL="postgresql+psycopg://<user>:<password>@host.docker.internal:5433/nemo_mcp_guardrails" -p 8000:8000 guardrail-be:latest
+docker run -d --name guardrail-fe -e GMS_API_BASE_URL=http://host.docker.internal:8000 -p 80:80 guardrail-fe:latest
+
 Invoke-RestMethod http://127.0.0.1:8000/health
 Invoke-RestMethod http://127.0.0.1:8000/health/db
 Invoke-RestMethod http://127.0.0.1/api/gms/health
-Invoke-WebRequest -UseBasicParsing http://127.0.0.1/login
 ```
 
-After the stack is healthy, keep the focused regression set green:
+Open `http://127.0.0.1/login`. Swagger is available locally at
+`http://127.0.0.1:8000/docs`. If host port `80` is occupied, publish the
+frontend with `-p 3000:80` and use `http://127.0.0.1:3000`; the image still
+listens on port `80` internally.
 
-```powershell
-python tests/test_app_auth_http.py
-python tests/test_policy_assignment_api.py
-python tests/test_policy_auto_compile.py
-python tests/test_guardrails_run_http.py
-python tests/test_output_guard.py
-python tests/test_runtime_connector_access.py
-python tests/test_app_connector_api.py
-python tests/test_runtime_connector_credentials.py
-python tests/test_app_policy_scope.py
-python tests/test_tool_guard.py
-python tests/test_nemo_mcp.py
-```
-
-Before leaving the home computer, commit and push this docs-only handoff. The
-work computer cannot see unpushed local files:
+Before leaving the home computer, make sure this milestone is committed and
+pushed. The work computer cannot see unpushed local files:
 
 ```powershell
 git status
 git add .
-git commit -m "Refresh work-computer deployment handoff"
+git commit -m "Prepare backend and frontend handoff for GMS demo"
 git push
 ```
 
@@ -157,8 +350,17 @@ GITHUB_MCP_READ_ONLY=1  # safe default for scripted tests
 GITHUB_MCP_READ_ONLY=0  # manual local write testing
 ```
 
-Restart `scripts/run_api.py` after flipping this value. The committed
-`.env.example` keeps the safe read-only default.
+For a direct Python API run, restart `scripts/run_api.py` after flipping this
+value. For a containerized API, remove and recreate the backend container;
+`docker restart` does not reload values from `--env-file`. Rebuilding the image
+is required only when code or dependencies changed, not for an `.env`-only
+change. Verify the live container value with:
+
+```powershell
+docker exec guardrail-be printenv GITHUB_MCP_READ_ONLY
+```
+
+The committed `.env.example` keeps the safe read-only default.
 
 ## Current Milestone
 
@@ -320,6 +522,30 @@ frontend/app/policies/page.tsx
 frontend/.env.example
 ```
 
+## Frontend Initial-Load Optimisation
+
+- The Policies page loads apps and assignments first, reducing its initial
+  backend request set from four requests to two.
+- Policy definitions and builder mappings are fetched only when Create or Edit
+  is opened, then reused for the current Policies page session.
+- Editing fetches only the selected reusable policy definition instead of the
+  complete policy catalogue.
+- Backend runtime construction caching is implemented independently below so
+  frontend lazy loading and runtime-object reuse can be tuned separately.
+
+## Backend Runtime Cache
+
+- Repeated requests reuse each app's NeMo rails, Azure clients, guarded MCP
+  tools, and LangChain agent for five minutes by default.
+- One lightweight database revision query detects policy, assignment,
+  connector, app, compiled-rule, connector-metadata, or LLM changes before a
+  cached runtime is reused. Relevant changes therefore rebuild immediately.
+- Concurrent cold requests for one app share a single build, and least-recently
+  used entries are capped at 32 apps by default.
+- Set `NEMO_RUNTIME_CACHE_TTL_SECONDS=0` to disable reuse while debugging.
+- Compare the existing `runtime_setup` entry in `Server-Timing` between cold
+  and warm requests when validating Azure performance.
+
 The normal-developer Apps workflow is now implemented:
 
 ```text
@@ -330,14 +556,14 @@ The normal-developer Apps workflow is now implemented:
 /apps/[clientId]
 -> Overview: edit name and rotate API key
 -> Connectors: link/enable/disable/unlink GitHub
--> LLM: select named main and guardrail configurations
+-> LLM: update main and guardrail config IDs
 -> Policies: effective summary and link to filtered policy management
 -> Runtime Test: authenticated POST /v1/guardrails/run
 ```
 
 SharePoint is hidden from active connector selectors because only GitHub has
-normalized runtime metadata and an executable adapter. The LLM tab now uses the
-readable LLM-config catalogue and named selectors.
+normalized runtime metadata and an executable adapter. The LLM tab uses numeric
+config IDs until a readable LLM-config listing endpoint is added.
 
 App creation no longer accepts user-entered client IDs or API keys. The backend
 generates GUID-format client IDs and high-entropy API keys, returns the API key
@@ -350,6 +576,10 @@ role/status changes, password reset, and app links.
 The Settings dark-mode toggle now applies an app-wide Tailwind `dark` class.
 Saving writes `gms:theme` to browser `localStorage`; `app/layout.tsx` restores
 the class before rendering to reduce theme flashing.
+
+The browser tab icon is `frontend/app/icon.svg`. Next.js discovers it through
+the App Router icon convention; it mirrors the optically centered blue G used
+in the top navigation.
 
 The policy builder loads valid connector/action/resource choices from
 `GET /policy-options`; the frontend filters this to GitHub for the current
@@ -455,7 +685,11 @@ resource; SharePoint remains absent until it has executable mappings.
 - `src/nemo_mcp_guardrails/database/conversation_store.py`: conversation history load/append helpers.
 - `src/nemo_mcp_guardrails/database/models.py`: includes `conversation_messages`.
 - `src/nemo_mcp_guardrails/runtime_factory.py`: Azure, NeMo, MCP, and agent construction. It uses the authenticated app's `guardrail_llm_config_id` for NeMo rails and `main_llm_config_id` for the LangChain agent, with `.env` Azure fallback when either ID is missing.
+- `docs/llm-provider-guide.md`: developer workflow for selecting Azure
+  deployments and the implementation checklist for local/non-Azure providers.
 - `src/nemo_mcp_guardrails/guarded_execution.py`: reusable single-request guardrail workflow.
+- `src/nemo_mcp_guardrails/output_guard.py`: deterministic app-scoped quoted
+  output phrase extraction and matching.
 - `src/nemo_mcp_guardrails/tool_guard.py`: app-scoped execution-level MCP tool guard.
 - `tests/test_nemo_mcp.py`: full read-only integration runner and terminal display.
 - `tests/test_app_auth_http.py`: protected HTTP boundary and runtime-execution reachability test.
@@ -466,6 +700,8 @@ resource; SharePoint remains absent until it has executable mappings.
 - `tests/test_runtime_connector_credentials.py`: env-based GitHub PAT
   reference resolution test.
 - `tests/test_app_policy_scope.py`: real temporary app-assignment scope test.
+- `tests/test_output_guard.py`: isolated explicit output phrase parser and
+  matcher regression test.
 
 ## Verified Current Results
 
@@ -482,6 +718,10 @@ authenticated /run allowed/blocked app-scope HTTP coverage: passed
 runtime connector access enforcement: passed
 Linux AMD64 frontend port-80 image build: passed
 non-root uid=1001 Next.js port-80 /login probe: passed
+Linux AMD64 backend image rebuild after output-guard fix: passed
+backend container API/database/frontend-proxy health: passed
+container-native GitHub MCP readOnly=false manual probe: passed
+explicit output phrase parser regression test: passed
 temporary authentication rows cleanup: passed
 temporary app policy-scope rows cleanup: passed
 App A issue_write blocked / App B issue_write allowed: passed
@@ -510,8 +750,9 @@ Read `docs/open-work-backlog.md` first. It is the source of truth for
 unfinished plans and prevents half-completed ideas from being lost between
 machines.
 
-Immediate top priority: verify and hand off the corrected ACI image pair. The
-frontend management MVP, management JWT/RBAC, named LLM selectors, connector
+Immediate top priority: finish verifying and hand off the corrected ACI image
+pair. The corrected backend image is local and verified but not yet pushed.
+The frontend management MVP, management JWT/RBAC, named LLM selectors, connector
 management, policy management, and Runtime Test are already implemented.
 
 ```text
@@ -519,12 +760,19 @@ guardrail.azurecr.io/guardrail-fe:<matching-tag> -> public port 80
 guardrail.azurecr.io/guardrail-be:<matching-tag> -> private port 8000
 ```
 
-After the complete Compose stack passes, build both final Linux AMD64 images
-from the repository root:
+Build both Linux AMD64 images from the repository root:
 
 ```powershell
 docker build --platform linux/amd64 -t guardrail-be:latest .
 docker build --platform linux/amd64 --build-arg NEXT_PUBLIC_API_BASE_URL=/api/gms -t guardrail-fe:latest .\frontend
+```
+
+Verify the containerized local stack:
+
+```powershell
+docker compose up -d
+Invoke-RestMethod http://127.0.0.1/api/gms/health
+Invoke-WebRequest -UseBasicParsing http://127.0.0.1/login
 ```
 
 Then push one matching image pair and give the deployment owner this ACI

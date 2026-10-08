@@ -91,6 +91,76 @@ export type ManagementSession = {
   user: ManagementUser;
 };
 
+export const RUNTIME_LOG_OUTCOMES = [
+  "started", "passed", "blocked", "tool_error",
+  "completed", "rejected", "redirected", "error"
+] as const;
+
+export type RuntimeLogOutcome = typeof RUNTIME_LOG_OUTCOMES[number];
+
+export type RuntimeLog = {
+  request_id: string;
+  schema_version: string;
+  app_id: number | null;
+  started_at: string;
+  completed_at: string | null;
+  http_status: number | null;
+  outcome: string;
+  duration_ms: number | null;
+};
+
+export type RuntimeLogEvent = {
+  sequence: number;
+  timestamp: string;
+  event: string;
+  severity: string;
+  stage: string;
+  outcome: string;
+  duration_ms: number | null;
+  tool_name: string | null;
+  reason_code: string | null;
+};
+
+export type RuntimeLogDetail = RuntimeLog & {
+  events: RuntimeLogEvent[];
+};
+
+export type RuntimeLogPage = {
+  items: RuntimeLog[];
+  limit: number;
+  offset: number;
+  has_more: boolean;
+};
+
+export const AUDIT_LOG_OUTCOMES = [
+  "succeeded", "rejected", "failed"
+] as const;
+
+export type AuditLogOutcome = typeof AUDIT_LOG_OUTCOMES[number];
+
+export type AuditLog = {
+  id: string;
+  request_id: string;
+  occurred_at: string;
+  actor_user_id: number | null;
+  actor_email: string | null;
+  actor_role: string | null;
+  action: string;
+  entity_type: string;
+  target_path: string;
+  http_method: string;
+  http_status: number;
+  outcome: AuditLogOutcome;
+  client_ip: string | null;
+};
+
+export type AuditLogPage = {
+  items: AuditLog[];
+  limit: number;
+  offset: number;
+  has_more: boolean;
+};
+
 export type ClientApp = {
   id: number;
   name: string;
@@ -101,6 +171,11 @@ export type ClientApp = {
   guardrail_llm_config_id: number | null;
   created_at: string;
   updated_at: string;
+};
+
+export type ClientAppSummary = ClientApp & {
+  connector_count: number;
+  policy_count: number;
 };
 
 export type AppCreatePayload = {
@@ -312,7 +387,14 @@ async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
       detail?: string | { code?: string; policy_id?: number };
     } | null;
     const detail = body?.detail;
-    if (response.status === 401 && detail === "Authentication required") {
+    const currentSession = loadManagementSession();
+    if (
+      response.status === 401 &&
+      detail === "Authentication required" &&
+      currentSession &&
+      headers.get("Authorization") ===
+        `Bearer ${currentSession.access_token}`
+    ) {
       clearManagementSession();
     }
     const message =
@@ -414,8 +496,66 @@ export function unlinkManagedUserApp(userId: number, appId: number) {
   });
 }
 
-export function listApps() {
-  return apiRequest<ClientApp[]>("/apps");
+export function listApps(signal?: AbortSignal) {
+  return apiRequest<ClientApp[]>("/apps", { signal });
+}
+
+export function listRuntimeLogs(
+  filters: {
+    appId?: number;
+    outcome?: RuntimeLogOutcome;
+    userContentOnly?: boolean;
+    offset: number;
+  },
+  signal?: AbortSignal
+) {
+  const query = new URLSearchParams({
+    limit: "25",
+    offset: String(filters.offset)
+  });
+  if (filters.appId !== undefined) {
+    query.set("app_id", String(filters.appId));
+  }
+  if (filters.outcome) query.set("outcome", filters.outcome);
+  if (filters.userContentOnly) query.set("user_content_only", "true");
+  return apiRequest<RuntimeLogPage>(`/runtime-logs?${query}`, { signal });
+}
+
+export function getRuntimeLog(requestId: string, signal?: AbortSignal) {
+  return apiRequest<RuntimeLogDetail>(
+    `/runtime-logs/${encodeURIComponent(requestId)}`,
+    { signal }
+  );
+}
+
+export function getRuntimeUserLog(requestId: string, signal?: AbortSignal) {
+  return apiRequest<{
+    request_id: string;
+    conversation_id: string | null;
+    input_text: string;
+    response_text: string | null;
+  }>(`/runtime-logs/${encodeURIComponent(requestId)}/user-content`, { signal });
+}
+
+export function listAuditLogs(
+  filters: {
+    entityType?: string;
+    outcome?: AuditLogOutcome;
+    offset: number;
+  },
+  signal?: AbortSignal
+) {
+  const query = new URLSearchParams({
+    limit: "25",
+    offset: String(filters.offset)
+  });
+  if (filters.entityType) query.set("entity_type", filters.entityType);
+  if (filters.outcome) query.set("outcome", filters.outcome);
+  return apiRequest<AuditLogPage>(`/audit-logs?${query}`, { signal });
+}
+
+export function listAppSummaries() {
+  return apiRequest<ClientAppSummary[]>("/apps/summaries");
 }
 
 export function createApp(payload: AppCreatePayload) {
