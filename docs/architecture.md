@@ -304,6 +304,34 @@ end
 
 ## Current Prototype Overlay - 2026-06-16
 
+### Policy Authoring Addition - 2026-10-09
+
+The management plane now includes a live AI authoring flow:
+
+```text
+logged-in user selects Input/Output and describes a restriction in Create Policy
+-> POST /policy-assistant/suggest with management JWT
+-> input only: read enabled GitHub capability metadata
+-> backend Azure model generates JSON draft/related suggestions or clarification
+-> validate tagged response shape, requested rail and input capability combinations
+-> frontend renders the draft's flowchart, scope wording and predicted examples
+-> user explicitly applies, edits and saves through existing policy CRUD
+-> compiler/runtime enforcement follows the existing app/global assignment path
+```
+
+Authoring is separate from runtime enforcement: generation does not run NeMo
+rails, call GitHub tools, or persist a policy. It uses backend environment model
+settings, not an app-selected agent/classifier configuration. `/policy-preview`
+remains an offline sample-only sandbox. Predicted outcomes require review and
+are not evidence of runtime enforcement.
+
+Output drafting is connector-independent: `Output -> Custom resource` previews
+an assistant-response restriction stored in `conditions.output_rule`. For example,
+`Do not include the word "hello" in assistant responses.` uses the existing
+output compiler and quoted-word guard; no schema/enforcement change is needed.
+Output examples are assistant responses, not user prompts. Output drafts do not
+suggest additional bans. Other-connector input authoring remains future work.
+
 The full architecture above is still the target direction. The current research prototype is a smaller GitHub-only slice.
 
 Current implemented path:

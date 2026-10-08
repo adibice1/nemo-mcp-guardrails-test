@@ -4,6 +4,21 @@ This is the recommended GitHub MCP demo path for the first Next.js 13 frontend.
 It assumes the backend is running locally and the database has seeded connector
 metadata.
 
+## Optional Output Authoring Demo - 2026-10-09
+
+After signing in, open Create Policy, select Output, and describe
+`Block any agent response that contains the word "hello"`. Generate a live
+draft and show `Output -> Custom resource`, the quoted response restriction
+and illustrative assistant-response examples. Use this draft fills Output Rule;
+it does not save until Create is explicitly chosen in the intended app/global
+scope. Predictions are not an enforcement test. Saved output rules use the
+existing compiler and rails, unchanged by this authoring addition.
+
+For a no-backend demonstration, `/policy-preview` offers the same hello sample
+and in-memory mock creation without login or live AI. GitHub input drafting
+remains supported; input authoring for other connectors is future work.
+See `testing-notes.md` for verification and `frontend-api-map.md` for payloads.
+
 ## Demo Objective
 
 Show that a developer can configure a client app to use the Guardrails

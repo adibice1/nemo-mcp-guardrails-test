@@ -14,6 +14,8 @@ excluded.
 | Frontend loads without styling | `frontend/app/globals.css`, `frontend/tailwind.config.ts`, `frontend/postcss.config.js` |
 | Policies page data or state is wrong | `frontend/app/policies/page.tsx`, then `frontend/lib/api-client.ts` |
 | Policy modal fields or cascading options are wrong | `frontend/components/policies/create-policy-modal.tsx`, `src/nemo_mcp_guardrails/api/policy_metadata.py` |
+| AI authoring samples, flowchart, or draft application are wrong | `frontend/components/policies/policy-authoring-assistant.tsx`, `frontend/components/policies/create-policy-modal.tsx`, `frontend/app/policy-preview/page.tsx` |
+| Live input/output policy AI fails, uses the wrong rail, or suggests an invalid combination | `src/nemo_mcp_guardrails/api/policy_assistant.py`, `frontend/lib/api-client.ts`, `tests/test_policy_assistant_http.py` |
 | Policy create/edit/delete behaves incorrectly | `frontend/app/policies/page.tsx`, `src/nemo_mcp_guardrails/api/policy_assignment_resolution.py`, `src/nemo_mcp_guardrails/policy_service.py` |
 | Policies are missing, duplicated, or assigned to the wrong app | `src/nemo_mcp_guardrails/database/policy_loader.py`, `src/nemo_mcp_guardrails/policy_service.py`, `src/nemo_mcp_guardrails/api/apps.py` |
 | Compiled NeMo rule is stale or incorrect | `src/nemo_mcp_guardrails/policy_rule_service.py`, `src/nemo_mcp_guardrails/policy_compiler.py`, `src/nemo_mcp_guardrails/prompt_rule_compiler.py` |
@@ -52,6 +54,8 @@ excluded.
 
 ## Backend API
 
+- `src/nemo_mcp_guardrails/api/policy_assistant.py` - JWT-protected Azure input/output drafting with tagged rail validation, input-only capability checks, clarification and bounded errors; no policy writes.
+
 - `src/nemo_mcp_guardrails/api/__init__.py` - Marks the FastAPI module directory as a Python package.
 - `src/nemo_mcp_guardrails/api/main.py` - Creates FastAPI, configures CORS/lifespan, mounts routers, and exposes health endpoints.
 - `src/nemo_mcp_guardrails/api/auth.py` - Reads runtime auth headers and rejects invalid app credentials before runtime work.
@@ -84,6 +88,8 @@ excluded.
 
 ## Frontend Routes
 
+- `frontend/app/policy-preview/page.tsx` - Standalone local authoring sandbox with mock draft creation and no backend or login requirement.
+
 - `frontend/app/icon.svg` - Supplies the blue G browser-tab favicon through the Next.js App Router icon convention.
 - `frontend/app/layout.tsx` - Defines the root HTML layout, global CSS import, metadata, and saved-theme restoration.
 - `frontend/app/globals.css` - Contains the shared Tailwind layers and nearly all custom GMS visual styling.
@@ -100,6 +106,8 @@ excluded.
 - `frontend/app/api/gms/[...path]/route.ts` - Proxies same-origin frontend API requests to FastAPI using the runtime server URL.
 
 ## Frontend Components
+
+- `frontend/components/policies/policy-authoring-assistant.tsx` - Live/sample input/output drafts, rail-specific flowcharts and examples, related input drafts, and cancellable authenticated generation.
 
 - `frontend/components/shared/app-top-nav.tsx` - Renders shared navigation including admin-only User Management and Logs.
 - `frontend/components/logs/use-admin-log-data.ts` - Loads admin data with cancellation, retry, and stale-session protection.
@@ -156,6 +164,8 @@ excluded.
 - `AGENTS.md` - Stores project terminology, current architecture, safety rules, and agent handoff instructions.
 
 ## Tests, Scripts, And Deeper Explanations
+
+- `tests/test_policy_assistant_http.py` - Isolated real-JWT/SQLite checks with fake Azure for input/output drafting, rail validation, output word matching, authentication, clarification and failures.
 
 - `tests/test_runtime_events.py` - Checks event isolation, privacy, capture limits, and late callbacks offline.
 - `tests/test_runtime_logs_http.py` - Checks log access/query behavior and retention against an isolated SQLite database.

@@ -1,5 +1,17 @@
 # Guardrails Management System â€” Project Summary and Flow
 
+## Latest Authoring Update - 2026-10-09
+
+The authenticated Create Policy form now generates both GitHub input drafts
+and connector-independent output drafts using the existing backend Azure model.
+Output previews use `Output -> Custom resource`; for a hello-word ban the rule
+is `Do not include the word "hello" in assistant responses.` Explicit draft
+application fills Output Rule, stored through `conditions.output_rule` by
+existing CRUD. Generation never saves or executes tools. GitHub input related
+suggestions remain available; output drafts do not add other bans. Other
+connectors are future enhancements. No schema or runtime enforcement changes
+were made. See `frontend-api-map.md` and `testing-notes.md` for details.
+
 ## Confirmed Production Direction
 
 The target GMS is a full proxy used primarily with GitHub and SharePoint while

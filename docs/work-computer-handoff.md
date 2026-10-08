@@ -1,5 +1,26 @@
 # Work/Home Computer Handoff
 
+## Live Input/Output Policy Authoring - 2026-10-09
+
+- Approved output-authoring changes are applied. Create Policy exposes the
+  Input/Output selector before the assistant and sends `policy_type` to the
+  JWT-protected `/policy-assistant/suggest` endpoint.
+- GitHub input drafting still validates enabled write mappings and can suggest
+  related input policies. Output drafts are independent of connector metadata,
+  carry `output_rule`, use assistant-response examples, and do not suggest
+  additional bans. The flowchart is `Output -> Custom resource`.
+- The hello example fills `Do not include the word "hello" in assistant
+  responses.` into the existing Output Rule field. Persistence still requires
+  an explicit Create action and uses the existing assignment-safe CRUD path.
+- No database migration, credential change, connector execution or runtime
+  enforcement change was required. Backend Azure environment settings are used
+  for drafting; app-selected runtime LLM configurations remain separate.
+- `/policy-preview` stays login/database-free and sample-only, including its
+  output sample and mock creation. Other-connector input authoring is deferred
+  until those connectors are implemented in GMS.
+- See `testing-notes.md` for offline/live/browser verification and
+  `open-work-backlog.md` for remaining deployment and semantic evaluation work.
+
 ## Traffic And Audit Logs - 2026-09-23
 - The admin Logs screen now has `Traffic Logs` and `Audit Logs` tabs. The old
   separate User Logs tab was removed because its prompt/response belongs to the

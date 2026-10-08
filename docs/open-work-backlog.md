@@ -3,6 +3,36 @@
 This file tracks unfinished implementation work so active plans do not get lost
 across machines or Codex sessions.
 
+## Policy Authoring Assistant - 2026-10-09
+
+- Implemented local UI prototype: labelled sample prompt responses, a condition
+  flowchart, suggested custom-resource wording, illustrative input-rail cases,
+  explicit draft application, and separate related-policy previews.
+- `/policy-preview` provides a database-free, login-free UI sandbox using
+  existing mock options. Created drafts are in-memory only. This page does not
+  change access control on real management routes.
+- Sample mode covers PR merges/creation from non-staging into production and
+  the output word-ban example for "hello".
+- Live AI generation and authenticated integration are implemented under
+  `/policy-assistant/suggest`, using the existing backend Azure settings and
+  enabled metadata. Typed JSON validation rejects unsupported primary/related
+  combinations and assignment-scope fields. Ambiguous prompts can clarify.
+- The normal logged-in Create Policy form renders dynamic flows, wording,
+  examples and independent related drafts. Cancellation, stale-response
+  protection and bounded timeouts are implemented. `/policy-preview` remains
+  offline/sample-only. No hosted-database connection or enforcement change
+  was made, and generation never saves policies or invokes GitHub tools.
+- Output AI drafting uses tagged, connector-independent `output_rule` drafts,
+  response examples and `Output -> Custom resource` previews. Existing output
+  storage/compilation/enforcement is unchanged; no additional bans are suggested.
+- Other-connector input authoring remains deferred until GMS implements those
+  connectors. GitHub input drafting and related suggestions are preserved.
+- Remaining: deployment verification, broader semantic evaluation of generated
+  policies, durable browser regression coverage, and future authoring model
+  configuration/rate-limiting administration if required. Example outcomes
+  are predictions; actual runtime enforcement still needs separate evaluation.
+- See `frontend-screen-plan.md` and `testing-notes.md` for behaviour and checks.
+
 ## Current Status
 
 The GMS backend prototype now has these core runtime pieces:

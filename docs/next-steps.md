@@ -1,5 +1,15 @@
 # Next Steps
 
+## Authoring Progress - 2026-10-09
+
+Live GitHub input and connector-independent output drafting are implemented in
+Create Policy. Output previews use `Output -> Custom resource` and existing
+output-rule storage; applying a draft still requires review and explicit save.
+Other-connector input drafting is deferred until GMS implements those connectors.
+Next authoring work is deployment verification, broader semantic/runtime
+evaluation and durable browser regression coverage, tracked only in
+`open-work-backlog.md`. See `testing-notes.md` for completed checks.
+
 ## Current Milestone
 
 The current prototype is now DB-backed through the main guardrail path:

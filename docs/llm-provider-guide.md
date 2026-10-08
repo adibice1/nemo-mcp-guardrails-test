@@ -3,6 +3,17 @@
 This guide explains how an application developer selects an LLM for a GMS
 application and how maintainers add support for a new provider.
 
+## Policy Authoring Model - 2026-10-09
+
+Live input/output policy drafting through `/policy-assistant/suggest` uses the
+backend `AZURE_OPENAI_*` environment deployment, not the selected app's main or
+guardrail LLM configuration. Credentials remain server-side. The management
+JWT authorizes drafting; an app API key is not used. Tagged JSON validation
+rejects the wrong rail and unknown fields. Output drafting is independent of
+GitHub metadata and does not run a classifier or connector. A dedicated
+authoring-model selector/provider extension remains future work; see
+`open-work-backlog.md` and `frontend-api-map.md`.
+
 ## Runtime Model
 
 Each GMS application can select two independent models:

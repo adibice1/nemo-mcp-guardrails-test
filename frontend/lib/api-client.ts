@@ -362,6 +362,45 @@ export type PolicyAssignmentResolution = {
   policy_label: string;
 };
 
+type PolicyAssistantDetails = {
+  name: string;
+  explanation: string;
+  examples: Array<{
+    prompt: string;
+    expected: "block" | "not_blocked_by_this_policy";
+  }>;
+};
+
+export type PolicyAssistantSuggestion = PolicyAssistantDetails & (
+  | {
+      policy_type: "input";
+      connector: "github";
+      action: string;
+      resource: string;
+      custom_resource: string;
+    }
+  | {
+      policy_type: "output";
+      output_rule: string;
+    }
+);
+
+export type PolicyAssistantResult = {
+  draft: PolicyAssistantSuggestion | null;
+  related: PolicyAssistantSuggestion[];
+  clarification: string;
+};
+
+export function suggestPolicy(
+  prompt: string, policyType: "input" | "output", signal: AbortSignal
+) {
+  return apiRequest<PolicyAssistantResult>("/policy-assistant/suggest", {
+    method: "POST",
+    body: JSON.stringify({ prompt, policy_type: policyType }),
+    signal
+  });
+}
+
 async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   if (!hasApiBaseUrl()) {
     throw new Error("NEXT_PUBLIC_API_BASE_URL is not configured.");

@@ -1,5 +1,15 @@
 # Guardrails Management System Target Architecture
 
+## Current Authoring Slice - 2026-10-09
+
+The implemented management plane now offers live GitHub input drafting and
+connector-independent output drafting. Output previews use
+`Output -> Custom resource` and existing `conditions.output_rule` storage;
+generation requires review and never saves a policy or executes connectors.
+This addition does not implement SharePoint, Outlook or other-connector input
+authoring and does not change the target schema or runtime topology below.
+See `frontend-api-map.md` and `open-work-backlog.md` for current scope.
+
 ## Status
 
 This document records the confirmed target direction after supervisor review.

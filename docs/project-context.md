@@ -1,5 +1,17 @@
 # Project Context: NeMo Guardrails + GitHub MCP
 
+## Policy Authoring Update - 2026-10-09
+
+Create Policy now supports live GitHub input drafts and connector-independent
+output drafts through authenticated `POST /policy-assistant/suggest`. Selecting
+Output previews `Output -> Custom resource`, suggests response-rule wording,
+and fills the existing `conditions.output_rule` path after explicit review.
+Output examples are assistant responses; no additional word bans are suggested.
+Drafting uses the backend Azure environment deployment, does not save policies
+or run tools, and does not change runtime enforcement. Other-connector input
+authoring remains future work. See `frontend-api-map.md`,
+`frontend-screen-plan.md`, and `testing-notes.md` for the current contract.
+
 ## Confirmed Target Direction
 
 The production target is a full-proxy Guardrails Management System used

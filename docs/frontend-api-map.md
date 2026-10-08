@@ -15,6 +15,42 @@ X-App-ID: <client_id>
 X-API-Key: <plaintext app api key>
 ```
 
+## AI Policy Authoring
+
+| Screen | Method | Endpoint | Purpose |
+| --- | --- | --- | --- |
+| Create Policy input/output form | `POST` | `/policy-assistant/suggest` | Generate validated draft, wording, illustrative cases and related suggestions |
+
+This endpoint requires the current management JWT. Request body:
+
+```json
+{"policy_type": "input", "prompt": "Prevent merging PRs from non-staging into production"}
+```
+
+Response: `draft` (or null), `related` (at most two drafts), and `clarification`.
+Every draft has a `policy_type` tag. Input drafts contain `name`, `connector`,
+`action`, `resource`, `custom_resource`, `explanation`, and `examples` with
+`prompt`/`expected` values. Examples are illustrative predictions, not tests.
+Authenticated users may request suggestions;
+policy mutation/global-assignment permissions remain enforced by existing CRUD.
+
+For output requests send `policy_type: "output"` with a response restriction,
+e.g. `Block any agent response that contains the word "hello"`. Output drafts
+contain `policy_type`, `name`, `output_rule`, `explanation` and `examples`;
+example `prompt` values represent assistant responses. Output `related` is empty.
+The form stores the rule in `conditions.output_rule`, not `custom_resource`.
+Output generation does not require GitHub metadata. The default request rail
+remains input, and mismatched draft rails/unknown fields are rejected.
+
+Only enabled GitHub action/resource combinations supported by the write-policy
+compiler are accepted for input drafts; other-connector input authoring is deferred.
+The AI uses the backend Azure environment defaults and never receives assignment
+scope or browser credentials. Generation reads
+authentication rows and input metadata, but does not create policies/assignments
+or invoke connector tools.
+Responses use `no-store`. Provider failures, invalid drafts and timeouts produce
+controlled errors; the UI retains an explicit sample mode for offline previews.
+
 ## Runtime Logs
 
 These screens require a system administrator's management JWT, not an app

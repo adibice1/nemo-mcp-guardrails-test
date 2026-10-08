@@ -1,5 +1,63 @@
 # Troubleshooting Notes
 
+## AI Output Policy Drafting - 2026-10-09
+
+Select Output in Choose Rail Type before generating a response restriction.
+The assistant should show `Output -> Custom resource` and fill Output Rule,
+not the input connector/action/resource fields. Input and output draft JSON
+must have the matching `policy_type` tag. Restart the API after updating the
+backend, and refresh the frontend if an older input-only client is cached.
+
+Live generation requires a management login and the backend's existing
+`AZURE_OPENAI_*` settings; it does not require an app API key or the hosted DB.
+Output generation does not read GitHub metadata. `/policy-preview` deliberately
+stays offline and provides the hello example in Sample mode.
+
+An invalid model response produces a visible error rather than an invented
+sample policy. For a word ban, use quoted wording such as
+`Do not include the word "hello" in assistant responses.` The existing matcher
+ignores casing and does not match hello inside `shelloworld`. Other output
+restrictions still require separate runtime evaluation. Generation and applying
+a draft do not save a policy; review the form and explicitly choose Create.
+
+## Home Computer: No Local Management Account - 2026-10-09
+
+Management users live in the database selected by the backend's `DATABASE_URL`.
+An account in the hosted database is not automatically available in the home
+computer's separate PostgreSQL instance. Public signup is intentionally
+disabled; creating a local development administrator requires an authorized
+database bootstrap or an existing administrator's User Management action.
+
+Before provisioning, confirm the backend points to the intended local database
+and the `users` table has the current profile/authentication columns. A local
+bootstrap can insert `UserRecord` with email, name, unique username,
+`system_role="admin"`, and `enabled=True`, using the existing
+`management_auth.hash_password()` helper for `password_hash`. Use a transaction
+and reject existing emails/usernames rather than overwriting another account.
+Never store a plaintext password in the database or documentation. No SQL
+injection, login bypass, or change to authentication code is needed.
+
+The backend also requires a randomly generated `GMS_JWT_SECRET` of at least
+32 characters in its environment. Keep it in the ignored local `.env`, never
+in committed code or docs. A newly created account alone cannot log in if
+the backend cannot sign its management JWT. Restart the backend when needed
+after changing local configuration.
+
+On 2026-10-09, one enabled local test administrator was provisioned against
+`localhost:5433/nemo_mcp_guardrails` with the application's scrypt helper.
+A missing local JWT secret was generated in the ignored `.env`. HTTP login
+and authenticated `/management-auth/me` returned 200 and confirmed the admin
+role. Existing accounts were not modified and the hosted database was not used.
+
+Use `http://127.0.0.1:3000/login` for the normal local management UI. Its API
+URL points to `http://127.0.0.1:8000`, and the default CORS configuration
+allows origin `http://127.0.0.1:3000`. The separate port-3100
+`/policy-preview` page requires no login; normal login on port 3100 is not
+allowed by the current backend CORS configuration. Avoid running multiple
+Next.js development servers against the same `.next` directory.
+
+Credentials were delivered separately to the user and are not stored here.
+
 ## Terminology During Migration
 
 The terminology migration is complete. `apps` represents client applications

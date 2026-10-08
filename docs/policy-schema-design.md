@@ -1,5 +1,17 @@
 # Policy Schema Design
 
+## Output AI Draft Contract - 2026-10-09
+
+AI authoring adds no database columns or migration. The management request
+contains `prompt` and `policy_type` (input by default). Output draft JSON has
+`policy_type: output`, `name`, `output_rule`, `explanation`, and illustrative
+`examples`; it has no connector/action/resource/custom_resource fields.
+The visual `Output -> Custom resource` label does not introduce a storage
+field: existing CRUD stores the reviewed rule in `conditions.output_rule`.
+Drafting is non-persistent and existing assignment resolution/RBAC applies on
+save. Other-connector input drafting remains future work. The complete HTTP
+contract is in `frontend-api-map.md`.
+
 ## Target Terminology Update
 
 The confirmed production meaning of `app` has changed:

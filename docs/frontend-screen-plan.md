@@ -1,5 +1,68 @@
 # Frontend Screen Plan
 
+## Live AI Policy Authoring - 2026-10-09
+
+The normal Create Policy input/output form now defaults to Live AI for a signed-in
+management user with a configured backend URL. `Generate policy` sends the
+description to JWT-protected `POST /policy-assistant/suggest`. The backend uses
+its existing Azure environment deployment, separate from app-selected runtime
+models, and validates tagged JSON drafts against the requested rail. Input
+combinations must match enabled GitHub write mappings; output is independent
+of connector metadata.
+The flowchart, custom-resource wording, explanations, illustrative outcomes,
+and up to two related input drafts now render from the returned data.
+
+The rail selector appears before the assistant. Output mode offers a hello
+sample and a two-step `Output -> Custom resource` flowchart. Its rule checks the
+assistant response, fills the existing Output Rule field, and uses response
+examples. No additional output bans are suggested. Changing rails unmounts the
+assistant and cancels/invalidates pending requests. Other connectors remain
+future work.
+
+Ambiguous/unsupported/allow-policy descriptions can return a clarification
+instead of a draft. Generation failures show an error without substituting a
+sample response. Related drafts remain independently reviewed; `Use this draft`
+fills the editable form, preserves scope, and never saves a policy. Existing
+Create and assignment-resolution endpoints still enforce persistence/RBAC.
+
+Requests are cancelled when the prompt/mode changes or the assistant unmounts;
+late responses are ignored. Backend model calls have a 30-second outer timeout,
+and the frontend cancels a stalled request after 45 seconds. Secrets remain on
+the backend. No connector tool, runtime rail, or database mutation runs during
+generation. The endpoint reads local metadata/authentication rows; it does not
+require the hosted database or an app API key.
+
+Sample mode remains explicit. `/policy-preview` disables live drafting even
+when a management session exists, preserving its offline sandbox behaviour.
+The following initial prototype section records the original sample-only slice.
+
+## Local Policy Authoring Prototype - 2026-10-09
+
+Create Policy now includes an AI Policy Assistant for input policies. This
+first slice uses explicitly labelled sample responses, not live model calls.
+It recognises the two supplied non-staging-to-production examples for PR merge
+and PR creation, displays a flowchart and suggested custom-resource wording,
+and previews a related policy separately. Arbitrary prompts show an explanatory
+message instead of silently generating an unrelated draft.
+
+`Use this draft` fills the existing editable form and focuses the policy name.
+It preserves the selected app/global scope and checks the supplied policy
+options before applying a combination. Saving remains an explicit Create
+action; previewing a related suggestion never creates an additional policy.
+Expected pass/block examples are illustrations, not runtime test results.
+The enforcement model remains the existing semantic NeMo input rail.
+
+For home-computer UI work, open `/policy-preview` on the local Next.js server.
+This standalone page needs no management session, backend, database, Azure, or
+GitHub connection, even when the frontend API URL is configured. It keeps the
+latest mock draft only in React state and loses it on refresh. The normal
+management routes retain their authentication and persistence behaviour.
+The expanded modal scrolls within the viewport and supports narrow layouts
+and the existing dark theme. No new dependency or backend change is required.
+
+The live integration described above completes the next slice from this
+initial prototype; deployed verification and broader regression coverage remain.
+
 Target stack:
 
 ```text

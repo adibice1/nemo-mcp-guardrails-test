@@ -1,10 +1,21 @@
 # nemo-mcp-guardrails-test
 testing nemo on github mcp
 
-Latest resume point (2026-09-11): read [the work/home handover](work-computer-handoff.md)
-first. Logs/mobile filters and manual retention are implemented; the password
-lifecycle schema is previewed only and awaiting approval. The handover records
-uncommitted files, test limits, and the agreed next password workflow.
+Latest feature update (2026-10-09): live AI policy authoring is implemented in
+the authenticated Create Policy input/output form, backed by `/policy-assistant/suggest`
+and the existing backend Azure deployment. Drafts, flowcharts, wording and
+related input suggestions require explicit review before saving. Output drafts
+preview `Output -> Custom resource` and populate the existing output-rule field;
+other-connector input authoring remains future work. The standalone
+`/policy-preview` stays offline/sample-only. See
+[the frontend API map](frontend-api-map.md),
+[the frontend plan](frontend-screen-plan.md), and
+[verification notes](testing-notes.md).
+
+Read [the work/home handover](work-computer-handoff.md) for the earlier password
+workflow: its schema remains preview-only and awaiting approval. Use
+[the open backlog](open-work-backlog.md) for current unfinished work; older
+dated handover notes record historical commit/deployment boundaries.
 
 Start with `target-architecture.md` for the confirmed production direction and
 terminology. Target `app` means a client application consuming the GMS, while

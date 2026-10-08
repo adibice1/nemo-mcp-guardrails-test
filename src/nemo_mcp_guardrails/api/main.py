@@ -18,6 +18,7 @@ from nemo_mcp_guardrails.api.management_auth import router as management_auth_ro
 from nemo_mcp_guardrails.api.management_users import router as management_users_router
 from nemo_mcp_guardrails.api.policies import router as policies_router
 from nemo_mcp_guardrails.api.policy_metadata import router as policy_metadata_router
+from nemo_mcp_guardrails.api.policy_assistant import router as policy_assistant_router
 from nemo_mcp_guardrails.api.policy_assignment_resolution import (
     router as policy_assignment_resolution_router,
 )
@@ -73,6 +74,7 @@ app.include_router(management_auth_router)
 app.include_router(management_users_router)
 app.include_router(policies_router)
 app.include_router(policy_metadata_router)
+app.include_router(policy_assistant_router)
 app.include_router(policy_assignment_resolution_router)
 app.include_router(runtime_router)
 app.include_router(runtime_logs_router)

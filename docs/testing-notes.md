@@ -1,5 +1,165 @@
 # Testing Notes
 
+## Output AI Drafting Verification - 2026-10-09
+
+Before application, the proposed input/output sources passed the isolated HTTP
+diagnostic, full frontend TypeScript check and scoped ESLint using in-memory
+source overrides. The existing `tests/test_output_guard.py` also passed.
+Live Azure generation returned a quoted hello restriction with no related
+output bans; a GitHub regression call preserved the non-staging-to-production
+merge condition and related PR-creation suggestion. No policy/assignment was
+saved and no connector tool or runtime rail was executed.
+
+The expanded `tests/test_policy_assistant_http.py` checks output JWT protection,
+invalid request rails, tagged input/output responses, cross-rail/unknown-field
+rejection, no GitHub metadata dependency, empty output-related lists, and
+compatibility with the existing quoted-word matcher. `Hello!` blocks while
+`Good morning.` and `shelloworld` do not. These are authoring/helper checks, not
+an end-to-end NeMo runtime proof.
+
+Post-application checks passed against the actual source files:
+
+```powershell
+.\.venv\Scripts\python.exe tests\test_policy_assistant_http.py
+.\.venv\Scripts\python.exe tests\test_output_guard.py
+.\.venv\Scripts\python.exe -m py_compile src\nemo_mcp_guardrails\api\policy_assistant.py tests\test_policy_assistant_http.py
+cd frontend
+node node_modules/typescript/bin/tsc --noEmit --incremental false
+```
+
+Scoped ESLint also passed with zero errors/warnings using the existing
+`next/core-web-vitals` configuration via its Node API. On this Windows host,
+`npx.ps1` is blocked by execution policy; invoking the installed Node entry
+point avoids changing that policy.
+
+A temporary isolated hidden Edge session verified real login, live output
+generation, the two-step flowchart and output-rail label, response examples,
+explicit Output Rule/name fill and focus, and unchanged policy/assignment counts.
+Live GitHub input generation and form fill passed too. A simulated provider
+error displayed without sample fallback; changing rails discarded a delayed
+response. The standalone output sample and mock Create remained offline even
+with a valid session. No browser runtime errors were recorded. Screenshots
+were inspected, and layouts passed at 320/390/1440 pixels and in dark mode.
+The initial temporary harness expected an outdated mock-result label; its
+assertion was corrected to the existing page label and the full check passed.
+
+The backend was restarted on port 8000 to load the changes; the existing port
+3000 frontend was retained. No policy/assignment was created in the real DB,
+no GitHub tool or NeMo runtime ran, and no production build/deployment was made.
+These temporary browser checks are not permanent regression tests.
+
+## Live AI Policy Authoring Verification - 2026-10-09
+
+The proposed integration passed full frontend TypeScript, scoped Next.js
+ESLint, Python compilation and the isolated HTTP diagnostic in memory before
+application. Two live Azure calls using local enabled metadata returned valid
+merge drafts with `target=production AND source!=staging`. The final prompt
+also returned the related PR-creation draft with the same condition.
+No policy/assignment was created and no GitHub tool or runtime rail ran.
+
+The permanent isolated check uses SQLite, real management JWTs and fake Azure:
+
+```powershell
+.\.venv\Scripts\python.exe tests\test_policy_assistant_http.py
+```
+
+It covers missing/invalid authentication, request bounds and scope rejection,
+valid responses/no-store, invalid primary/related combinations, clarification,
+truncation/refusal, timeout, missing model settings and empty metadata.
+It does not contact the real database, Azure or GitHub.
+
+Post-application checks passed against the actual files:
+
+```powershell
+.\.venv\Scripts\python.exe tests\test_policy_assistant_http.py
+.\.venv\Scripts\python.exe -m py_compile src\nemo_mcp_guardrails\api\policy_assistant.py src\nemo_mcp_guardrails\api\main.py tests\test_policy_assistant_http.py
+```
+
+From `frontend/`, `node node_modules/typescript/bin/tsc --noEmit --incremental
+false` passed. Scoped Next.js ESLint passed via the installed ESLint API with
+`next/core-web-vitals` for the four frontend files. `git diff --check` passed.
+
+Temporary headless Edge/CDP checks verified real management login and a live
+HTTP-200 Azure-backed suggestion through the normal port-3000 Policies UI.
+The flowchart/draft preserved production as target and non-staging as source.
+Primary and related drafts filled the editable form only on explicit selection;
+policy and global-assignment counts remained unchanged throughout the checks.
+
+Additional synthetic-response browser checks verified controlled API errors,
+dynamic Issue/action rendering instead of a hardcoded PR diagram, and ignoring
+a late result after the prompt was edited. `/policy-preview` stayed sample-only
+despite an authenticated session. No browser runtime errors were observed.
+Viewport checks passed at 320, 390 and 1440 pixels; desktop and mobile dark-mode
+screenshots were visually inspected. These browser scripts were temporary and
+are not committed regression tests.
+
+The local backend was restarted to load the new router; the earlier port-3100
+verification server was stopped so the port-3000 dev server owns the shared
+`.next` output. No hosted database, policy CRUD write, GitHub tool, NeMo runtime
+evaluation, production image build or deployment was exercised for this slice.
+
+## Local Administrator Provisioning Verification - 2026-10-09
+
+- Confirmed the home database was local PostgreSQL on host port 5433, the
+  existing user schema was compatible, and the selected email/username were
+  unused before inserting one enabled admin with a generated password.
+- Verified the persisted password with `management_auth.verify_password()`.
+- Verified real `POST /management-auth/login` and authenticated
+  `GET /management-auth/me` returned HTTP 200 and the expected user/admin role.
+  JWTs and plaintext passwords were excluded from verification output.
+- The normal frontend `/login` on port 3000 returned HTTP 200; its login CORS
+  preflight returned 200 with the matching allowed origin. Port 3100 serves the
+  independent policy preview but its normal login preflight is rejected by
+  the current backend configuration.
+- A missing JWT signing secret was generated in the ignored local `.env`.
+  No authentication source code, hosted database, or existing user was changed.
+  See `troubleshooting.md` for the local bootstrap procedure. No credentials
+  are included in these notes.
+
+## Policy Authoring UI Prototype - 2026-10-09
+
+Before application, the three proposed TypeScript files passed a full frontend
+TypeScript check and scoped Next.js ESLint using in-memory sources. No
+database, Azure, or GitHub calls were made for those checks.
+
+Local manual verification path:
+
+```powershell
+cd frontend
+npm run dev
+```
+
+Open `http://127.0.0.1:3000/policy-preview`. This standalone page works without
+a management login or backend connection. Choose the merge example, preview
+it, inspect the condition and illustrative outcomes, and use the draft to
+fill the existing form. Edit the fields and Create to display a mock draft.
+Preview the related PR-creation policy separately. Check unsupported prompts,
+close/reopen reset, output/manual form behaviour, narrow layouts and dark mode.
+Refresh must clear the mock-created draft. No live AI generation or runtime
+policy evaluation is part of this prototype.
+
+Post-application verification passed on 2026-10-09:
+
+- `node node_modules/typescript/bin/tsc --noEmit --incremental false`, run
+  from `frontend/`, passed against the actual files.
+- Scoped Next.js ESLint passed via an inline Node script using the installed
+  ESLint API and `next/core-web-vitals` for the three changed/new code files.
+- The local Next.js dev server used
+  `node node_modules/next/dist/bin/next dev --hostname 127.0.0.1 --port 3100`.
+  `GET http://127.0.0.1:3100/policy-preview` returned HTTP 200.
+- Temporary headless Edge checks using an inline Node/CDP script passed sample
+  interpretation, unsupported-prompt handling, independent related previews,
+  metadata/draft application, policy-name focus, editable name/condition,
+  mock creation, form reset, manual output-policy creation, and refresh reset.
+- Layout checks passed at widths 320, 390, and 1440 pixels with no horizontal
+  overflow and a viewport-bounded scrollable modal. Dark theme styling passed;
+  desktop and 390-pixel dark screenshots were visually inspected.
+- No browser runtime errors or backend/external HTTP requests were observed.
+  The route stayed isolated even with an existing frontend `.env.local`.
+- `git diff --check` passed. These temporary browser checks were not added as
+  permanent regression tests. No production build, database, live AI, NeMo
+  classifier, GitHub tool, or deployment verification was run for this slice.
+
 ## Logging And Retention Handoff - 2026-09-11
 
 Run from the repository root in PowerShell:

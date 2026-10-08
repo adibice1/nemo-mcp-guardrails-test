@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, HelpCircle, Plus, X } from "lucide-react";
 import { type PolicyConnectorOption } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import { FormField } from "@/components/shared/form-field";
+import { PolicyAuthoringAssistant } from "@/components/policies/policy-authoring-assistant";
 
 export type PolicyDraft = {
   policyType: "input" | "output";
@@ -24,6 +25,7 @@ type CreatePolicyModalProps = {
   mode?: "create" | "edit";
   initialPolicy?: PolicyDraft | null;
   policyOptions: PolicyConnectorOption[];
+  enableLiveAssistant?: boolean;
   onClose: () => void;
   onSubmit: (policy: PolicyDraft) => Promise<boolean> | boolean;
 };
@@ -35,6 +37,7 @@ export function CreatePolicyModal({
   mode = "create",
   initialPolicy = null,
   policyOptions,
+  enableLiveAssistant = true,
   onClose,
   onSubmit
 }: CreatePolicyModalProps) {
@@ -47,6 +50,7 @@ export function CreatePolicyModal({
   const [policyName, setPolicyName] = useState("");
   const [setGlobal, setSetGlobal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const policyNameRef = useRef<HTMLInputElement>(null);
 
   const actionLocked = !connector;
   const resourceLocked = !action;
@@ -136,7 +140,8 @@ export function CreatePolicyModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent px-6">
-      <section className="relative w-full max-w-[840px] rounded-[14px] bg-white px-5 pb-5 pt-16 shadow-modal dark:bg-[#20242c]">
+      <section role="dialog" aria-modal="true" aria-label={`${mode === "edit" ? "Edit" : "Create"} policy`}
+        className="relative max-h-[90dvh] w-full max-w-[840px] overflow-y-auto rounded-[14px] bg-white px-5 pb-5 pt-16 shadow-modal dark:bg-[#20242c]">
         <button
           aria-label={`Close ${mode} policy modal`}
           className="absolute left-4 top-4 flex h-10 w-10 items-center justify-center rounded-xl bg-white text-gms-text shadow-[0_3px_12px_rgba(40,48,78,0.12)] dark:bg-[#2a2f39]"
@@ -151,9 +156,55 @@ export function CreatePolicyModal({
             {mode === "edit" ? "Edit Policy:" : "Create Policy:"}
           </h2>
 
+          <div className="mt-5 max-w-[240px]">
+            <SelectField
+              label="Choose Rail Type:"
+              required
+              placeholder="Rail Type"
+              tip="Input policies check the user's request before tools run. Output policies check the assistant response."
+              value={policyType}
+              options={[
+                { value: "input", label: "Input" },
+                { value: "output", label: "Output" }
+              ]}
+              onChange={(value) => {
+                if (value !== "input" && value !== "output") {
+                  return;
+                }
+                setPolicyType(value as "input" | "output");
+                setConnector("");
+                setAction("");
+                setResourceType("");
+                setCustomResource("");
+                setOutputRule("");
+              }}
+            />
+          </div>
+
+          {mode === "create" && (
+            <PolicyAuthoringAssistant
+              key={policyType}
+              policyType={policyType}
+              policyOptions={policyOptions}
+              enableLive={enableLiveAssistant}
+              disabled={submitting}
+              onUseDraft={(draft) => {
+                setPolicyType(draft.policyType);
+                setConnector(draft.connector);
+                setAction(draft.action);
+                setResourceType(draft.resource);
+                setCustomResource(draft.customResource);
+                setOutputRule(draft.outputRule);
+                setPolicyName(draft.name);
+                policyNameRef.current?.focus();
+              }}
+            />
+          )}
+
           <div className="mt-6 grid grid-cols-1 gap-8 md:grid-cols-[240px_1fr]">
             <FormField label="Name Policy:" required>
               <input
+                ref={policyNameRef}
                 className="h-7 w-full rounded border border-gms-blue bg-white px-3 text-sm text-gms-text outline-none placeholder:text-[#a9bdff] disabled:bg-[#f2f2f2] dark:bg-[#252932] dark:disabled:bg-[#363b45]"
                 placeholder="Type your Policy Name"
                 value={policyName}
@@ -183,29 +234,7 @@ export function CreatePolicyModal({
             )}
           </div>
 
-          <div className="mt-6 grid grid-cols-1 gap-7 md:grid-cols-4">
-            <SelectField
-              label="Choose Rail Type:"
-              required
-              placeholder="Rail Type"
-              tip="Input policies check the user's request before tools run. Output policies check the assistant response."
-              value={policyType}
-              options={[
-                { value: "input", label: "Input" },
-                { value: "output", label: "Output" }
-              ]}
-              onChange={(value) => {
-                if (value !== "input" && value !== "output") {
-                  return;
-                }
-                setPolicyType(value as "input" | "output");
-                setConnector("");
-                setAction("");
-                setResourceType("");
-                setCustomResource("");
-                setOutputRule("");
-              }}
-            />
+          <div className={policyType === "input" ? "mt-6 grid grid-cols-1 gap-7 md:grid-cols-3" : "hidden"}>
             {policyType === "input" && (
               <SelectField
                 label="Choose Connector:"

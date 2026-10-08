@@ -1,5 +1,15 @@
 # Runtime Flow Map
 
+## Authoring Is Separate From Runtime - 2026-10-09
+
+`POST /policy-assistant/suggest` is a management-JWT endpoint for live GitHub
+input or connector-independent output drafts. It does not execute this runtime
+flow. Output generation previews `Output -> Custom resource` and fills a rule
+that existing policy CRUD stores in `conditions.output_rule`. The compiler,
+app/global assignment scope, quoted-word check and NeMo output rail remain
+unchanged. Suggested example outcomes are predictions, not runtime results.
+Other-connector input authoring is deferred. See `frontend-api-map.md`.
+
 ## Target Full-Proxy Flow
 
 The current flow documented below is the GitHub research prototype. The

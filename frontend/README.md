@@ -2,6 +2,50 @@
 
 Next.js 13 frontend prototype for the Guardrails Management System.
 
+## Live AI Policy Drafting
+
+Sign in to the local management UI, open Policies, and choose Create Policy
+with the Input or Output rail. With `NEXT_PUBLIC_API_BASE_URL` configured,
+the assistant defaults to Live AI. Describe the restriction and click
+`Generate policy`.
+Review its dynamic flowchart, custom-resource wording, predicted outcomes and
+related input suggestions, then explicitly use a draft and Create to save it.
+Output mode previews `Output -> Custom resource`, fills the Output Rule field,
+and illustrates assistant-response decisions. Try the hello sample, which uses
+`Do not include the word "hello" in assistant responses.` No additional output
+bans are suggested; other-connector input drafting is future work.
+
+The backend calls the existing `AZURE_OPENAI_*` environment deployment through
+JWT-protected `POST /policy-assistant/suggest`. Input drafts read enabled GitHub
+metadata; output drafts do not depend on it. Both use typed rail validation;
+credentials stay server-side. Generation does not save policies or invoke tools.
+Clarification and provider errors display in
+the assistant; failed generation never silently falls back to sample data.
+
+Sample examples remain selectable. The dedicated `/policy-preview` route
+always disables live mode and continues to work without a login/database.
+See `docs/frontend-api-map.md` and `docs/testing-notes.md` for details.
+
+## Local Policy Authoring Preview
+
+Run `npm run dev` and open `http://127.0.0.1:3000/policy-preview` to try the
+new assistant without a database, backend, or management login. It also works
+when an API URL is configured; this page makes no backend requests.
+
+Choose a sample prompt, preview its flowchart/custom-resource wording, and
+click `Use this draft` to fill the editable policy form. Create displays a
+mock policy stored only until this page is refreshed. Related suggestions
+are independently previewed and never automatically saved. The assistant also
+appears in the normal Create Policy input form, using the supplied options
+and preserving the selected app/global scope.
+
+The standalone sandbox is explicitly labelled `Sample preview`: only the
+supplied PR merge/creation examples are recognised there. Live drafting is
+available in normal authenticated policy creation. Example pass/block cases
+in either mode are expectations, not test results.
+See `docs/frontend-screen-plan.md` and `docs/testing-notes.md` in the repository
+root for scope and verification.
+
 ## Current Scope
 
 This first UI slice recreates the uploaded Figma screens:
