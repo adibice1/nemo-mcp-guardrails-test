@@ -11,8 +11,11 @@ across machines or Codex sessions.
 - `/policy-preview` provides a database-free, login-free UI sandbox using
   existing mock options. Created drafts are in-memory only. This page does not
   change access control on real management routes.
-- Sample mode covers PR merges/creation from non-staging into production and
+- Saved examples cover PR merges/creation from non-staging into production and
   the output word-ban example for "hello".
+- The drafting selector and Yes/No boxes are removed. One Generate policy
+  button remains; example buttons load saved visualizations immediately and
+  edited custom descriptions use live AI.
 - Live AI generation and authenticated integration are implemented under
   `/policy-assistant/suggest`, using the existing backend Azure settings and
   enabled metadata. Typed JSON validation rejects unsupported primary/related
@@ -331,20 +334,24 @@ Current state:
 - The frontend automatically sends its saved JWT and hides or disables
   admin-only global-policy and guardrail-LLM controls for developers.
 - Admin creation/reset already returns a generated password for either role.
-  One-time display is not enforced single-use authentication; old JWTs are
-  not currently revoked by a password reset.
+  Copy Password now handles denied/missing clipboard access and fallback errors.
+- Settings supports voluntary password changes after current-password
+  verification. Replacements are 15-256 characters; old sessions are rejected
+  after a change or admin reset through an HMAC-derived JWT password version.
+  No schema migration was needed. Legacy tokens require a fresh login.
 
 Follow-up:
 
-- Current priority (2026-09-11): implement required personal-password setup
-  after admin creation/reset, plus voluntary password changes in Settings.
-- Stage 1 schema preview is awaiting approval, NOT applied: add
+- Remaining password priority: required personal-password setup after admin
+  creation/reset, temporary expiry, compromised-password screening and throttling.
+- The older Stage 1 schema preview was NOT applied: it proposed
   `must_change_password`, `temporary_password_expires_at`, and `session_version`,
-  extend the management-auth migration, and add isolated schema-default tests.
-  See `work-computer-handoff.md` for exact scope and existing-account defaults.
-- Then enforce restricted setup, credential expiry, JWT-version invalidation,
-  current-password verification, strong password validation, throttling, and
-  the frontend flows. Test both roles and direct-API bypass attempts.
+  an extended management-auth migration, and isolated schema-default tests.
+  Revisit that preview before implementing forced setup: session invalidation
+  now works without a session_version column. See `work-computer-handoff.md`.
+- Then enforce restricted setup and credential expiry with frontend/backend
+  coverage for both roles and direct-API bypass attempts. Voluntary changes,
+  current-password verification and reset/change session invalidation are done.
 - Confirm temporary expiry, secure delivery/identity verification, production
   HTTPS and MFA, and sole-admin recovery. Email recovery remains deferred.
 - Expand audit coverage only when new management mutation route families are

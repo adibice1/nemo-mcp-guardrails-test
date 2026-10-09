@@ -1,12 +1,13 @@
 import jwt
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from nemo_mcp_guardrails.api.management_auth_schemas import (
     ManagementLoginRequest,
+    ManagementPasswordChange,
     ManagementProfileUpdate,
     ManagementSignupRequest,
     ManagementTokenResponse,
@@ -18,6 +19,7 @@ from nemo_mcp_guardrails.management_auth import (
     create_access_token,
     decode_access_token,
     normalize_email,
+    hash_password,
     verify_password,
 )
 
@@ -66,6 +68,13 @@ def require_management_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication required",
         )
+    try:
+        decode_access_token(credentials.credentials, user=user)
+    except (jwt.InvalidTokenError, RuntimeError) as error:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+        ) from error
     request.state.gms_management_actor = {
         "user_id": user.id,
         "email": user.email,
@@ -153,3 +162,32 @@ def update_current_user(
 
     db.refresh(user)
     return _user_response(user)
+
+
+@router.put("/me/password", status_code=status.HTTP_204_NO_CONTENT)
+def change_current_password(
+    payload: ManagementPasswordChange,
+    user: UserRecord = Depends(require_management_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    """Verify the current password and atomically replace only this user's hash."""
+
+    if not verify_password(payload.current_password, user.password_hash):
+        raise HTTPException(400, detail="Current password is incorrect")
+    if not payload.new_password.strip():
+        raise HTTPException(400, detail="Choose a password containing more than whitespace")
+    if verify_password(payload.new_password, user.password_hash):
+        raise HTTPException(400, detail="Choose a different new password")
+    old_hash = user.password_hash
+    new_hash = hash_password(payload.new_password)
+    result = db.execute(
+        update(UserRecord)
+        .where(UserRecord.id == user.id, UserRecord.password_hash == old_hash)
+        .values(password_hash=new_hash),
+        execution_options={"synchronize_session": False},
+    )
+    if result.rowcount != 1:
+        db.rollback()
+        raise HTTPException(409, detail="Password changed during this request. Sign in again.")
+    db.commit()
+    return Response(status_code=204, headers={"Cache-Control": "no-store"})

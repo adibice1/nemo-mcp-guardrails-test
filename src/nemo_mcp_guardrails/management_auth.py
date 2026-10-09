@@ -87,6 +87,13 @@ def _jwt_expiry_minutes() -> int:
     return value
 
 
+def _password_token_version(user: UserRecord) -> str:
+    """Bind sessions to the stored password without exposing its hash."""
+
+    value = f"{user.id}:{user.password_hash}".encode("utf-8")
+    return hmac.new(_jwt_secret().encode("utf-8"), value, hashlib.sha256).hexdigest()
+
+
 def create_access_token(user: UserRecord) -> str:
     """Create a signed management access token for one user."""
 
@@ -95,17 +102,23 @@ def create_access_token(user: UserRecord) -> str:
         "sub": str(user.id),
         "email": user.email,
         "role": user.system_role,
+        "pwdv": _password_token_version(user),
         "iat": issued_at,
         "exp": issued_at + timedelta(minutes=_jwt_expiry_minutes()),
     }
     return jwt.encode(payload, _jwt_secret(), algorithm=JWT_ALGORITHM)
 
 
-def decode_access_token(token: str) -> int:
+def decode_access_token(token: str, *, user: UserRecord | None = None) -> int:
     """Verify a management token and return its user ID."""
 
     payload = jwt.decode(token, _jwt_secret(), algorithms=[JWT_ALGORITHM])
     subject = payload.get("sub")
     if not isinstance(subject, str) or not subject.isdigit():
         raise jwt.InvalidTokenError("Token subject is invalid")
+    if user is not None:
+        version = payload.get("pwdv")
+        if (int(subject) != user.id or not isinstance(version, str)
+                or not hmac.compare_digest(version.encode("utf-8"), _password_token_version(user).encode("ascii"))):
+            raise jwt.InvalidTokenError("Token credentials are outdated")
     return int(subject)

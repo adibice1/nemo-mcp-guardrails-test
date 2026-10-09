@@ -481,6 +481,21 @@ export function updateCurrentManagementUser(
   });
 }
 
+export function changeManagementPassword(
+  token: string,
+  currentPassword: string,
+  newPassword: string
+) {
+  return apiRequest<void>("/management-auth/me/password", {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({
+      current_password: currentPassword,
+      new_password: newPassword
+    })
+  });
+}
+
 export function listManagedUsers() {
   return apiRequest<ManagedUser[]>("/management-users");
 }

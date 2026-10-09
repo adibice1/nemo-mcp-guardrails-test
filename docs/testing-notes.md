@@ -1,5 +1,50 @@
 # Testing Notes
 
+## Assistant UI, Password Copy And Self-Service Change - 2026-10-09
+
+Approved changes were applied after their exact diffs were reviewed. The
+actual source passed the following checks:
+
+```powershell
+.\.venv\Scripts\python.exe tests/test_management_password_change.py
+.\.venv\Scripts\python.exe tests/test_policy_assistant_http.py
+.\.venv\Scripts\python.exe tests/test_management_audit_http.py
+.\.venv\Scripts\python.exe -m py_compile src/nemo_mcp_guardrails/api/management_auth_schemas.py src/nemo_mcp_guardrails/api/management_auth.py src/nemo_mcp_guardrails/management_auth.py src/nemo_mcp_guardrails/management_audit.py tests/test_management_password_change.py
+cd frontend
+node node_modules/typescript/bin/tsc --noEmit --incremental false
+```
+
+Scoped ESLint also passed with zero errors/warnings using the installed ESLint
+Node API and `next/core-web-vitals`. The six checked files were the assistant,
+User Management page, Settings form, new password-change form, API client, and
+Login page. `git diff --check` passed.
+
+The new isolated SQLite diagnostic checks admin/developer password changes,
+missing authentication, incorrect current passwords, unchanged/whitespace/
+short/oversized/non-string replacements, rejection of target-user fields,
+hashed storage, legacy-token rejection, old-password/login-session rejection,
+unaffected other-user sessions, admin-reset invalidation, and metadata-only
+success/rejection audit capture. It does not contact Postgres, Azure or GitHub.
+
+Before application, temporary in-memory UI checks passed modern Clipboard API
+copying, missing/denied API fallbacks, total copy failure feedback and temporary
+field cleanup. Assistant checks passed immediate example loading without AI,
+edited descriptions using AI, the output sample, and no live requests in the
+offline preview. These are simulated handler checks, not a real browser proof.
+The browser tool failed to connect in this session, so visual verification of
+the new controls is still outstanding. No real user password was changed, no
+online DB connection was configured, and no image/deployment was published.
+
+Local service smoke verification after applying the changes: Docker Desktop
+was stopped, so its existing PostgreSQL container was restored first. The API's
+initial startup attempt timed out while the DB was unavailable; restarting it
+after the container was healthy succeeded. `/health`, `/health/db`, and frontend
+`/settings` and `/policy-preview` returned 200. The live OpenAPI document includes
+`PUT /management-auth/me/password`. The safe target/connectivity snippet in
+`home-online-database.md` passed against the local work DB and printed only
+host/port/database plus a success flag. These probes do not verify a signed-in
+browser password change or an online DB connection.
+
 ## Output AI Drafting Verification - 2026-10-09
 
 Before application, the proposed input/output sources passed the isolated HTTP

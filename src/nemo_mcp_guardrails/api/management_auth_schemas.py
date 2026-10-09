@@ -38,6 +38,15 @@ class ManagementProfileUpdate(BaseModel):
     username: str = Field(min_length=1, max_length=320)
 
 
+class ManagementPasswordChange(BaseModel):
+    """Accept the current password and a replacement for the signed-in user."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    current_password: str = Field(min_length=1, max_length=256)
+    new_password: str = Field(min_length=15, max_length=256)
+
+
 class ManagementTokenResponse(BaseModel):
     """Return a bearer token and its authenticated user identity."""
 

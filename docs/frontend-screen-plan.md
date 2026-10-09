@@ -2,8 +2,8 @@
 
 ## Live AI Policy Authoring - 2026-10-09
 
-The normal Create Policy input/output form now defaults to Live AI for a signed-in
-management user with a configured backend URL. `Generate policy` sends the
+The normal Create Policy input/output form uses live AI for custom descriptions
+from a signed-in management user with a configured backend URL. `Generate policy` sends the
 description to JWT-protected `POST /policy-assistant/suggest`. The backend uses
 its existing Azure environment deployment, separate from app-selected runtime
 models, and validates tagged JSON drafts against the requested rail. Input
@@ -25,16 +25,29 @@ sample response. Related drafts remain independently reviewed; `Use this draft`
 fills the editable form, preserves scope, and never saves a policy. Existing
 Create and assignment-resolution endpoints still enforce persistence/RBAC.
 
-Requests are cancelled when the prompt/mode changes or the assistant unmounts;
+Requests are cancelled when the prompt changes or the assistant unmounts;
 late responses are ignored. Backend model calls have a 30-second outer timeout,
 and the frontend cancels a stalled request after 45 seconds. Secrets remain on
 the backend. No connector tool, runtime rail, or database mutation runs during
 generation. The endpoint reads local metadata/authentication rows; it does not
 require the hosted database or an app API key.
 
-Sample mode remains explicit. `/policy-preview` disables live drafting even
-when a management session exists, preserving its offline sandbox behaviour.
+The drafting-mode selector and Yes/No outcome boxes have been removed. There
+is one Generate policy button. Example buttons immediately display the saved
+workflow and examples; editing that text clears the preview and custom text
+uses live generation. `/policy-preview` disables live drafting even when a
+management session exists, preserving its offline sandbox behaviour.
 The following initial prototype section records the original sample-only slice.
+
+## Account Password Controls - 2026-10-09
+
+Settings now includes a separate Change password form with current/new/confirm
+password fields. The replacement is 15-256 characters and may be a memorable
+passphrase. Success clears the session and returns to Login with a confirmation.
+Admin resets and self-service changes invalidate older sessions. Copy Password
+in User Management handles unavailable/denied clipboard access and shows a
+manual-copy message if both clipboard methods fail. Forced first-login setup
+and temporary-password expiry remain future work.
 
 ## Local Policy Authoring Prototype - 2026-10-09
 

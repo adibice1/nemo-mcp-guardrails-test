@@ -1,5 +1,47 @@
 # Work/Home Computer Handoff
 
+## Assistant UI And Password Changes - 2026-10-09
+
+- Approved changes are applied to source. The assistant has one Generate policy
+  button and no drafting-mode selector or Yes/No outcome boxes. Example buttons
+  immediately load their saved draft/visualization; an edited description uses
+  live AI. `/policy-preview` remains offline and does not call the backend.
+- Copy Password now handles missing/denied Clipboard API access, tries a
+  selection-based fallback, and shows an error if both copy methods fail.
+- Settings has Current password, New password, and Confirm new password fields.
+  `PUT /management-auth/me/password` accepts the authenticated user's current
+  password and a new 15-256-character password. It rejects incorrect current
+  passwords, unchanged/all-whitespace replacements, and concurrent hash changes.
+- Management JWTs now carry an HMAC-derived password version. Password changes
+  and admin resets invalidate that user's earlier sessions. Existing tokens
+  without the version are rejected; sign in once after updating the backend.
+  Successful self-service changes return to Login with a confirmation message.
+- Password-change audit records contain metadata only. No schema migration was
+  needed. Forced first-login replacement and temporary-password expiry remain
+  unfinished; the older schema-only preview below was not applied.
+- Actual-source password-change, policy-assistant, and audit tests, Python
+  compilation, full frontend TypeScript, and scoped ESLint passed. See
+  `testing-notes.md` for verification limits. No deployment/image publish ran.
+
+## Home Computer: Accessing The Online Database - 2026-10-09
+
+Read [home-online-database.md](home-online-database.md) before changing connection
+settings. It explains using the deployed API from a local frontend, directly
+connecting a local Python backend/DBeaver to online PostgreSQL, TLS/firewall
+requirements, safe verification, and switching back to local development.
+
+The work computer currently uses Docker PostgreSQL at `127.0.0.1:5432`; the
+home local database uses port `5433`. Neither setting points directly to an
+online database. Same login credentials do not establish database sharing;
+an imported backup creates a separate copy with no automatic synchronization.
+The online provider/hostname/credentials have not been supplied or verified.
+The guide therefore uses placeholders and does not claim a remote connection
+has been configured. Keep real credentials in ignored local configuration.
+
+Important: Compose explicitly points its backend at the local `postgres`
+service. Editing `.env` DATABASE_URL alone does not override that Compose value.
+Use the direct Python launcher for the documented online-database option.
+
 ## Live Input/Output Policy Authoring - 2026-10-09
 
 - Approved output-authoring changes are applied. Create Policy exposes the

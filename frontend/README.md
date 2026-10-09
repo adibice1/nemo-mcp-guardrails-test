@@ -6,7 +6,7 @@ Next.js 13 frontend prototype for the Guardrails Management System.
 
 Sign in to the local management UI, open Policies, and choose Create Policy
 with the Input or Output rail. With `NEXT_PUBLIC_API_BASE_URL` configured,
-the assistant defaults to Live AI. Describe the restriction and click
+the assistant uses Live AI for custom descriptions. Describe the restriction and click
 `Generate policy`.
 Review its dynamic flowchart, custom-resource wording, predicted outcomes and
 related input suggestions, then explicitly use a draft and Create to save it.
@@ -22,8 +22,11 @@ credentials stay server-side. Generation does not save policies or invoke tools.
 Clarification and provider errors display in
 the assistant; failed generation never silently falls back to sample data.
 
-Sample examples remain selectable. The dedicated `/policy-preview` route
-always disables live mode and continues to work without a login/database.
+One Generate policy button remains; the drafting selector and Yes/No boxes have
+been removed. Example buttons immediately load their saved visualization and
+draft. Editing the example clears it and custom descriptions use live AI.
+The dedicated `/policy-preview` route always disables live generation and
+continues to work without a login/database.
 See `docs/frontend-api-map.md` and `docs/testing-notes.md` for details.
 
 ## Local Policy Authoring Preview
@@ -39,14 +42,21 @@ are independently previewed and never automatically saved. The assistant also
 appears in the normal Create Policy input form, using the supplied options
 and preserving the selected app/global scope.
 
-The standalone sandbox is explicitly labelled `Sample preview`: only the
-supplied PR merge/creation examples are recognised there. Live drafting is
+The standalone sandbox recognizes only the saved PR merge/creation and hello
+examples. Live drafting is
 available in normal authenticated policy creation. Example pass/block cases
 in either mode are expectations, not test results.
 See `docs/frontend-screen-plan.md` and `docs/testing-notes.md` in the repository
 root for scope and verification.
 
 ## Current Scope
+
+Settings includes Change password with current/new/confirmation fields. New
+passwords are 15-256 characters; successful changes return to Login. Existing
+sessions require a fresh login after the updated backend is started. Password
+changes and admin resets invalidate older sessions. User Management's Copy
+Password button now uses a fallback and shows a failure message when needed.
+See `docs/home-online-database.md` for accessing the online DB from a home setup.
 
 This first UI slice recreates the uploaded Figma screens:
 

@@ -1,6 +1,14 @@
 # nemo-mcp-guardrails-test
 testing nemo on github mcp
 
+Latest follow-up (2026-10-09): assistant controls are simplified, example
+buttons immediately load saved previews, password copying has a fallback, and
+Settings supports current-password-verified password changes. Changes/resets
+invalidate earlier management sessions; sign in again after this backend
+update. See [verification notes](testing-notes.md) and the
+[home online-database guide](home-online-database.md). No database migration,
+online connection configuration or deployment was performed for this slice.
+
 Latest feature update (2026-10-09): live AI policy authoring is implemented in
 the authenticated Create Policy input/output form, backed by `/policy-assistant/suggest`
 and the existing backend Azure deployment. Drafts, flowcharts, wording and
@@ -88,6 +96,7 @@ Start here for current project context:
 
 - `file-map.md`: one-line backend/frontend file index and symptom lookup
 - `work-computer-handoff.md`: exact 2026-08-21 deployment continuation point
+- `home-online-database.md`: home frontend/API/DBeaver access to the deployed database
 - `open-work-backlog.md`: active unfinished work tracker
 - `project-context.md`: current architecture and implementation state
 - `frontend-api-map.md`: endpoint map for the Next.js frontend

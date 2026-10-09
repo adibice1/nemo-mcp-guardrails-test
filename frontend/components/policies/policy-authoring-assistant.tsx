@@ -54,16 +54,11 @@ function outputSample(): PolicyAssistantSuggestion {
   };
 }
 
-function normalizePrompt(value: string) {
-  return value.trim().toLowerCase().replace(/\s+/g, " ").replace(/[.!?]+$/, "");
-}
-
 export function PolicyAuthoringAssistant({
   policyType, policyOptions, disabled = false, enableLive = true, onUseDraft
 }: Props) {
   const promptId = useId();
   const [prompt, setPrompt] = useState("");
-  const [mode, setMode] = useState<"sample" | "live">("sample");
   const [liveAvailable, setLiveAvailable] = useState(false);
   const [result, setResult] = useState<PolicyAssistantResult | null>(null);
   const [selected, setSelected] = useState<PolicyAssistantSuggestion | null>(null);
@@ -75,7 +70,6 @@ export function PolicyAuthoringAssistant({
   useEffect(() => {
     const available = enableLive && hasApiBaseUrl() && !!loadManagementSession();
     setLiveAvailable(available);
-    setMode(available ? "live" : "sample");
     return () => {
       requestId.current += 1;
       controller.current?.abort();
@@ -115,37 +109,33 @@ export function PolicyAuthoringAssistant({
     setPrompt(value);
   }
 
-  async function previewPolicy() {
+  function loadExample(value: string) {
     clearPreview();
-    if (mode === "sample") {
-      if (policyType === "output") {
-        if (normalizePrompt(prompt) !== normalizePrompt(outputPrompt)) {
-          setMessage("Sample mode supports the hello example. Select Live AI to describe another output policy.");
-          return;
-        }
-        const sample = { draft: outputSample(), related: [], clarification: "" };
-        setResult(sample);
-        setSelected(sample.draft);
-        return;
-      }
-      const match = actions.find(
-        (action) => normalizePrompt(prompts[action]) === normalizePrompt(prompt)
-      );
-      if (!match) {
-        setMessage("Sample mode supports the two examples. Select Live AI to describe another policy.");
-        return;
-      }
-      const sample = {
-        draft: sampleSuggestion(match),
-        related: [sampleSuggestion(match === "merge" ? "create" : "merge")],
-        clarification: ""
-      };
-      setResult(sample);
-      setSelected(sample.draft);
+    setPrompt(value);
+    const action = actions.find((item) => prompts[item] === value);
+    const sample: PolicyAssistantResult = policyType === "output"
+      ? { draft: outputSample(), related: [], clarification: "" }
+      : {
+          draft: sampleSuggestion(action!),
+          related: [sampleSuggestion(action === "merge" ? "create" : "merge")],
+          clarification: ""
+        };
+    setResult(sample);
+    setSelected(sample.draft);
+    setMessage("Example loaded. Edit the description to generate a different policy.");
+  }
+
+  async function previewPolicy() {
+    if (policyType === "output" ? prompt === outputPrompt
+      : actions.some((action) => prompt === prompts[action])) {
+      loadExample(prompt);
       return;
     }
+    clearPreview();
     if (!liveAvailable) {
-      setMessage("Sign in to the configured GMS backend to use live AI.");
+      setMessage(enableLive
+        ? "Sign in to the configured GMS backend to generate a policy."
+        : "Choose an example to preview. Live generation is unavailable on this page.");
       return;
     }
     const version = ++requestId.current;
@@ -178,25 +168,7 @@ export function PolicyAuthoringAssistant({
           <Sparkles className="h-4 w-4 text-gms-blue" aria-hidden="true" />
           AI Policy Assistant
         </h3>
-        <span className="rounded-full border border-gms-line px-2 py-1 text-xs text-gms-muted">
-          {mode === "live" ? "Live AI draft" : "Sample preview"}
-        </span>
       </div>
-      {enableLive && (
-        <label className="mt-3 block text-sm text-gms-text">
-          Drafting mode
-          <select className="ml-2 rounded border border-gms-line bg-white p-2 dark:bg-[#252932]"
-            value={mode} disabled={disabled}
-            onChange={(event) => {
-              clearPreview();
-              setMode(event.target.value as "sample" | "live");
-            }}>
-            <option value="sample">Sample examples</option>
-            <option value="live" disabled={!liveAvailable}>Live AI</option>
-          </select>
-          {!liveAvailable && <span className="mt-1 block text-xs text-gms-muted">Sign in to a configured backend to enable Live AI.</span>}
-        </label>
-      )}
       <label htmlFor={promptId} className="mt-4 block text-sm font-medium text-gms-text">
         Describe what you want to prevent
       </label>
@@ -208,23 +180,22 @@ export function PolicyAuthoringAssistant({
       <div className="mt-2 flex flex-wrap gap-2">
         {policyType === "output" ? (
           <button type="button" className={buttonClass} disabled={disabled}
-            onClick={() => changePrompt(outputPrompt)}>
+            onClick={() => loadExample(outputPrompt)}>
             Try hello example
           </button>
         ) : actions.map((action) => (
           <button key={action} type="button" className={buttonClass} disabled={disabled}
-            onClick={() => changePrompt(prompts[action])}>
+            onClick={() => loadExample(prompts[action])}>
             {action === "merge" ? "Try merge example" : "Try PR creation example"}
           </button>
         ))}
         <button type="button" className="rounded-md bg-gms-blue px-3 py-2 text-sm text-white disabled:opacity-50"
           disabled={disabled || busy || prompt.trim().length < 5} onClick={() => void previewPolicy()}>
-          {busy ? "Generating..." : mode === "live" ? "Generate policy" : "Preview policy"}
+          {busy ? "Generating..." : "Generate policy"}
         </button>
       </div>
       <p className="mt-2 text-xs text-gms-muted">
-        {mode === "live" ? "AI-generated drafts require review." : "Local sample responses."}
-        {" "}Previewing does not save policies or run connector tools.
+        Drafts require review. Previewing does not save policies or run connector tools.
       </p>
       <p role="status" className="mt-2 text-sm text-gms-text">{busy ? "Generating a policy draft..." : message}</p>
 
@@ -248,10 +219,6 @@ export function PolicyAuthoringAssistant({
               {selected.policy_type === "output"
                 ? "Does the assistant response violate this rule?" : "Does the request match this scope?"}<br />
               <strong>{ruleText || "Any matching request"}</strong>
-            </div>
-            <div className="mt-2 grid grid-cols-1 gap-2 text-center sm:grid-cols-2">
-              <div className="rounded-lg border border-gms-danger p-2">Yes → Block at {selected.policy_type} rail</div>
-              <div className="rounded-lg border border-gms-line p-2">No → Not blocked by this policy</div>
             </div>
           </div>
           <div>

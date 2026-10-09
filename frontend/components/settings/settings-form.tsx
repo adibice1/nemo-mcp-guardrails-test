@@ -12,6 +12,7 @@ import {
   updateStoredManagementUser
 } from "@/lib/management-auth";
 import { cn } from "@/lib/utils";
+import { PasswordChangeForm } from "@/components/settings/password-change-form";
 
 type SettingsState = {
   darkMode: boolean;
@@ -167,6 +168,7 @@ export function SettingsForm() {
             </div>
           )}
 
+          <PasswordChangeForm token={accessToken} />
           <SettingsToggle
             enabled={settings.darkMode}
             label="Dark Mode"

@@ -22,8 +22,10 @@ export default function LoginPage() {
   const [remember, setRemember] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [passwordChanged, setPasswordChanged] = useState(false);
 
   useEffect(() => {
+    setPasswordChanged(new URLSearchParams(window.location.search).get("passwordChanged") === "1");
     const session = loadManagementSession();
     if (!session) return;
 
@@ -112,6 +114,11 @@ export default function LoginPage() {
               </label>
             </div>
 
+            {passwordChanged && (
+              <p role="status" className="text-sm text-gms-text">
+                Password changed. Sign in with your new password.
+              </p>
+            )}
             {error && (
               <p className="rounded-md bg-[#fff0f1] px-3 py-2 text-xs font-semibold text-gms-danger">
                 {error}

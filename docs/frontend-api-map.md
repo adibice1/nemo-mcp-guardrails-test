@@ -49,7 +49,8 @@ scope or browser credentials. Generation reads
 authentication rows and input metadata, but does not create policies/assignments
 or invoke connector tools.
 Responses use `no-store`. Provider failures, invalid drafts and timeouts produce
-controlled errors; the UI retains an explicit sample mode for offline previews.
+controlled errors. Example buttons load saved previews immediately; edited
+descriptions use live AI through the single Generate policy button.
 
 ## Runtime Logs
 
@@ -178,11 +179,12 @@ screen, then issue a generated temporary password displayed once.
 | `POST` | `/management-auth/login` | Authenticate email/password and return a JWT |
 | `GET` | `/management-auth/me` | Restore the current bearer-token identity |
 | `PUT` | `/management-auth/me` | Save the current user's name and username |
+| `PUT` | `/management-auth/me/password` | Verify current password and change the signed-in user's password |
 
 The browser stores the prototype token in session storage, or local storage
 when Remember Me is selected. `api-client.ts` automatically attaches it as a
 Bearer token. Settings displays the real read-only email, persists
-name/username, has only the Dark Mode preference toggle, and clears the session
+name/username, offers Change password and the Dark Mode preference toggle, and clears the session
 on the red Logout action. Runtime app-auth failures such as invalid app API
 keys must not clear the management login; the frontend only clears the stored
 management session when the backend returns the management-auth detail
@@ -210,18 +212,25 @@ temporary-password reset, and app links.
 Temporary passwords are returned only in the create/reset responses. Admins
 must copy them before closing the notice.
 
-### Pending Password Lifecycle - 2026-09-11
+### Password Changes And Remaining Lifecycle Work - 2026-10-09
 
-The existing reset endpoint accepts developer and admin targets. One-time
-display does not imply credential expiry, forced replacement, or JWT revocation;
-these are not implemented. No self-service password-change endpoint exists yet.
+Settings sends `current_password` and `new_password` to the JWT-protected
+`PUT /management-auth/me/password`. New passwords are 15-256 characters;
+incorrect current passwords, unchanged/all-whitespace replacements and
+concurrent hash changes are rejected. Successful changes return `204` with
+`Cache-Control: no-store`, clear the browser session and return to Login.
+The endpoint changes only the authenticated user; target-user fields are rejected.
 
-The agreed next flow requires recipients to replace generated credentials
-before normal GMS access, with backend-enforced restrictions. Settings will
-also support voluntary changes after current-password verification. Admin
-reset remains the fallback for forgotten passwords. Endpoint paths and payloads
-for the new flow are not finalized; do not wire frontend calls to assumed APIs.
-The schema-only first preview is still awaiting approval. See
+Management tokens carry an HMAC-derived password version, so both self-service
+changes and admin resets invalidate earlier sessions. Tokens predating this
+version are rejected; sign in again after updating. Password-change audit
+capture stores metadata only. User Management copy now tries a clipboard
+fallback and displays a manual-copy message when copying fails.
+
+Admin reset remains the fallback for forgotten passwords. Forced first-login
+replacement, temporary-password expiry, throttling, compromised-password
+screening and recovery remain unfinished. The older schema-only preview was
+not applied and should be revisited against the current implementation. See
 `work-computer-handoff.md` and section 6 of `open-work-backlog.md`.
 
 ## Apps

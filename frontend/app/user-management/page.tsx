@@ -72,6 +72,7 @@ export default function UserManagementPage() {
   const [notice, setNotice] = useState("");
   const [secret, setSecret] = useState<SecretDisplay | null>(null);
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState("");
 
   const selectedUser = users.find((user) => user.id === selectedUserId) ?? null;
 
@@ -187,6 +188,8 @@ export default function UserManagementPage() {
       setCreateForm(EMPTY_CREATE_FORM);
       setSelectedUserId(created.id);
       setLinks([]);
+      setCopyError("");
+      setCopied(false);
       setSecret({
         email: created.email,
         password: created.temporary_password,
@@ -236,6 +239,8 @@ export default function UserManagementPage() {
       setError("");
       const reset: ManagedUserPasswordResetResponse =
         await resetManagedUserPassword(selectedUser.id);
+      setCopyError("");
+      setCopied(false);
       setSecret({
         email: reset.email,
         password: reset.temporary_password,
@@ -323,9 +328,36 @@ export default function UserManagementPage() {
 
   async function handleCopySecret() {
     if (!secret) return;
-    await navigator.clipboard.writeText(secret.password);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1800);
+    setCopied(false);
+    setCopyError("");
+    try {
+      if (navigator.clipboard?.writeText) {
+        try {
+          await navigator.clipboard.writeText(secret.password);
+          setCopied(true);
+          return;
+        } catch {
+          // Try the selection-based fallback when clipboard access is denied.
+        }
+      }
+      const field = document.createElement("textarea");
+      const focused = document.activeElement;
+      field.value = secret.password;
+      field.readOnly = true;
+      field.style.position = "fixed";
+      field.style.opacity = "0";
+      document.body.appendChild(field);
+      try {
+        field.select();
+        if (!document.execCommand("copy")) throw new Error("Copy failed");
+        setCopied(true);
+      } finally {
+        field.remove();
+        if (focused instanceof HTMLElement) focused.focus();
+      }
+    } catch {
+      setCopyError("Could not copy automatically. Select the password above and copy it.");
+    }
   }
 
   return (
@@ -451,7 +483,7 @@ export default function UserManagementPage() {
               <p className="font-extrabold">Temporary password for {secret.email}</p>
               <p className="mt-1 text-xs text-gms-muted">{secret.notice}</p>
             </div>
-            <button type="button" onClick={() => setSecret(null)}>
+            <button type="button" onClick={() => { setSecret(null); setCopyError(""); setCopied(false); }}>
               <X className="h-4 w-4" />
             </button>
           </div>
@@ -466,6 +498,7 @@ export default function UserManagementPage() {
             {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
             {copied ? "Copied!" : "Copy Password"}
           </button>
+          {copyError && <p role="alert" className="mt-2 text-gms-danger">{copyError}</p>}
         </div>
       )}
 

@@ -1,5 +1,53 @@
 # Troubleshooting Notes
 
+## Password Copy And Change - 2026-10-09
+
+Copy Password now catches unavailable/denied Clipboard API access, tries a
+selection-based fallback, and shows a manual-copy message if neither succeeds.
+Refresh the User Management page after updating the frontend. A failed copy
+does not dismiss the one-time password popup.
+
+Signed-in admins and developers can use Settings -> Change password. Enter the
+current password, a 15-256-character replacement and matching confirmation.
+Success returns to Login; use the new password. Password changes and admin
+resets invalidate earlier sessions, and tokens from before this backend update
+need a fresh login. Forced first-login setup/temporary expiry are still pending.
+The feature requires the updated backend's `/management-auth/me/password` route;
+a deployed older backend will not gain it from a local frontend change alone.
+
+For online-database access from home, read
+[home-online-database.md](home-online-database.md). It separates local Docker
+data from the deployed DB, explains the Compose DATABASE_URL override, and
+provides both a deployed-API route and direct PostgreSQL/DBeaver instructions.
+
+## Work Computer: Policy Assistant Failed To Fetch - 2026-10-09
+
+The work-computer frontend uses `http://localhost:3000/policies` and calls
+`http://127.0.0.1:8000`. During this diagnosis, the API was stopped and the
+only running project frontend was on port 3001. The API and frontend were
+restarted on 8000 and 3000 using the existing launchers. No source,
+environment-file, credential, or database-configuration change was needed.
+The configured work database at `127.0.0.1:5432/nemo_mcp_guardrails` was reachable;
+do not copy the home computer's port-5433 settings to this machine.
+
+Verify `/health`, `/health/db`, and the frontend page before checking Azure.
+The current default CORS origins permit localhost/127.0.0.1 on frontend port
+3000. Another frontend port requires an explicit matching origin. Avoid
+running two Next.js development servers against the same `.next` directory.
+
+Live Azure drafting succeeded with the existing backend settings. The text
+`any issues with the name 'hello'` returned a clarification asking whether
+issue creation should be blocked. To request that action explicitly, use
+`Block creation of GitHub issues titled 'hello'.` Drafting does not save a
+policy or execute GitHub tools.
+
+HTTP health/page checks and the policy-assistant CORS preflight returned 200;
+unauthenticated generation returned the expected 401 with the matching CORS
+origin. The isolated policy-assistant diagnostic passed. Live generation was
+checked directly through the authoring helper; an authenticated browser
+generation was not verified because the browser connection tool was unavailable.
+Refresh the page and sign in again if the management session has expired.
+
 ## AI Output Policy Drafting - 2026-10-09
 
 Select Output in Choose Rail Type before generating a response restriction.

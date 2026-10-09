@@ -41,6 +41,8 @@ def classify_management_action(
         "/v1/guardrails/run",
     }:
         return None
+    if normalized_path == "/management-auth/me/password" and method == "PUT":
+        return "user.password_changed", "user"
     if normalized_path == "/management-auth/me" and method == "PUT":
         return "profile.updated", "profile"
     if normalized_path == "/policies/compile-rules" and method == "POST":
