@@ -1,20 +1,212 @@
 # Work/Home Computer Handoff
 
-## Patch 019 Source And Rehearsal - 2026-10-16
+## Resume Here At Home - 2026-10-16
 
-Read [019 behavior and conversion](branch-routing-patch-019.md) before continuing.
-Branch creation routing is implemented with configurable equality/inequality and
-AND. Selective branch merges remain unavailable: matching metadata blocks, while
-other conditional merges refuse safely. Do not execute the earlier proposed
-disable SQL. The five branch definitions can be previewed/converted on the
-restored database without deleting policies or changing assignments.
+This section supersedes the older dated continuation instructions below. Read
+the [single backlog](open-work-backlog.md) and [019 behavior/limitations](branch-routing-patch-019.md)
+next. Patches 010-018 and the 019 source work are implemented; do not restart
+historical 009 subdivisions or the old "010 next" sequence. The user approved
+the five-file plain-English UI follow-up, which is applied and checked.
 
-The user confirmed the work .env targets local 127.0.0.1:5432 while DBeaver targets
-Azure PostgreSQL 18.6. The rehearsal uses a temporary PowerShell DATABASE_URL
-override for nemo_restore_check_20261016. Never assume that override exists in a
-new terminal or print its credential-bearing value. No Azure mutation was made
-by the implementation agent. Existing unsupported non-branch policies and model
-grant approvals remain independent rollout steps.
+### Files And Configuration To Bring
+
+At this handoff's start the working tree was clean at commit `4268d90`
+(`!8 patches of security and code optimization`); the new source files and
+plain-English formatter are tracked there. Remote/push availability was not
+checked. This handoff update itself is a later working-tree change: ensure it
+also reaches home. Confirm the source revision and files after transferring;
+do not assume a Git pull includes changes that have not been pushed.
+
+Keep real `.env` values, the GitHub token, app API key, database credentials and
+backup archives out of Git. Arrange private access to the required credentials
+at home. `.waylog/branch-conversion-review.json` and
+`.waylog/llm-grants-rehearsal.json` are ignored local review files, so Git does
+not transfer them. Keep them privately if needed as review records. Do not
+replay an old conversion manifest; the converted records have changed.
+Recreate the virtual environment and node_modules for the home machine rather
+than copying generated dependencies. The current requirements.txt includes
+constraints.txt automatically; use the committed frontend lockfile with npm ci.
+
+### Database Targets And Completed Rehearsal Work
+
+| Target | Host / port | Status |
+| --- | --- | --- |
+| Azure rehearsal | guardrails-postgresql.postgres.database.azure.com:5432 / nemo_restore_check_20261016 | Current continuation target; restored copy, not production |
+| Azure production | Same Azure host:5432 / nemo_mcp_guardrails | No production migration, conversion or cutover performed in this session |
+| Work local | 127.0.0.1:5432 / nemo_mcp_guardrails | Work .env target; missing the two security password-state columns when diagnosed |
+| Home local | localhost:5433 / nemo_mcp_guardrails | Separate local Docker database; use 5433 only for local host access, not Azure |
+
+The user completed the following on the Azure rehearsal copy:
+
+- Created a PostgreSQL custom-format backup with PostgreSQL 18.6 tools after
+  pg_dump 17 failed against server 18.6. Restored it into the rehearsal database.
+  Restore screenshots showed system-catalog ACL warnings; the user reported
+  matching application-table row counts. Full restore-log/error review is not
+  documented, so row counts alone are not a complete recovery certification.
+- Applied migrate_security_foundation.py --apply successfully, adding the
+  password-state columns and conversation-tail index while preserving accounts.
+- Applied migrate_app_llm_grants.py --apply-schema. The reviewed grant preview
+  approved Test App (app 4) main and guardrail defaults only: two new grants,
+  four unapproved entries. The apply output was not supplied; later successful
+  runtime is evidence of working access for Test App, not a complete grant audit.
+- Applied the reviewed branch conversion for policies 181, 182, 192, 193 and 209.
+  SQL results showed all five still enabled with one enabled/current compiled
+  row each. IDs, assignment scopes and names were retained.
+
+| Policies | Intended condition in plain English |
+| --- | --- |
+| 181 and global 209 | Source is not development, and target is staging |
+| 182 | Target is main |
+| 192 and 193 | Source is not staging, and target is production |
+
+The UI now renders these conditions in English in summaries, branch editing and
+AI draft previews. Exact versioned comparisons remain in storage for enforcement.
+Do not undo the conversion, disable these policies or restore unsupported prose
+as a workaround for presentation. User confirmation of the refreshed UI layout
+and edit/cancel behavior is still pending.
+
+### Reconnect The Home Backend To The Rehearsal Copy
+
+The work backend initially returned login HTTP 500 because it used local
+127.0.0.1:5432, whose users table lacked the new columns. After restarting from
+the PowerShell session with the Azure rehearsal override, the user confirmed
+login worked. Health/db only checks SELECT 1 and did not detect that mismatch.
+
+DATABASE_URL overrides belong to one PowerShell session. They do not travel
+with Git or survive in a new terminal. Keep each machine's local .env database
+setting; recreate the rehearsal override explicitly. From the home repository
+root, with dependencies installed, obtain credentials through a local prompt:
+
+```powershell
+$rehearsalCredential = Get-Credential -UserName "guardrailsadmin" -Message "Azure rehearsal database credentials"
+try {
+    $env:GMS_REHEARSAL_DB_USER = $rehearsalCredential.UserName
+    $env:GMS_REHEARSAL_DB_PASSWORD = $rehearsalCredential.GetNetworkCredential().Password
+    $rehearsalDatabaseUrl = @'
+import os
+from sqlalchemy.engine import URL
+print(URL.create(
+    "postgresql+psycopg",
+    username=os.environ["GMS_REHEARSAL_DB_USER"],
+    password=os.environ["GMS_REHEARSAL_DB_PASSWORD"],
+    host="guardrails-postgresql.postgres.database.azure.com",
+    port=5432,
+    database="nemo_restore_check_20261016",
+    query={"sslmode": "require", "connect_timeout": "15"},
+).render_as_string(hide_password=False))
+'@ | .\.venv\Scripts\python.exe -B -
+    if ($LASTEXITCODE -ne 0) { throw "Could not construct rehearsal connection setting." }
+    $env:DATABASE_URL = $rehearsalDatabaseUrl
+} finally {
+    Remove-Item Env:GMS_REHEARSAL_DB_USER, Env:GMS_REHEARSAL_DB_PASSWORD -ErrorAction SilentlyContinue
+    Remove-Variable rehearsalCredential, rehearsalDatabaseUrl -ErrorAction SilentlyContinue
+}
+```
+
+The URL output is captured, not displayed. Never echo DATABASE_URL. Verify the
+actual connection and schema without importing the src package or printing secrets:
+
+```powershell
+@'
+import os
+from dotenv import load_dotenv
+from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.engine import make_url
+load_dotenv(".env")
+url = make_url(os.environ["DATABASE_URL"])
+assert url.host == "guardrails-postgresql.postgres.database.azure.com", "Wrong server"
+assert url.database == "nemo_restore_check_20261016", "Wrong database"
+engine = create_engine(url)
+try:
+    with engine.connect() as connection:
+        assert connection.scalar(text("SELECT current_database()")) == "nemo_restore_check_20261016"
+        columns = {column["name"] for column in inspect(connection).get_columns("users")}
+        assert {"must_change_password", "temporary_password_expires_at"} <= columns
+    print("Verified Azure rehearsal database and password-state columns.")
+except Exception as error:
+    print("Verification failed:", type(error).__name__)
+    raise SystemExit(1) from None
+finally:
+    engine.dispose()
+'@ | .\.venv\Scripts\python.exe -B -
+```
+
+If verification fails, resolve credentials, TLS/network/firewall access or schema
+before starting the backend. Do not substitute production to get past the check.
+Home public-IP access to Azure has not been verified. See the
+[online connection guide](home-online-database.md) for network context.
+
+After successful verification, start in that same terminal:
+
+```powershell
+$env:GITHUB_MCP_READ_ONLY = "1"
+.\.venv\Scripts\python.exe -B scripts/run_api.py
+```
+
+Start the frontend in a second terminal from the home repository root:
+
+```powershell
+Set-Location frontend
+$env:NEXT_PUBLIC_API_BASE_URL = "/api/gms"
+$env:GMS_API_BASE_URL = "http://127.0.0.1:8000"
+npm.cmd run dev
+```
+
+Open http://localhost:3000 and sign in again. The backend also needs the local
+Azure OpenAI/GitHub settings and a valid GMS_JWT_SECRET from private configuration.
+Direct source execution defaults to the Docker MCP launcher, so Docker must be
+available. Compose's backend explicitly selects its own local postgres service;
+use the direct Python launcher above for this rehearsal.
+
+### Observed Browser Results And Immediate Next Tests
+
+The user confirmed login after fixing the database target. A Test App runtime
+search for octocat/Hello-World passed input, tool guard and output, with an actual
+search_repositories call/result in the trace. Screenshots then showed an input
+block for one branch-test request, and another request passing rails but receiving
+the agent's read-only refusal. The branch prompts and policy attribution are not
+visible in those screenshots. Neither demonstrates a write tool invocation or
+independent execution-level branch enforcement. History used was 32 turns.
+
+Continue in the order tracked in the backlog:
+
+1. Confirm the English summary and structured editor for policy 209; edit/cancel
+   must preserve its source-not-development and target-staging condition.
+2. Test invalid app API credentials: expect 401 before models/tools, then restore
+   the existing valid key. Do not regenerate keys just to perform the test.
+3. Complete branch creation tests on a dedicated repository the user owns, using
+   existing development, staging and feature/test branches and a fresh conversation
+   ID for each independent case. Source feature/test into staging should be
+   blocked by global policy 209; development into staging should not match 209.
+   Record the input/tool stage, policy attribution, tool trace and actual repository
+   result. A matching input block does not prove the execution-level guard ran.
+4. Review remaining unsupported legacy definitions and actual LLM grants before
+   full recompilation/production planning. Do not repeat already-completed schema
+   or branch conversion operations merely because older notes list them.
+
+The user explicitly requested enabling writes for manual testing. Instructions
+were supplied to stop the backend, set GITHUB_MCP_READ_ONLY=0 in its verified
+rehearsal terminal and restart it. Completion of that restart and a real write
+have NOT been confirmed. Use mode 0 only for the requested controlled manual
+test with a suitable existing token/repository; restart with mode 1 afterward.
+Do not change the committed default or broaden token permissions automatically.
+A rehearsal database does not sandbox GitHub: write tools can affect real repos.
+Do not test writes against octocat/Hello-World. Change the Runtime Test conversation
+ID from frontend-demo-1 to avoid earlier read-only responses influencing the test.
+
+Selective branch merging remains unavailable. Matching trusted PR metadata blocks;
+other branch-conditional merges fail closed because the pinned connector cannot
+atomically enforce the target branch. Do not bypass this refusal or claim that
+head-SHA checks alone fix it. Production cutover, production data changes, image
+publication and deployment remain outstanding and require a concrete reviewed
+rollout; --apply-rehearsal deliberately refuses production database names.
+
+Latest local verification: the approved English UI follow-up passed the existing
+branch-editor script, whole-project TypeScript, full lint and diff whitespace
+checks. Earlier 019 Windows/Linux offline checks, images and disposable PostgreSQL
+18.6 results are in [019 verification](branch-routing-patch-019.md#verification).
+Those image builds precede the English UI follow-up; rebuild the frontend release
+image before a future release. Earlier dated sections below are historical records.
 
 ## Patches 010-018 Implemented - 2026-10-16
 

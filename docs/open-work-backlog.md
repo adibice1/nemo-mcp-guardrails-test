@@ -14,6 +14,35 @@ Remaining work includes selective branch-merge execution beyond the conservative
 plus the documented unpatched development-tool dependency and lint compatibility
 follow-up. No release image was published or production data changed.
 
+## Resume From Home - Rehearsal Checkpoint 2026-10-16
+
+Read the latest [home continuation instructions](work-computer-handoff.md#resume-here-at-home---2026-10-16)
+before starting a server or changing data. The user has applied the security
+schema, grant-table schema and five reviewed branch conversions on Azure
+nemo_restore_check_20261016. Login and a real read-only GitHub search succeeded.
+The English UI follow-up is applied and checked. No production cutover occurred.
+
+Remaining work, in order:
+
+1. Transfer the current source/docs and recreate the home session's verified
+   Azure rehearsal DATABASE_URL override. Home local port 5433 is a separate DB.
+2. Verify English summaries and edit/cancel preservation; test invalid app-key
+   rejection. These manual outcomes have not been supplied.
+3. Finish controlled branch-creation checks on a user-owned test repository with
+   fresh conversation IDs. Write mode was requested and restart instructions
+   supplied; an actual write-mode restart or write tool call is not confirmed.
+   Existing screenshots show an input block and a read-only refusal only.
+4. Review actual app LLM grants and remaining unsupported legacy conditions;
+   reconcile them before full recompilation. Do not disable the required branch
+   policies or blindly replay their already-applied manifest.
+5. Resolve selective-merge enforcement and prepare a separately reviewed
+   production rollout, fresh backup, matching rebuilt images and cutover plan.
+   The rehearsal-only conversion helper is not a production apply path.
+
+Write mode affects real GitHub even with a rehearsal DB. Keep committed defaults
+read-only and preserve the existing merge refusal. Full evidence and secure
+restart instructions belong in the handoff rather than duplicate plans here.
+
 ## 019 Presentation Follow-up - Completed 2026-10-16
 
 The user approved the exact five-file preview in chat. One shared frontend
@@ -32,20 +61,21 @@ UI/AI authoring, canonical storage/reuse, conversion tooling and safe merge
 refusals are implemented and tested. See [019 results](branch-routing-patch-019.md).
 Selective merge execution remains incomplete because the pinned connector cannot
 atomically enforce the branch decision. Do not mark that capability complete or
-resume deployment based only on offline tests. No Azure data was changed.
+resume deployment based only on offline tests. The user subsequently applied
+the five branch conversions on the Azure rehearsal copy; production is unchanged.
 
 During the Azure restore rehearsal the user confirmed that administrators must
 be able to configure source/target branch restrictions through the management
 system without editing backend code for each policy. The user then clarified
 that retiring these policies is not the intended resolution. The earlier
 suggestion to disable policies 181, 182, 192, 193 and 209 is withdrawn; do not
-execute that SQL. Preserve definitions and assignments. No database change is
-performed or implied by this documentation update. Global policy 209 remains a
-runtime setup blocker under the current implementation.
+execute that SQL. Preserve definitions and assignments. Global policy 209 was a
+legacy runtime setup blocker before conversion; the user has now converted it
+on the rehearsal database. Production conversion remains unverified/unapplied.
 
-The completed review patches deliberately support one literal equality. They do
-not satisfy this compound-branch requirement. Implement it as one cohesive new
-feature slice, rather than another historical 009 subpatch or a manual cleanup:
+The historical 009 patches supported one literal equality. The following design
+requirements led to the implemented 019 slice and remain its acceptance criteria;
+they are not instructions to rebuild the completed creation-routing feature:
 
 - Provide structured source/target predicates with conjunction and equality /
   inequality, with arbitrary configured branch names rather than hard-coded

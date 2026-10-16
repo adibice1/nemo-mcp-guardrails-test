@@ -1,8 +1,18 @@
 # Home Computer: Online Database Access
 
-Updated 2026-10-09. Online provider, hostname, database name, credentials, and
-network access requirements still need confirmation from the deployment owner.
-This guide uses placeholders; no online connection or database copy was made.
+Updated 2026-10-16. The current Azure server is
+guardrails-postgresql.postgres.database.azure.com:5432. Continue against the
+restored nemo_restore_check_20261016 database; nemo_mcp_guardrails on that server
+is production and has not received this session's rollout. See the
+[latest home handoff](work-computer-handoff.md#resume-here-at-home---2026-10-16)
+for completed migrations, secure session-override commands and the exact next
+tests. The user verified login and read-only GitHub runtime at work. Home network
+access/firewall requirements remain unverified; obtain credentials privately.
+
+The options below retain general connection guidance from 2026-10-09. Any claim
+below that a schema change is unnecessary describes that older password/UI slice,
+not the current security release. Do not follow the generic shared-database option
+as authority to switch to production or rerun migrations on the restored copy.
 
 ## Choose The Connection You Need
 
@@ -12,7 +22,7 @@ This guide uses placeholders; no online connection or database copy was made.
 | Home frontend + deployed API | Deployed frontend's /api/gms proxy | Database used by the deployed backend |
 | Home frontend + home API + online PostgreSQL | API at 127.0.0.1:8000, DB at the online hostname | Shared online database |
 
-The work computer's confirmed local DB is Docker PostgreSQL on 5432. Home's
+The work computer's confirmed local DB is PostgreSQL on 5432. Home's
 5433 is a local Docker mapping, not the online server's port. Matching account
 passwords on two sites do not prove they share a database. Restoring a local
 backup online makes a separate copy; later changes do not automatically sync.

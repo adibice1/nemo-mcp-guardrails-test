@@ -1,5 +1,12 @@
 # nemo-mcp-guardrails-test
 
+Continuing at home: start with the [2026-10-16 handoff checkpoint](work-computer-handoff.md#resume-here-at-home---2026-10-16)
+and [current backlog](open-work-backlog.md#resume-from-home---rehearsal-checkpoint-2026-10-16).
+Azure rehearsal migrations/conversions, login and a real read-only search are
+confirmed. Branch conditions display in English. Write execution and production
+cutover are not confirmed; selective merging remains unavailable. The handoff
+contains exact database targets, private-credential setup and the next tests.
+
 Patch 019 adds configurable PR-creation branch routing and conservative merge
 handling. Selective branch merges remain unavailable with the pinned connector.
 See [019 behavior and rehearsal](branch-routing-patch-019.md) before rollout.
@@ -34,7 +41,8 @@ catalogue filter are active. 009c3a backend assistant/options validation is appr
 and applied unchanged; all seven saved-source offline diagnostics passed.
 009c3b's final four-file frontend diff is approved and applied unchanged; saved-
 source TypeScript, scoped lint, focused selector checks and related HTTP checks
-passed. **Patch 010 is next.** Live compatibility, browser and reviewed legacy
+passed. That historical "Patch 010 is next" checkpoint is superseded by the
+2026-10-16 completion and handoff above. Live compatibility, browser and reviewed legacy
 repair/resync checks remain open.
 Code previews are shown in chat only; docs contain the plan and change summaries.
 
@@ -57,8 +65,8 @@ other-connector input authoring remains future work. The standalone
 [the frontend plan](frontend-screen-plan.md), and
 [verification notes](testing-notes.md).
 
-Read [the work/home handover](work-computer-handoff.md) for the earlier password
-workflow: its schema remains preview-only and awaiting approval. Use
+Read [the work/home handover](work-computer-handoff.md) for the latest password
+schema and rehearsal status; its older preview-only notes are historical. Use
 [the open backlog](open-work-backlog.md) for current unfinished work; older
 dated handover notes record historical commit/deployment boundaries.
 
