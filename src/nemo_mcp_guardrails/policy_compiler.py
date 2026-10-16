@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import json
 
 
 @dataclass(frozen=True)
@@ -291,16 +292,36 @@ def get_policy_key(policy: InputPolicyObject) -> tuple[str, str]:
 
 
 def compile_input_rail_rule(policy: InputPolicyObject) -> str:
-    """Generate NeMo self-check policy text from adapter synonyms."""
+    """Describe the same literal field and comparison used by execution bindings."""
+
+    from nemo_mcp_guardrails.github_resource_bindings import compile_resource_binding
+
+    binding = compile_resource_binding(policy)
 
     actions = GITHUB_ACTION_SYNONYMS[policy.action]
     resources = GITHUB_RESOURCE_SYNONYMS[policy.resource]
     action_text = format_or_list(actions)
     resource_text = " or ".join(f"GitHub {resource}" for resource in resources)
     restriction = ""
-    if policy.custom_resource:
+    if binding is not None:
+        condition = binding.condition
+        from nemo_mcp_guardrails.resource_conditions import BranchCondition, condition_terms
+        if isinstance(condition, BranchCondition):
+            comparisons = " AND ".join(
+                f"its {term.field.replace('_', ' ')} {'does not equal' if term.operator == 'neq' else 'equals'} {json.dumps(term.value, ensure_ascii=False)}"
+                for term in condition_terms(condition)
+            )
+            return (f'Answer "yes" when the user asks to {action_text} a {resource_text} '
+                    f"only when {comparisons} (all comparisons exact and case-sensitive; "
+                    "do not assume unknown branches or match unrelated fields).")
+        literal = json.dumps(condition.value, ensure_ascii=False)
+        comparison = (
+            "numeric" if condition.field == "number" else
+            "case-insensitive" if condition.field in {"title", "name"} else "exact, case-sensitive"
+        )
         restriction = (
-            f' matching the custom resource "{policy.custom_resource.strip()}"'
+            f" only when its {condition.field.replace('_', ' ')} equals {literal}"
+            f" ({comparison} equality; do not match unrelated fields or assume unknown values)"
         )
 
     return (
@@ -312,9 +333,38 @@ def compile_input_rail_rule(policy: InputPolicyObject) -> str:
 def compile_test_cases(policy: InputPolicyObject) -> tuple[TestCase, ...]:
     """Generate representative blocked prompt tests from adapter templates."""
 
+    from nemo_mcp_guardrails.github_resource_bindings import compile_resource_binding
+
+    binding = compile_resource_binding(policy)
+
     actions = GITHUB_ACTION_SYNONYMS[policy.action]
     resources = GITHUB_RESOURCE_SYNONYMS[policy.resource]
     test_cases: list[TestCase] = []
+
+    if binding is not None:
+        condition = binding.condition
+        from nemo_mcp_guardrails.resource_conditions import BranchCondition, condition_terms
+        if isinstance(condition, BranchCondition):
+            branches = ", ".join(
+                f"{term.field.replace('_', ' ')} {json.dumps(term.value if term.operator == 'eq' else next(value for value in ('feature/gms-check', 'feature/gms-other') if value != term.value))}"
+                for term in condition_terms(condition)
+            )
+            return (TestCase(name=f"Blocked: {policy.action} pull_request branch route",
+                             prompt=f"{sentence_case(actions[0])} a GitHub pull request with {branches} in {GITHUB_TEST_REPOSITORY}."),)
+        literal = json.dumps(condition.value, ensure_ascii=False)
+        if policy.resource == "repository":
+            prompt = (
+                f"Create a GitHub repository named {literal}."
+                if policy.action == "create"
+                else f"Fork the GitHub repository with owner sample-owner and name {literal}."
+            )
+        else:
+            prompt = (
+                f"{sentence_case(actions[0])} a GitHub {resources[0]} with "
+                f"{condition.field.replace('_', ' ')} {literal} in {GITHUB_TEST_REPOSITORY}."
+            )
+        return (TestCase(name=f"Blocked: {policy.action} {policy.resource} with {condition.field} equality",
+                         prompt=prompt),)
 
     for index, (action, resource) in enumerate(zip(actions, resources * len(actions))):
         template = GITHUB_TEST_PROMPT_TEMPLATES[index % len(GITHUB_TEST_PROMPT_TEMPLATES)]
@@ -337,6 +387,8 @@ def compile_test_cases(policy: InputPolicyObject) -> tuple[TestCase, ...]:
 def compile_policy(policy: InputPolicyObject) -> CompiledInputPolicy:
     """Compile one structured policy object into guardrail and test artifacts."""
 
+    from nemo_mcp_guardrails.github_tool_contract import compile_github_execution_rule
+
     if policy.connector != "github":
         raise ValueError(f"Unsupported connector: {policy.connector}")
 
@@ -350,9 +402,10 @@ def compile_policy(policy: InputPolicyObject) -> CompiledInputPolicy:
             f"No GitHub tool mapping for action/resource: {policy.action}/{policy.resource}"
         )
 
+    execution_rule = compile_github_execution_rule(policy)
     return CompiledInputPolicy(
         input_rail_rule=compile_input_rail_rule(policy),
-        blocked_tools=GITHUB_METADATA_TOOL_MAPPINGS[policy_key],
+        blocked_tools=tuple(sorted(execution_rule.tool_names)),
         test_cases=compile_test_cases(policy),
     )
 
@@ -462,4 +515,8 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    from pathlib import Path
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     main()

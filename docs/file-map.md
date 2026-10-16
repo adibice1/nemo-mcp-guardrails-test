@@ -1,5 +1,17 @@
 # Backend and Frontend File Map
 
+## Patch 019 Branch Routing
+
+- `src/nemo_mcp_guardrails/resource_conditions.py` - Shared immutable equality and branch-conjunction grammar.
+- `src/nemo_mcp_guardrails/github_pr_state.py` - Bounded trusted MCP PR metadata lookup and identity validation.
+- `frontend/lib/branch-conditions.ts` - Bounded editor parser/serializer and shared merge limitation notice.
+- `frontend/components/policies/branch-condition-editor.tsx` - Configurable source/target branch controls.
+- `scripts/convert_branch_policies.py` - Explicit reviewed conversion with atomic rehearsal-only writes.
+- `scripts/check_branch_editor.cjs` - Rendered control-handler and edit/serialization checks.
+- `scripts/check_branch_conversion_postgres.py` - Guarded disposable PostgreSQL conversion/rollback check.
+- `tests/test_branch_routing.py` - Guarded create/merge boundaries, truth tables and metadata errors.
+- `docs/branch-routing-patch-019.md` - Behavior, selective-merge limitation, verification and conversion procedure.
+
 Use this as the low-token debugging index: find the symptom first, then open
 only the listed files. Each maintained backend and frontend file has a one-line
 summary. Generated folders such as `frontend/.next/`, `node_modules/`, Python
@@ -37,6 +49,7 @@ excluded.
 
 - `src/nemo_mcp_guardrails/__init__.py` - Marks `nemo_mcp_guardrails` as an importable Python package.
 - `src/nemo_mcp_guardrails/app_auth.py` - Hashes app API keys and authenticates authorized client-ID/API-key pairs.
+- `src/nemo_mcp_guardrails/connector_credentials.py` - Validates backend-approved GitHub credential names before resolving PAT values.
 - `src/nemo_mcp_guardrails/management_auth.py` - Hashes management passwords and creates/verifies signed JWT access tokens.
 - `src/nemo_mcp_guardrails/management_permissions.py` - Enforces system-admin roles and active app-developer links across management routes.
 - `src/nemo_mcp_guardrails/guarded_execution.py` - Runs input rails, the agent and guarded tools, output rails, and structured Azure/GMS status handling.
@@ -46,15 +59,29 @@ excluded.
 - `src/nemo_mcp_guardrails/policy_service.py` - Canonicalizes policies and resolves equivalent, reusable, or duplicate definitions.
 - `src/nemo_mcp_guardrails/prompt_rule_compiler.py` - Injects app-scoped compiled DB rules into the NeMo prompt configuration.
 - `src/nemo_mcp_guardrails/runtime_factory.py` - Builds app-scoped LLMs, NeMo rails, connector credentials, GitHub MCP tools, and the agent.
+- `src/nemo_mcp_guardrails/llm_security.py` - Validates exact backend-approved HTTPS origins before runtime model credential resolution.
+- `src/nemo_mcp_guardrails/llm_credentials.py` - Validates exact backend-approved LLM credential names; runtime resolution reads values only after validation.
+- `src/nemo_mcp_guardrails/llm_access.py` - Shares app/purpose grant and model-bundle validation across management and runtime.
 - `src/nemo_mcp_guardrails/runtime_events.py` - Captures bounded request-scoped execution metadata without raw content or private reasoning.
 - `src/nemo_mcp_guardrails/runtime_logging.py` - Records runtime HTTP lifecycle and execution events independently of runtime transactions.
-- `src/nemo_mcp_guardrails/tool_guard.py` - Blocks restricted MCP calls before execution, including custom-resource argument matching.
-- `src/nemo_mcp_guardrails/helper/__init__.py` - Marks the helper directory as a Python package.
-- `src/nemo_mcp_guardrails/helper/utility.py` - Reserved helper module; it currently contains no implementation.
+- `src/nemo_mcp_guardrails/tool_guard.py` - Applies immutable field/method-bound MCP rules before execution, with actual matched-policy identity and controlled evaluation errors.
+- `src/nemo_mcp_guardrails/resource_conditions.py` - Literal-condition grammar used by management storage validation, inventory and runtime execution-contract compilation.
+- `src/nemo_mcp_guardrails/input_conditions.py` - Validates supported input selectors and serializes format version 1 while preserving path/branch case and literal punctuation.
+- `tests/test_input_condition_storage.py` - Offline real-JWT/RBAC SQLite HTTP checks for versioned identity, rejected edits, shared assignments, legacy isolation and safe deduplication.
+- `src/nemo_mcp_guardrails/database/runtime_policy_snapshot.py` - Single-SELECT app/global policy and compiled-rule reader with canonical-selector validation and detached immutable contents; used by runtime construction and exact-content cache admission checks.
+- `tests/test_runtime_policy_integration.py` - 009c2c offline real-app-key HTTP/SQLite checks for shared runtime snapshots, rails injection, field guards, matched-policy identity, evaluation privacy, exact cache changes, build races and actual LangGraph tool-node error propagation.
+- `tests/test_runtime_policy_snapshot.py` - Offline SQLite checks for exact snapshot contents, assignment scope, normalized metadata, no autoflush, legacy rejection and compiled-rule consistency.
+- `tests/test_resource_conditions.py` - Offline literal grammar acceptance/rejection checks without database or external services.
+- `src/nemo_mcp_guardrails/github_resource_bindings.py` - Reviewed field-specific GitHub write bindings used for management validation and the runtime execution contract; unsupported or unobservable targets reject.
+- `src/nemo_mcp_guardrails/github_tool_contract.py` - Immutable field/method-bound direct/indirect write rules, reviewed tool/schema selection, and pinned image/native-path constants; used by runtime/full-runner catalogue filtering and runtime tool matching.
+- `tests/test_github_tool_contract.py` - Offline checks for shared methods, indirect writes, indeterminate targets, catalogue/schema drift, and conditional compiler artifacts.
+- `scripts/inventory_resource_conditions.py` - Read-only compatibility report with explicit database opt-in; omits private literal values and never rewrites policies.
+- `tests/test_github_resource_bindings.py` - Offline authoritative-field, shared-method, malformed-target and unsupported-condition checks.
+- `tests/test_resource_condition_inventory.py` - Disposable SQLite inventory, normalized-metadata, scope, no-autoflush and CLI read-only checks.
 
 ## Backend API
 
-- `src/nemo_mcp_guardrails/api/policy_assistant.py` - JWT-protected Azure input/output drafting with tagged rail validation, input-only capability checks, clarification and bounded errors; no policy writes.
+- `src/nemo_mcp_guardrails/api/policy_assistant.py` - JWT-protected Azure input/output drafting with storage-compatible input selector validation/canonicalization, primary/related scope checks, clarification and bounded errors; no policy writes.
 
 - `src/nemo_mcp_guardrails/api/__init__.py` - Marks the FastAPI module directory as a Python package.
 - `src/nemo_mcp_guardrails/api/main.py` - Creates FastAPI, configures CORS/lifespan, mounts routers, and exposes health endpoints.
@@ -65,10 +92,11 @@ excluded.
 - `src/nemo_mcp_guardrails/api/runtime_schemas.py` - Defines runtime conversation, request, and response Pydantic models.
 - `src/nemo_mcp_guardrails/api/runtime_logs.py` - Provides admin-only filtered log lists and ordered request-event details.
 - `src/nemo_mcp_guardrails/api/runtime_log_schemas.py` - Defines metadata-only log list/detail responses.
-- `src/nemo_mcp_guardrails/api/llm_configs.py` - Lists and creates Azure LLM configuration metadata without exposing credential references.
+- `src/nemo_mcp_guardrails/api/llm_configs.py` - Admin-only model catalogue and Azure configuration creation with approved endpoints/credential names.
+- `src/nemo_mcp_guardrails/api/app_llm_grants.py` - App-scoped model options and admin grant decisions/revocation by app ID or client ID.
 - `src/nemo_mcp_guardrails/api/policies.py` - Implements reusable policy CRUD, compile preview, and compiled-rule refresh endpoints.
 - `src/nemo_mcp_guardrails/api/policy_schemas.py` - Defines policy, assignment-resolution, metadata, test-case, and compile-response schemas.
-- `src/nemo_mcp_guardrails/api/policy_metadata.py` - Returns valid connector/action/resource combinations for cascading policy dropdowns.
+- `src/nemo_mcp_guardrails/api/policy_metadata.py` - Returns enabled, connector-consistent supported input-block combinations and conditional field names for policy forms.
 - `src/nemo_mcp_guardrails/api/policy_assignment_resolution.py` - Implements duplicate-aware assignment creation and assignment-safe policy edits.
 - `src/nemo_mcp_guardrails/api/apps.py` - Implements app, app-connector, app-policy, and effective-policy CRUD by ID or client ID.
 - `src/nemo_mcp_guardrails/api/app_schemas.py` - Defines app, connector-link, LLM-selection, and app-assignment request/response schemas.
@@ -81,8 +109,13 @@ excluded.
 - `src/nemo_mcp_guardrails/database/__init__.py` - Marks the database directory as a Python package.
 - `src/nemo_mcp_guardrails/database/connection.py` - Creates the SQLAlchemy engine/session and provides DB health/table helpers.
 - `src/nemo_mcp_guardrails/database/models.py` - Defines every SQLAlchemy ORM table and relationship.
+- `scripts/migrate_app_llm_grants.py` - Previews grant DDL and unapproved selection inventory; separately applies grant schema or reviewed new grants without changing existing grants.
+- `tests/test_app_llm_grant_migration.py` - Offline SQLite grant schema/manifest checks with PostgreSQL DDL compilation; runtime enforcement is outside this diagnostic.
+- `tests/test_app_llm_grants_http.py` - Offline real-JWT/SQLite grant API, model selection, app/purpose isolation, revocation and audit checks.
+- `tests/test_runtime_llm_grants.py` - Offline SQLite runtime grant, cache revocation, credential approval and controlled HTTP failure checks with external execution substituted.
 - `src/nemo_mcp_guardrails/database/conversation_store.py` - Loads and appends app-scoped conversation turns in Postgres.
 - `src/nemo_mcp_guardrails/database/policy_loader.py` - Loads enabled global/app policies and converts rows into compiler objects.
+- `src/nemo_mcp_guardrails/database/policy_errors.py` - Defines controlled failures that stop runtime setup when enforcement policies cannot be loaded.
 - `src/nemo_mcp_guardrails/database/prompt_rule_loader.py` - Loads enabled compiled NeMo rules with optional app assignment scope.
 - `src/nemo_mcp_guardrails/database/test_case_loader.py` - Loads allowed test cases and falls back to default read tests when none exist.
 
@@ -107,7 +140,7 @@ excluded.
 
 ## Frontend Components
 
-- `frontend/components/policies/policy-authoring-assistant.tsx` - Live/sample input/output drafts, rail-specific flowcharts and examples, related input drafts, and cancellable authenticated generation.
+- `frontend/components/policies/policy-authoring-assistant.tsx` - Live input/output drafts, supported PR-number/branch samples, explicit unsupported-condition clarification, rail-specific flowcharts and cancellable generation; related live drafts retain backend scope checks.
 
 - `frontend/components/shared/app-top-nav.tsx` - Renders shared navigation including admin-only User Management and Logs.
 - `frontend/components/logs/use-admin-log-data.ts` - Loads admin data with cancellation, retry, and stale-session protection.
@@ -123,7 +156,6 @@ excluded.
 - `frontend/components/apps/create-llm-config-modal.tsx` - Collects Azure deployment metadata and an optional backend environment-variable reference.
 - `frontend/components/apps/app-overview.tsx` - Displays and edits core app details.
 - `frontend/components/apps/app-connectors.tsx` - Lists and manages an app's connector links and credential references.
-- `frontend/components/apps/app-llm-settings.tsx` - Creates and selects named main-agent and guardrail LLM configurations for an app.
 - `frontend/components/apps/app-policy-summary.tsx` - Lists the app's effective global and app-specific policy assignments.
 - `frontend/components/apps/app-runtime-test.tsx` - Sends authenticated runtime requests and displays rail/tool/history results.
 
@@ -165,7 +197,8 @@ excluded.
 
 ## Tests, Scripts, And Deeper Explanations
 
-- `tests/test_policy_assistant_http.py` - Isolated real-JWT/SQLite checks with fake Azure for input/output drafting, rail validation, output word matching, authentication, clarification and failures.
+- `tests/test_policy_options_capabilities.py` - Offline real-JWT/SQLite HTTP checks for supported-write options, conditional field names, all metadata enable flags, read/other-connector exclusion and connector ownership.
+- `tests/test_policy_assistant_http.py` - Isolated real-JWT/SQLite checks with fake Azure for canonical input/related selectors, unsupported-condition clarification, scope changes, output isolation and provider failures.
 
 - `tests/test_runtime_events.py` - Checks event isolation, privacy, capture limits, and late callbacks offline.
 - `tests/test_runtime_logs_http.py` - Checks log access/query behavior and retention against an isolated SQLite database.
@@ -175,3 +208,21 @@ excluded.
 - Use `docs/runtime-flow-map.md` when one-line descriptions are not enough and function-level execution order is needed.
 - Use `docs/llm-provider-guide.md` for Azure model selection and the adapter checklist for local or non-Azure models.
 - Use `docs/troubleshooting.md` for known local setup, Postgres, DBeaver, NeMo, and GitHub MCP failures.
+
+## Security Foundation Added In Patches 010-018
+
+- `src/nemo_mcp_guardrails/rate_limits.py` - Bounded process-local management attempt/cost windows using hashed identity and transport peer.
+- `src/nemo_mcp_guardrails/request_limits.py` - Outer raw-body cap, shared runtime limits and input-safe validation responses.
+- `scripts/migrate_security_foundation.py` - No-connect schema preview; explicit opt-in password-state/index migration.
+- `scripts/backfill_existing_app_users.py` - Exact user/app membership preview and opt-in application.
+- `scripts/run_security_checks.py` - Explicit credential-isolated offline test catalogue; excludes external diagnostics.
+- `scripts/check_frontend_container.cjs` - Non-root port-80, static page and fake-upstream proxy checks inside the frontend image.
+- `tests/test_security_controls.py` - Disposable SQL/HTTP regressions for patches 012-015.
+- `frontend/app/setup-password/page.tsx` - Restricted password setup using the shared password-change form.
+- `requirements.txt` / `constraints.txt` - Direct runtime roots and exact required dependency closure; provider-only extras removed.
+- `docs/security-run-2026-10-16.md` - Final implementation summary, verification, upstream limitations and rollout requirements.
+
+The unmounted legacy LLM-settings component and empty helper utility were removed
+after reference checks. The app detail page retains the active scoped LLM-grant
+selectors. Standalone diagnostics remain intentional entry points.
+- `scripts/check_backend_container.py` - Explicit empty/disposable PostgreSQL guard, real backend HTTP lifecycle, stale-update race and legacy migration smoke checks.

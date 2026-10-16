@@ -1,7 +1,8 @@
 import re
 import secrets
+from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -23,6 +24,7 @@ from nemo_mcp_guardrails.database.models import (
 )
 from nemo_mcp_guardrails.management_auth import hash_password, normalize_email
 from nemo_mcp_guardrails.management_permissions import require_system_admin
+from nemo_mcp_guardrails.rate_limits import limit_operation
 
 
 router = APIRouter(
@@ -33,7 +35,7 @@ router = APIRouter(
 
 EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 TEMPORARY_PASSWORD_NOTICE = (
-    "Copy this temporary password now. It will not be shown again."
+    "Copy this temporary password now. It will not be shown again. It expires in 24 hours and must be replaced before normal access."
 )
 
 
@@ -124,10 +126,11 @@ def list_managed_users(db: Session = Depends(get_db)) -> list[ManagedUserRead]:
 )
 def create_managed_user(
     payload: ManagedUserCreate,
-    db: Session = Depends(get_db),
+    response: Response,    db: Session = Depends(get_db),
 ) -> ManagedUserCreateRead:
     """Create one admin-managed user and return its temporary password once."""
 
+    response.headers["Cache-Control"] = "no-store"
     email = _require_valid_email(payload.email)
     temporary_password = _temporary_password()
     user = UserRecord(
@@ -135,6 +138,8 @@ def create_managed_user(
         name=(payload.name or email).strip(),
         username=(payload.username or email).strip(),
         password_hash=hash_password(temporary_password),
+        must_change_password=True,
+        temporary_password_expires_at=datetime.now(timezone.utc) + timedelta(hours=24),
         system_role=payload.system_role,
         enabled=payload.enabled,
     )
@@ -198,13 +203,20 @@ def update_managed_user(
 @router.post("/{user_id}/password", response_model=ManagedUserPasswordResetRead)
 def reset_managed_user_password(
     user_id: int,
+    request: Request,
+    response: Response,
+    actor: UserRecord = Depends(require_system_admin),
     db: Session = Depends(get_db),
 ) -> ManagedUserPasswordResetRead:
     """Reset one user's password and return the temporary password once."""
 
+    response.headers["Cache-Control"] = "no-store"
+    limit_operation(request, "password-reset", str(actor.id), 10, 900)
     user = _require_user(user_id, db)
     temporary_password = _temporary_password()
     user.password_hash = hash_password(temporary_password)
+    user.must_change_password = True
+    user.temporary_password_expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
     db.commit()
     db.refresh(user)
     return ManagedUserPasswordResetRead(

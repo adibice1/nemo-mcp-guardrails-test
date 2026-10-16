@@ -130,10 +130,11 @@ def main() -> None:
                     "enabled": False,
                 },
             )
-            assert update_by_name.status_code == 200, update_by_name.text
-            assert update_by_name.json()["credential_reference"] == "vault:github/test"
-            assert update_by_name.json()["enabled"] is False
-            assert_connector_summary(client, app_id, 0)
+            assert update_by_name.status_code == 400, update_by_name.text
+            assert update_by_name.json()["detail"] == (
+                "GitHub credential reference is not approved by backend configuration."
+            )
+            assert_connector_summary(client, app_id, 1)
 
             upsert_by_client_id = client.post(
                 f"/apps/by-client-id/{client_id}/connectors",

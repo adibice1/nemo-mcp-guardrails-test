@@ -30,7 +30,7 @@ export default function LoginPage() {
     if (!session) return;
 
     getCurrentManagementUser(session.access_token)
-      .then(() => router.replace("/apps"))
+      .then((user) => router.replace(user.must_change_password ? "/setup-password" : "/apps"))
       .catch((sessionError) => {
         if (isAuthenticationError(sessionError)) {
           clearManagementSession();
@@ -49,7 +49,7 @@ export default function LoginPage() {
     try {
       const session = await loginManagementUser(email.trim(), password);
       saveManagementSession(session, remember);
-      router.push("/apps");
+      router.push(session.user.must_change_password ? "/setup-password" : "/apps");
     } catch (loginError) {
       setError(
         loginError instanceof Error ? loginError.message : "Login failed."

@@ -1,5 +1,20 @@
 # Container Images And Azure Container Instances
 
+## Verified Security Baseline - 2026-10-16
+
+Frontend stages now use digest-pinned Node 24.21.0 Alpine with Next 16.4.2/React
+19.3.1. The final image preserves non-root `nextjs`, direct port 80 and
+NET_BIND_SERVICE. Backend dependencies are installed from direct `requirements.txt`
+plus exact `constraints.txt`; both files must be in the build context. Uvicorn
+runs with `--no-proxy-headers`, matching the transport-peer throttling contract.
+Do not override this with untrusted forwarded headers.
+
+Local test images are `gms-security-fe:local-test` and
+`gms-security-be:local-test`; they have not been published. Isolated frontend
+checks use a fake internal upstream with networking disabled. See the
+[completion report](security-run-2026-10-16.md) for results and the required schema
+rollout before using the new backend against an existing PostgreSQL database.
+These local builds do not change the ACI topology or authorize deployment.
 The GMS has separate production-style images for the FastAPI backend and
 Next.js frontend. Docker Compose remains available for local integration tests,
 but it is not required to build, tag, or push the images requested by the
@@ -26,6 +41,16 @@ them to `GMS_API_BASE_URL`. The image grants the non-root Node executable only
 frontend process does not run as root.
 
 ## GitHub MCP In The Backend Image
+
+009c2b is approved and applied (2026-10-15). It pins the direct-source
+Docker launcher and full test runner to the same digest as the Dockerfile and
+requires native mode to use the bundled `/usr/local/bin/github-mcp-server` path.
+Alternate `GITHUB_MCP_BINARY_PATH` values reject. Saved-source offline diagnostics
+passed; no image pull, build, process, publish or deployment ran. The catalogue
+schema helper checks compatibility, not binary authenticity; 009c2c now filters
+runtime and full-runner tools through it before wrapping. Snapshot/cache and
+field-bound enforcement are connected and offline-checked. Actual image/process/
+catalogue compatibility remains unverified. See the single backlog.
 
 The backend image copies the pinned official GitHub MCP executable into
 `/usr/local/bin/github-mcp-server` and sets:
@@ -198,7 +223,24 @@ The deployment team needs environment values for:
 - PostgreSQL connection details or `DATABASE_URL`.
 - `GMS_JWT_SECRET`.
 - Azure OpenAI endpoint, API version, deployment, and credential.
+- Optional `GMS_ALLOWED_LLM_ENDPOINTS` for additional exact HTTPS model origins.
+  `AZURE_OPENAI_ENDPOINT` is automatically approved. Do not include credentials,
+  paths, queries, or fragments. Existing stored LLM endpoints are checked too;
+  restart the backend after changes. See `llm-provider-guide.md`.
+- `GMS_ALLOWED_LLM_CREDENTIAL_ENV_VARS` for additional exact LLM credential
+  variable names. `AZURE_OPENAI_API_KEY` is automatically approved. Name approval
+  is enforced during management provisioning/selection and runtime resolution
+  before credential lookup. 008c also checks both app model grants for cold,
+  warm-cache and cache-disabled requests. Before rollout, provision the grant
+  schema and explicitly approve reviewed named/default selections for both
+  purposes; existing selections do not receive automatic grants. PostgreSQL
+  verification remains open. Restart after credential/environment changes.
 - GitHub PAT environment references used by enabled app connectors.
+- `GMS_ALLOWED_GITHUB_CREDENTIAL_ENV_VARS` for any additional exact GitHub PAT
+  variable names. The default `GITHUB_PERSONAL_ACCESS_TOKEN` is automatically
+  approved. Check existing custom references before rollout; unapproved/missing
+  credentials stop runtime setup with 503. Restart after changes because clients
+  are cached. Keep actual PAT values in backend secret configuration.
 - `GITHUB_MCP_READ_ONLY`, normally `1` except controlled write demos.
 - Any existing NeMo runtime limits and debug flags required by the environment.
 

@@ -1,5 +1,18 @@
 # GMS Frontend
 
+Patch 019 adds source/target branch controls to the shared create/edit modal,
+using the existing policy API and automatic compilation. Merge notices are shown
+in both editing and summaries because selective conditional merging remains
+unavailable. Run `node ../scripts/check_branch_editor.cjs` from this directory
+for rendered control-handler checks; see `../docs/branch-routing-patch-019.md`.
+
+Current baseline (2026-10-16): Next.js 16.4.2, React 19.3.1 and the digest-pinned
+Node 24 production image. Use `npm ci`, `npm run lint` and `npm run build` with a
+supported Node runtime. Setup-only accounts use `/setup-password`. The former
+unmounted LLM-settings component has been removed; active app detail selectors
+remain. See [the completion report](../docs/security-run-2026-10-16.md) for
+verification, required schema rollout and the unpatched development-only advisory.
+
 Next.js 13 frontend prototype for the Guardrails Management System.
 
 ## Live AI Policy Drafting
@@ -174,7 +187,6 @@ components/
     create-app-modal.tsx
     app-overview.tsx
     app-connectors.tsx
-    app-llm-settings.tsx
     app-policy-summary.tsx
     app-runtime-test.tsx
   settings/

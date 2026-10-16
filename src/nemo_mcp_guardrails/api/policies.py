@@ -219,11 +219,11 @@ def update_policy(
     for field, value in updates.items():
         setattr(policy, field, value)
 
-    resolve_policy_references(policy, db)
-    equivalent = find_equivalent_policy(
-        policy,
-        db,
-        exclude_policy_id=policy.id,
+    disabling_only = updates == {"enabled": False}
+    if not disabling_only:
+        resolve_policy_references(policy, db, conditions_reviewed="conditions" in updates)
+    equivalent = None if disabling_only else find_equivalent_policy(
+        policy, db, exclude_policy_id=policy.id,
     )
     if equivalent is not None:
         raise HTTPException(

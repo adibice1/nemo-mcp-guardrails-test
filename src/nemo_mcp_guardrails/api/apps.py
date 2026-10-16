@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import Select, func, select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, joinedload
 
 from nemo_mcp_guardrails.app_auth import generate_unique_api_key, hash_api_key
@@ -30,6 +30,10 @@ from nemo_mcp_guardrails.api.app_schemas import (
     PolicyAssignmentCreate,
     PolicyAssignmentUpdate,
 )
+from nemo_mcp_guardrails.connector_credentials import (
+    ConnectorCredentialError,
+    validate_github_credential_reference,
+)
 from nemo_mcp_guardrails.database.connection import get_db
 from nemo_mcp_guardrails.database.models import (
     AppConnectorRecord,
@@ -38,13 +42,14 @@ from nemo_mcp_guardrails.database.models import (
     AppUserRecord,
     ConnectorRecord,
     GlobalPolicyAssignmentRecord,
-    LlmConfigRecord,
     PolicyRecord,
     UserRecord,
 )
+from nemo_mcp_guardrails.llm_access import LLM_SELECTION_FIELDS, LlmAccessError, require_llm_grant
 from nemo_mcp_guardrails.management_permissions import (
     APP_MANAGE_ROLES,
     require_app_route_access,
+    require_system_admin,
 )
 
 
@@ -158,16 +163,18 @@ def _require_policies(policy_ids: list[int], db: Session) -> dict[int, PolicyRec
     return policies_by_id
 
 
-def _validate_llm_config_ids(values: dict[str, object], db: Session) -> None:
-    """Validate any provided main-agent or guardrail LLM references."""
+def _validate_llm_selections(values: dict[str, object], app_id: int, db: Session) -> None:
+    """Check explicitly supplied model choices before any app mutation."""
 
-    for field in ("main_llm_config_id", "guardrail_llm_config_id"):
-        config_id = values.get(field)
-        if config_id is not None and not db.get(LlmConfigRecord, config_id):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Unknown {field}: {config_id}",
-            )
+    try:
+        for field, purpose in LLM_SELECTION_FIELDS.items():
+            if field in values:
+                require_llm_grant(db, app_id, purpose, values[field])
+    except LlmAccessError as error:
+        raise HTTPException(403, "LLM selection is not approved for this app and purpose.") from error
+    except SQLAlchemyError as error:
+        db.rollback()
+        raise HTTPException(503, "LLM grant configuration is unavailable.") from error
 
 
 def _list_policy_assignments_for_app(
@@ -210,13 +217,31 @@ def _list_app_connectors(
     return [serialize_app_connector(link) for link in links]
 
 
+def _validated_connector_reference(connector_name: str, reference: str | None) -> str | None:
+    """Validate executable GitHub references without resolving their secret values."""
+
+    if connector_name != "github":
+        return reference
+    try:
+        return validate_github_credential_reference(reference)
+    except ConnectorCredentialError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="GitHub credential reference is not approved by backend configuration.",
+        ) from error
+
+
 def _link_connector_to_app(
     app_id: int,
     payload: AppConnectorCreate,
     db: Session,
+    user: UserRecord,
 ) -> dict[str, object]:
     """Create or update one app connector link."""
 
+    supplied_reference = "credential_reference" in payload.model_fields_set
+    if supplied_reference:
+        require_system_admin(user)
     connector = _require_connector_from_payload(payload, db)
     link = db.scalar(
         select(AppConnectorRecord).where(
@@ -226,15 +251,20 @@ def _link_connector_to_app(
     )
 
     if link is None:
+        require_system_admin(user)
+        reference = _validated_connector_reference(connector.name, payload.credential_reference)
         link = AppConnectorRecord(
             app_id=app_id,
             connector_id=connector.id,
-            credential_reference=payload.credential_reference,
+            credential_reference=reference,
             enabled=payload.enabled,
         )
         db.add(link)
     else:
-        link.credential_reference = payload.credential_reference
+        if supplied_reference:
+            link.credential_reference = _validated_connector_reference(
+                connector.name, payload.credential_reference,
+            )
         link.enabled = payload.enabled
 
     db.commit()
@@ -271,11 +301,17 @@ def _update_app_connector_link(
     connector_ref: str,
     payload: AppConnectorUpdate,
     db: Session,
+    user: UserRecord,
 ) -> dict[str, object]:
     """Update one app connector link."""
 
     link = _require_app_connector_link(app_id, connector_ref, db)
     values = payload.model_dump(exclude_unset=True)
+    if "credential_reference" in values:
+        require_system_admin(user)
+        values["credential_reference"] = _validated_connector_reference(
+            link.connector.name, payload.credential_reference,
+        )
 
     for field, value in values.items():
         setattr(link, field, value)
@@ -620,7 +656,8 @@ def create_app(
         )
 
     values = payload.model_dump()
-    _validate_llm_config_ids(values, db)
+    if any(values[field] is not None for field in LLM_SELECTION_FIELDS):
+        raise HTTPException(400, "Create the app, approve its model grants, then select its models.")
     api_key = generate_unique_api_key(db)
     app = AppRecord(**values, api_key_hash=hash_api_key(api_key))
     db.add(app)
@@ -689,12 +726,13 @@ def list_app_connectors_by_client_id(
 def create_app_connector_by_client_id(
     client_id: str,
     payload: AppConnectorCreate,
+    user: UserRecord = Depends(require_app_route_access),
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
     """Create or update one app connector link by client ID."""
 
     app = _require_app_by_client_id(client_id, db)
-    return _link_connector_to_app(app.id, payload, db)
+    return _link_connector_to_app(app.id, payload, db, user)
 
 
 @router.put(
@@ -705,12 +743,13 @@ def update_app_connector_by_client_id(
     client_id: str,
     connector_ref: str,
     payload: AppConnectorUpdate,
+    user: UserRecord = Depends(require_app_route_access),
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
     """Update one app connector link by client ID."""
 
     app = _require_app_by_client_id(client_id, db)
-    return _update_app_connector_link(app.id, connector_ref, payload, db)
+    return _update_app_connector_link(app.id, connector_ref, payload, db, user)
 
 
 @router.delete(
@@ -876,12 +915,13 @@ def list_app_connectors(
 def create_app_connector(
     app_id: int,
     payload: AppConnectorCreate,
+    user: UserRecord = Depends(require_app_route_access),
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
     """Create or update one app connector link."""
 
     _require_app(app_id, db)
-    return _link_connector_to_app(app_id, payload, db)
+    return _link_connector_to_app(app_id, payload, db, user)
 
 
 @router.put(
@@ -892,12 +932,13 @@ def update_app_connector(
     app_id: int,
     connector_ref: str,
     payload: AppConnectorUpdate,
+    user: UserRecord = Depends(require_app_route_access),
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
     """Update one app connector link."""
 
     _require_app(app_id, db)
-    return _update_app_connector_link(app_id, connector_ref, payload, db)
+    return _update_app_connector_link(app_id, connector_ref, payload, db, user)
 
 
 @router.delete(
@@ -926,12 +967,17 @@ def update_app(
 
     app = _require_app(app_id, db)
     values = payload.model_dump(exclude_unset=True)
+    if user.system_role != "admin" and "authorized" in values:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can change app authorization",
+        )
     if user.system_role != "admin" and "guardrail_llm_config_id" in values:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only administrators can select the guardrail LLM",
         )
-    _validate_llm_config_ids(values, db)
+    _validate_llm_selections(values, app_id, db)
 
     for field, value in values.items():
         setattr(app, field, value)

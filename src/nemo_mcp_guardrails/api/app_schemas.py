@@ -100,6 +100,36 @@ class LlmConfigRead(BaseModel):
     enabled: bool
 
 
+class AppLlmGrantWrite(BaseModel):
+    """Require an explicit, strictly typed administrator grant decision."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    enabled: bool
+
+
+class AppLlmGrantRead(BaseModel):
+    """Expose grant metadata without credential references."""
+
+    id: int
+    app_id: int
+    purpose: Literal["main", "guardrail"]
+    llm_config_id: int | None
+    enabled: bool
+    config_name: str
+    config_enabled: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class AppLlmOptions(BaseModel):
+    """Describe the approved choices for one app and model purpose."""
+
+    purpose: Literal["main", "guardrail"]
+    environment_default_allowed: bool
+    configs: list[LlmConfigRead]
+
+
 class LlmConfigCreate(BaseModel):
     """Request body for creating one Azure-compatible LLM configuration."""
 

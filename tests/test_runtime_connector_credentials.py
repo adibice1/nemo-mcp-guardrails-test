@@ -39,6 +39,8 @@ def main() -> None:
         AZURE_OPENAI_DEPLOYMENT="fake-deployment",
         GITHUB_PERSONAL_ACCESS_TOKEN="default-github-pat",
         APP_A_GITHUB_PAT="app-a-github-pat",
+        MISSING_GITHUB_PAT=None,
+        GMS_ALLOWED_GITHUB_CREDENTIAL_ENV_VARS="APP_A_GITHUB_PAT,MISSING_GITHUB_PAT",
         GITHUB_MCP_READ_ONLY="1",
     ):
         default_environment = load_runtime_environment()
@@ -53,21 +55,21 @@ def main() -> None:
         try:
             load_runtime_environment("env:")
         except RuntimeError as exc:
-            assert "env: is missing a variable name" in str(exc)
+            assert "GitHub credential reference is not approved." == str(exc)
         else:
             raise AssertionError("Empty env credential reference should fail")
 
         try:
             load_runtime_environment("vault:github/app-a")
         except RuntimeError as exc:
-            assert "Unsupported connector credential reference" in str(exc)
+            assert "GitHub credentials require an approved env: reference." == str(exc)
         else:
             raise AssertionError("Unsupported credential reference should fail")
 
         try:
             load_runtime_environment("env:MISSING_GITHUB_PAT")
         except RuntimeError as exc:
-            assert "Missing connector credential environment value" in str(exc)
+            assert "GitHub credential is unavailable." == str(exc)
         else:
             raise AssertionError("Missing env credential should fail")
 

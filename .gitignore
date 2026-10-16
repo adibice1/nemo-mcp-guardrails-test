@@ -10,3 +10,7 @@ dev-server*.log
 api-server*.log
 .waylog/
 .env*.local
+
+# Generated compiler state and application logs
+*.tsbuildinfo
+logs/*.log

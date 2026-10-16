@@ -192,7 +192,8 @@ def main() -> None:
                 headers=_headers(admin),
                 json={"guardrail_llm_config_id": None},
             )
-            assert admin_update.status_code == 200, admin_update.text
+            # Even admins need a grant for the guardrail environment default.
+            assert admin_update.status_code == 403, admin_update.text
 
             global_denied = client.post(
                 "/global-policy-assignments",

@@ -1,7 +1,9 @@
+from datetime import datetime, timezone
+
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy import select, update
+from sqlalchemy import or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -21,12 +23,16 @@ from nemo_mcp_guardrails.management_auth import (
     normalize_email,
     hash_password,
     verify_password,
+    temporary_password_is_valid,
 )
 
 
 router = APIRouter(prefix="/management-auth", tags=["management-auth"])
 bearer_scheme = HTTPBearer(auto_error=False)
+from nemo_mcp_guardrails.rate_limits import limit_operation
+
 INVALID_CREDENTIALS = "Invalid email or password"
+_DUMMY_PASSWORD_HASH = hash_password("gms-unrecognized-account")
 
 
 def _user_response(user: UserRecord) -> ManagementUserRead:
@@ -38,6 +44,7 @@ def _user_response(user: UserRecord) -> ManagementUserRead:
         name=user.name,
         username=user.username,
         system_role=user.system_role,
+        must_change_password=bool(user.must_change_password),
     )
 
 
@@ -75,6 +82,10 @@ def require_management_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication required",
         ) from error
+    if user.must_change_password and (request.method, request.url.path) not in {
+        ("GET", "/management-auth/me"), ("PUT", "/management-auth/me/password"),
+    }:
+        raise HTTPException(403, detail="Password replacement required")
     request.state.gms_management_actor = {
         "user_id": user.id,
         "email": user.email,
@@ -102,22 +113,27 @@ def signup(
 @router.post("/login", response_model=ManagementTokenResponse)
 def login(
     payload: ManagementLoginRequest,
+    request: Request,
+    response: Response,
     db: Session = Depends(get_db),
 ) -> ManagementTokenResponse:
     """Authenticate one enabled management user."""
 
+    limit_operation(request, "login", normalize_email(payload.email), 10, 300)
     user = db.scalar(
         select(UserRecord).where(
             UserRecord.email == normalize_email(payload.email),
             UserRecord.enabled.is_(True),
         )
     )
-    if user is None or not verify_password(payload.password, user.password_hash):
+    valid_password = verify_password(payload.password, user.password_hash if user else _DUMMY_PASSWORD_HASH)
+    if user is None or not valid_password or not temporary_password_is_valid(user):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=INVALID_CREDENTIALS,
         )
 
+    response.headers["Cache-Control"] = "no-store"
     return ManagementTokenResponse(
         access_token=create_access_token(user),
         user=_user_response(user),
@@ -167,11 +183,13 @@ def update_current_user(
 @router.put("/me/password", status_code=status.HTTP_204_NO_CONTENT)
 def change_current_password(
     payload: ManagementPasswordChange,
+    request: Request,
     user: UserRecord = Depends(require_management_user),
     db: Session = Depends(get_db),
 ) -> Response:
     """Verify the current password and atomically replace only this user's hash."""
 
+    limit_operation(request, "password-change", str(user.id), 20, 900)
     if not verify_password(payload.current_password, user.password_hash):
         raise HTTPException(400, detail="Current password is incorrect")
     if not payload.new_password.strip():
@@ -182,8 +200,11 @@ def change_current_password(
     new_hash = hash_password(payload.new_password)
     result = db.execute(
         update(UserRecord)
-        .where(UserRecord.id == user.id, UserRecord.password_hash == old_hash)
-        .values(password_hash=new_hash),
+        .where(UserRecord.id == user.id, UserRecord.password_hash == old_hash,
+               UserRecord.must_change_password == bool(user.must_change_password),
+               or_(UserRecord.must_change_password.is_(False),
+                   UserRecord.temporary_password_expires_at > datetime.now(timezone.utc)))
+        .values(password_hash=new_hash, must_change_password=False, temporary_password_expires_at=None),
         execution_options={"synchronize_session": False},
     )
     if result.rowcount != 1:

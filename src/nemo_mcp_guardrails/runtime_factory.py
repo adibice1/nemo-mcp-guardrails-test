@@ -10,10 +10,13 @@ from langchain.agents import create_agent
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain_openai import AzureChatOpenAI
 from nemoguardrails import LLMRails
+from openai import DefaultAsyncHttpxClient, DefaultHttpxClient
 from sqlalchemy import func, select
-from sqlalchemy.orm import joinedload
+from sqlalchemy.exc import SQLAlchemyError
 
+from nemo_mcp_guardrails.connector_credentials import resolve_github_credential
 from nemo_mcp_guardrails.database.connection import SessionLocal
+from nemo_mcp_guardrails.database.policy_errors import PolicyLoadError
 from nemo_mcp_guardrails.database.models import (
     AppConnectorRecord,
     AppPolicyAssignmentRecord,
@@ -29,8 +32,18 @@ from nemo_mcp_guardrails.database.models import (
 )
 from nemo_mcp_guardrails.database.policy_loader import (
     LoadedInputPolicy,
-    load_input_policy_entries,
-    load_output_policy_objects,
+    default_policy_source_requested,
+)
+from nemo_mcp_guardrails.database.runtime_policy_snapshot import RuntimePolicySnapshot, read_runtime_policy_snapshot
+from nemo_mcp_guardrails.database.prompt_rule_loader import LoadedPromptRule
+from nemo_mcp_guardrails.policy_compiler import InputPolicyObject, OutputPolicyObject
+from nemo_mcp_guardrails.llm_access import LlmAccessError, require_llm_grant
+from nemo_mcp_guardrails.llm_credentials import (
+    LlmCredentialError, resolve_llm_credential, validate_llm_credential_reference,
+)
+from nemo_mcp_guardrails.llm_security import validate_llm_endpoint
+from nemo_mcp_guardrails.github_tool_contract import (
+    REVIEWED_MCP_IMAGE, REVIEWED_NATIVE_BINARY, select_reviewed_github_tools,
 )
 from nemo_mcp_guardrails.output_guard import compile_blocked_output_phrases
 from nemo_mcp_guardrails.prompt_rule_compiler import (
@@ -40,7 +53,7 @@ from nemo_mcp_guardrails.prompt_rule_compiler import (
 from nemo_mcp_guardrails.tool_guard import (
     ToolGuardRule,
     guard_mcp_tool,
-    tool_guard_rules_for_app,
+    compile_tool_guard_rules,
 )
 
 
@@ -89,6 +102,7 @@ class RuntimeLlmSelection:
 
     main_llm_config: RuntimeLlmConfig | None
     guardrail_llm_config: RuntimeLlmConfig | None
+    grant_ids: tuple[int, int]
 
 
 @dataclass(frozen=True)
@@ -202,44 +216,13 @@ def clear_guardrails_runtime_cache() -> None:
     _RUNTIME_BUILD_LOCKS.clear()
 
 
-def resolve_env_credential(
-    credential_reference: str | None,
-    *,
-    default_env_var: str,
-    credential_kind: str,
-) -> str:
-    """Resolve an env-based credential reference into a secret value."""
-
-    reference = (credential_reference or "").strip()
-    if not reference:
-        env_var = default_env_var
-    elif reference.startswith("env:"):
-        env_var = reference.removeprefix("env:").strip()
-        if not env_var:
-            raise RuntimeError(
-                f"{credential_kind} credential reference env: is missing a variable name"
-            )
-    else:
-        raise RuntimeError(
-            f"Unsupported {credential_kind} credential reference: "
-            f"{credential_reference}. Only env:VAR_NAME is wired in this prototype."
-        )
-
-    value = os.getenv(env_var)
-    if not value:
-        raise RuntimeError(
-            f"Missing {credential_kind} credential environment value: {env_var}"
-        )
-
-    return value
-
-
 def load_runtime_environment(
     github_credential_reference: str | None = None,
 ) -> RuntimeEnvironment:
     """Load required Azure OpenAI and GitHub MCP environment settings."""
 
     load_dotenv()
+    validate_llm_credential_reference(None)
 
     values = {
         "AZURE_OPENAI_API_KEY": os.getenv("AZURE_OPENAI_API_KEY"),
@@ -250,14 +233,10 @@ def load_runtime_environment(
     missing = [name for name, value in values.items() if not value]
 
     if missing:
-        raise RuntimeError("Missing runtime environment values: " + ", ".join(missing))
+        raise LlmCredentialError("Runtime LLM environment is unavailable.")
 
     azure_api_key = values["AZURE_OPENAI_API_KEY"] or ""
-    github_pat = resolve_env_credential(
-        github_credential_reference,
-        default_env_var="GITHUB_PERSONAL_ACCESS_TOKEN",
-        credential_kind="connector",
-    )
+    github_pat = resolve_github_credential(github_credential_reference)
     github_mcp_read_only = os.getenv("GITHUB_MCP_READ_ONLY", "1").strip()
     if github_mcp_read_only not in {"0", "1"}:
         raise RuntimeError("GITHUB_MCP_READ_ONLY must be 0 or 1")
@@ -332,25 +311,31 @@ def _to_runtime_llm_config(
 
 
 def load_runtime_llm_selection(app_id: int) -> RuntimeLlmSelection:
-    """Load detached LLM config choices for one app."""
+    """Require live grants for both purposes and detach their exact model state."""
 
-    with SessionLocal() as db:
-        app = db.scalar(
-            select(AppRecord)
-            .options(
-                joinedload(AppRecord.main_llm_config),
-                joinedload(AppRecord.guardrail_llm_config),
+    try:
+        with SessionLocal() as db:
+            app = db.get(AppRecord, app_id)
+            if app is None or not app.authorized:
+                raise LlmAccessError("Runtime model selection is unavailable.")
+            main_grant, main = require_llm_grant(db, app_id, "main", app.main_llm_config_id)
+            guardrail_grant, guardrail = require_llm_grant(
+                db, app_id, "guardrail", app.guardrail_llm_config_id,
             )
-            .where(AppRecord.id == app_id)
-        )
+            return RuntimeLlmSelection(
+                main_llm_config=_to_runtime_llm_config(main),
+                guardrail_llm_config=_to_runtime_llm_config(guardrail),
+                grant_ids=(main_grant.id, guardrail_grant.id),
+            )
+    except (SQLAlchemyError, ValueError, TypeError, AttributeError) as error:
+        raise LlmAccessError("Runtime model selection is unavailable.") from error
 
-        if app is None:
-            raise RuntimeError(f"App not found: {app_id}")
 
-        return RuntimeLlmSelection(
-            main_llm_config=_to_runtime_llm_config(app.main_llm_config),
-            guardrail_llm_config=_to_runtime_llm_config(app.guardrail_llm_config),
-        )
+def _check_llm_selection(app_id: int, expected: RuntimeLlmSelection) -> None:
+    """Reject a build if its selected grants or model metadata changed."""
+
+    if load_runtime_llm_selection(app_id) != expected:
+        raise LlmAccessError("Runtime model selection changed during construction.")
 
 
 def build_chat_model(
@@ -363,7 +348,6 @@ def build_chat_model(
     if config is None:
         deployment = environment.azure_deployment
         endpoint = environment.azure_endpoint
-        api_key = environment.azure_api_key
     else:
         provider = config.provider.strip().lower()
         if provider not in SUPPORTED_AZURE_PROVIDERS:
@@ -376,17 +360,19 @@ def build_chat_model(
 
         deployment = config.model_name or environment.azure_deployment
         endpoint = config.endpoint or environment.azure_endpoint
-        api_key = resolve_env_credential(
-            config.credential_reference,
-            default_env_var="AZURE_OPENAI_API_KEY",
-            credential_kind="LLM",
-        )
+    endpoint = validate_llm_endpoint(endpoint, default_endpoint=environment.azure_endpoint)
+    reference = validate_llm_credential_reference(config.credential_reference if config else None)
+    api_key = resolve_llm_credential(reference) if reference else environment.azure_api_key
+    if not api_key:
+        raise LlmCredentialError("LLM credential is unavailable.")
 
     return AzureChatOpenAI(
         azure_deployment=deployment,
         azure_endpoint=endpoint,
         api_key=api_key,
         api_version=environment.azure_api_version,
+        http_client=DefaultHttpxClient(follow_redirects=False),
+        http_async_client=DefaultAsyncHttpxClient(follow_redirects=False),
         temperature=0,
     )
 
@@ -402,11 +388,18 @@ async def build_guarded_github_tools(
         {"github": github_mcp_client_config(environment)}
     )
     raw_tools = await client.get_tools()
+    try:
+        raw_tools = select_reviewed_github_tools(raw_tools)
+    except (ValueError, TypeError, AttributeError):
+        raise PolicyLoadError("GitHub MCP tool contract is unavailable.") from None
+    from nemo_mcp_guardrails.github_pr_state import pr_branch_reader
+    branch_reader = pr_branch_reader(raw_tools)
     guarded_tools = tuple(
         guard_mcp_tool(
             tool,
             blocked_tool_names=blocked_tool_names,
             guard_rules=guard_rules,
+            branch_reader=branch_reader,
         )
         for tool in raw_tools
     )
@@ -429,12 +422,12 @@ def github_mcp_client_config(environment: RuntimeEnvironment) -> dict[str, Any]:
     launch_mode = os.getenv("GITHUB_MCP_LAUNCH_MODE", "docker").strip().lower()
 
     if launch_mode == "native":
+        binary_path = os.getenv("GITHUB_MCP_BINARY_PATH", REVIEWED_NATIVE_BINARY)
+        if binary_path != REVIEWED_NATIVE_BINARY:
+            raise RuntimeError("Native GitHub MCP requires the bundled reviewed executable.")
         return {
             **shared_config,
-            "command": os.getenv(
-                "GITHUB_MCP_BINARY_PATH",
-                "/usr/local/bin/github-mcp-server",
-            ),
+            "command": binary_path,
             "args": ["stdio"],
         }
 
@@ -452,7 +445,7 @@ def github_mcp_client_config(environment: RuntimeEnvironment) -> dict[str, Any]:
                 f"GITHUB_READ_ONLY={github_read_only}",
                 "-e",
                 "GITHUB_TOOLSETS=repos,issues,pull_requests",
-                "ghcr.io/github/github-mcp-server",
+                REVIEWED_MCP_IMAGE,
             ],
         }
 
@@ -461,16 +454,64 @@ def github_mcp_client_config(environment: RuntimeEnvironment) -> dict[str, Any]:
     )
 
 
+def load_runtime_policy_snapshot(app_id: int) -> RuntimePolicySnapshot:
+    """Use a fresh database statement for exact app/global enforcement state."""
+
+    if default_policy_source_requested():
+        raise PolicyLoadError("Authenticated runtimes require database policies.")
+    try:
+        with SessionLocal() as db:
+            return read_runtime_policy_snapshot(db, app_id)
+    except SQLAlchemyError:
+        raise PolicyLoadError("Runtime policy snapshot is unavailable.") from None
+
+
+def _check_policy_snapshot(app_id: int, expected: RuntimePolicySnapshot) -> None:
+    """Reject construction if selected policy or compiler contents changed."""
+
+    if load_runtime_policy_snapshot(app_id) != expected:
+        raise PolicyLoadError("Runtime policy configuration changed during construction.")
+
+
 async def _build_guardrails_runtime_parts_uncached(
     app_id: int,
+    llm_selection: RuntimeLlmSelection | None = None,
+    policy_snapshot: RuntimePolicySnapshot | None = None,
 ) -> GuardrailsRuntimeParts:
     """Build uncached rails, agent, and guarded tools for one app."""
 
     github_connector = load_app_connector_config(app_id, "github")
+    try:
+        if policy_snapshot is None:
+            policy_snapshot = load_runtime_policy_snapshot(app_id)
+        if policy_snapshot.app_id != app_id:
+            raise PolicyLoadError("Runtime policy scope is invalid.")
+        input_policy_entries = tuple(
+            LoadedInputPolicy("database", entry.policy_id, entry.policy)
+            for entry in policy_snapshot.policies if isinstance(entry.policy, InputPolicyObject)
+        )
+        prompt_rules = tuple(
+            LoadedPromptRule("database", entry.compiled_rule_id, entry.policy_id,
+                             "input" if isinstance(entry.policy, InputPolicyObject) else "output", entry.rule_text)
+            for entry in policy_snapshot.policies
+        )
+        prompt_rule_config = build_rails_config_with_prompt_rules(
+            "config", app_id=app_id, prompt_rules=prompt_rules,
+        )
+        guard_rules = compile_tool_guard_rules(input_policy_entries)
+        blocked_tools = frozenset(name for rule in guard_rules for name in rule.tool_names)
+        blocked_output_phrases = compile_blocked_output_phrases(
+            entry.policy.description for entry in policy_snapshot.policies
+            if isinstance(entry.policy, OutputPolicyObject)
+        )
+    except (ValueError, TypeError, AttributeError) as error:
+        raise PolicyLoadError("Runtime policy configuration is invalid.") from error
+
+    if llm_selection is None:
+        llm_selection = load_runtime_llm_selection(app_id)
     environment = load_runtime_environment(
         github_credential_reference=github_connector.credential_reference,
     )
-    llm_selection = load_runtime_llm_selection(app_id)
     guardrail_model = build_chat_model(
         environment,
         llm_selection.guardrail_llm_config,
@@ -481,29 +522,13 @@ async def _build_guardrails_runtime_parts_uncached(
         llm_selection.main_llm_config,
         "main agent",
     )
-    prompt_rule_config = build_rails_config_with_prompt_rules(
-        "config",
-        app_id=app_id,
-    )
     rails = LLMRails(prompt_rule_config.rails_config, llm=guardrail_model)
-    guard_rules = tool_guard_rules_for_app(app_id=app_id)
-    blocked_tools = frozenset(
-        tool_name
-        for rule in guard_rules
-        for tool_name in rule.tool_names
-    )
     tool_bundle = await build_guarded_github_tools(
         environment,
         blocked_tools,
         guard_rules,
     )
     agent = create_agent(model=main_model, tools=list(tool_bundle.tools))
-    blocked_output_phrases = compile_blocked_output_phrases(
-        policy.description for policy in load_output_policy_objects(app_id=app_id)
-    )
-
-    input_policy_entries = load_input_policy_entries(app_id=app_id)
-
     return GuardrailsRuntimeParts(
         prompt_rule_config=prompt_rule_config,
         input_policy_count=len(input_policy_entries),
@@ -520,11 +545,19 @@ async def _build_guardrails_runtime_parts_uncached(
 async def build_guardrails_runtime_parts(app_id: int) -> GuardrailsRuntimeParts:
     """Reuse an app runtime until its database revision or TTL changes."""
 
+    if default_policy_source_requested():
+        raise PolicyLoadError("Authenticated runtimes require database policies.")
+
+    selection = load_runtime_llm_selection(app_id)
+    snapshot = load_runtime_policy_snapshot(app_id)
     ttl = _runtime_cache_ttl_seconds()
     if ttl == 0:
-        return await _build_guardrails_runtime_parts_uncached(app_id)
+        parts = await _build_guardrails_runtime_parts_uncached(app_id, selection, snapshot)
+        _check_llm_selection(app_id, selection)
+        _check_policy_snapshot(app_id, snapshot)
+        return parts
 
-    revision = load_runtime_revision(app_id)
+    revision = (selection, snapshot, *load_runtime_revision(app_id))
     now = monotonic()
     cached = _RUNTIME_PARTS_CACHE.get(app_id)
     if cached and cached.revision == revision and cached.expires_at > now:
@@ -533,14 +566,18 @@ async def build_guardrails_runtime_parts(app_id: int) -> GuardrailsRuntimeParts:
 
     lock = _RUNTIME_BUILD_LOCKS.setdefault(app_id, asyncio.Lock())
     async with lock:
-        revision = load_runtime_revision(app_id)
+        selection = load_runtime_llm_selection(app_id)
+        snapshot = load_runtime_policy_snapshot(app_id)
+        revision = (selection, snapshot, *load_runtime_revision(app_id))
         now = monotonic()
         cached = _RUNTIME_PARTS_CACHE.get(app_id)
         if cached and cached.revision == revision and cached.expires_at > now:
             _RUNTIME_PARTS_CACHE.move_to_end(app_id)
             return cached.parts
 
-        parts = await _build_guardrails_runtime_parts_uncached(app_id)
+        parts = await _build_guardrails_runtime_parts_uncached(app_id, selection, snapshot)
+        _check_llm_selection(app_id, selection)
+        _check_policy_snapshot(app_id, snapshot)
         _RUNTIME_PARTS_CACHE[app_id] = RuntimeCacheEntry(
             revision=revision,
             expires_at=now + ttl,

@@ -32,6 +32,7 @@ export type ManagementUser = {
   name: string;
   username: string;
   system_role: "developer" | "admin";
+  must_change_password?: boolean;
 };
 
 export type ManagedUser = ManagementUser & {
@@ -211,6 +212,12 @@ export type LlmConfig = {
   enabled: boolean;
 };
 
+export type AppLlmOptions = {
+  purpose: "main" | "guardrail";
+  environment_default_allowed: boolean;
+  configs: LlmConfig[];
+};
+
 export type LlmConfigCreatePayload = {
   name: string;
   provider: "azure" | "azure_openai";
@@ -336,6 +343,7 @@ export type PolicyConnectorOption = {
     resources: Array<{
       value: string;
       label: string;
+      condition_fields: string[];
     }>;
   }>;
 };
@@ -646,6 +654,10 @@ export function listLlmConfigs() {
   return apiRequest<LlmConfig[]>("/llm-configs");
 }
 
+export function listAppLlmOptions(appId: number, purpose: "main" | "guardrail") {
+  return apiRequest<AppLlmOptions>(`/apps/${appId}/llm-options?purpose=${purpose}`);
+}
+
 export function createLlmConfig(payload: LlmConfigCreatePayload) {
   return apiRequest<LlmConfig>("/llm-configs", {
     method: "POST",
@@ -663,7 +675,7 @@ export function saveAppConnector(
   clientId: string,
   payload: {
     connector_name: string;
-    credential_reference: string | null;
+    credential_reference?: string | null;
     enabled: boolean;
   }
 ) {

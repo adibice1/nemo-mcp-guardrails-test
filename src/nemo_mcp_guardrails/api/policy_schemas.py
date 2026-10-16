@@ -46,10 +46,11 @@ class PolicyAssignmentResolutionCreate(BaseModel):
 
 
 class PolicyResourceOption(BaseModel):
-    """One resource available for a connector action."""
+    """One executable input-block resource and its supported equality fields."""
 
     value: str
     label: str
+    condition_fields: list[str] = Field(default_factory=list)
 
 
 class PolicyActionOption(BaseModel):

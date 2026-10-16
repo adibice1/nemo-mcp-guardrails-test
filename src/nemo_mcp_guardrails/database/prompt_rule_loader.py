@@ -4,6 +4,13 @@ from sqlalchemy import and_, or_, select
 from sqlalchemy.exc import SQLAlchemyError
 
 from nemo_mcp_guardrails.database.connection import SessionLocal
+from nemo_mcp_guardrails.database.policy_errors import PolicyLoadError
+from nemo_mcp_guardrails.database.policy_loader import (
+    default_policy_source_requested,
+    load_input_policy_objects,
+    load_output_policy_objects,
+)
+from nemo_mcp_guardrails.policy_compiler import compile_output_rail_rules, compile_policy
 from nemo_mcp_guardrails.database.models import (
     AppPolicyAssignmentRecord,
     CompiledPolicyRuleRecord,
@@ -27,6 +34,19 @@ def load_prompt_policy_rules(
     app_id: int | None = None,
 ) -> tuple[LoadedPromptRule, ...]:
     """Load enabled compiled prompt rules, optionally scoped to one app."""
+
+    if default_policy_source_requested():
+        return tuple(
+            LoadedPromptRule("default", None, None, rail_type, text)
+            for rail_type, texts in (
+                ("input", tuple(
+                    compile_policy(policy).input_rail_rule
+                    for policy in load_input_policy_objects()
+                )),
+                ("output", compile_output_rail_rules(load_output_policy_objects())),
+            )
+            for text in texts
+        )
 
     try:
         with SessionLocal() as db:
@@ -62,8 +82,15 @@ def load_prompt_policy_rules(
                 )
 
             records = list(db.scalars(statement))
-    except SQLAlchemyError:
-        return ()
+    except SQLAlchemyError as error:
+        raise PolicyLoadError("Compiled policies could not be loaded.") from error
+
+    for record in records:
+        if (
+            record.rail_type not in {"input", "output"}
+            or not isinstance(record.rule_text, str) or not record.rule_text.strip()
+        ):
+            raise PolicyLoadError("Compiled policy metadata is invalid.")
 
     return tuple(
         LoadedPromptRule(

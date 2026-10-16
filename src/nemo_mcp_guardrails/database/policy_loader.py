@@ -6,11 +6,13 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import selectinload
 
 from nemo_mcp_guardrails.database.connection import SessionLocal
+from nemo_mcp_guardrails.database.policy_errors import PolicyLoadError
 from nemo_mcp_guardrails.database.models import (
     AppPolicyAssignmentRecord,
     GlobalPolicyAssignmentRecord,
     PolicyRecord,
 )
+from nemo_mcp_guardrails.input_conditions import prepare_input_conditions
 from nemo_mcp_guardrails.policy_compiler import (
     DEFAULT_INPUT_POLICY_OBJECTS,
     DEFAULT_OUTPUT_POLICY_OBJECTS,
@@ -44,7 +46,7 @@ def default_policy_source_requested() -> bool:
 def _load_enabled_policy_records(
     policy_type: str,
     app_id: int | None = None,
-) -> list[PolicyRecord] | None:
+) -> list[PolicyRecord]:
     """Load enabled policies, optionally scoped to global and app assignments."""
 
     try:
@@ -79,11 +81,21 @@ def _load_enabled_policy_records(
                 )
 
             return list(db.scalars(statement))
-    except SQLAlchemyError:
-        return None
+    except SQLAlchemyError as error:
+        raise PolicyLoadError("Database policies could not be loaded.") from error
 
 
-def _to_input_policy_object(record: PolicyRecord) -> InputPolicyObject | None:
+def _policy_conditions(record: PolicyRecord) -> dict:
+    """Reject malformed conditions instead of silently weakening a policy."""
+
+    if record.conditions is None:
+        return {}
+    if not isinstance(record.conditions, dict):
+        raise PolicyLoadError("Policy conditions must be an object.")
+    return record.conditions
+
+
+def _to_input_policy_object(record: PolicyRecord) -> InputPolicyObject:
     """Convert one enabled database row into an input policy object."""
 
     connector = (
@@ -96,36 +108,50 @@ def _to_input_policy_object(record: PolicyRecord) -> InputPolicyObject | None:
         record.normalized_resource.name if record.normalized_resource else record.resource
     )
 
-    if not (connector and action and resource and record.effect):
-        return None
+    if (
+        not all(isinstance(value, str) and value.strip() for value in (connector, action, resource))
+        or record.effect != "block"
+    ):
+        raise PolicyLoadError("Input policy metadata is invalid.")
 
-    custom_resource_value = (record.conditions or {}).get("custom_resource")
+    custom_resource_value = _policy_conditions(record).get("custom_resource")
+    if custom_resource_value is not None and not isinstance(custom_resource_value, str):
+        raise PolicyLoadError("Input policy custom resource must be text.")
     custom_resource = (
         str(custom_resource_value).strip()
         if custom_resource_value is not None
         else None
     )
 
-    return InputPolicyObject(
+    policy = InputPolicyObject(
         connector=connector,
         action=action,
         resource=resource,
         effect=record.effect,
         custom_resource=custom_resource or None,
     )
+    try:
+        prepared = prepare_input_conditions(policy, _policy_conditions(record))
+        if prepared and prepared != record.conditions:
+            raise ValueError("Unreviewed or noncanonical selector.")
+    except (ValueError, TypeError, AttributeError):
+        raise PolicyLoadError("Input policy conditions require review.") from None
+    return policy
 
 
-def _to_output_policy_object(record: PolicyRecord) -> OutputPolicyObject | None:
+def _to_output_policy_object(record: PolicyRecord) -> OutputPolicyObject:
     """Convert one enabled database row into an output policy object."""
 
-    output_rule_value = (record.conditions or {}).get("output_rule")
-    output_rule = (
-        str(output_rule_value).strip()
-        if output_rule_value is not None
-        else (record.description or "").strip()
-    )
-    if not (record.category and output_rule and record.effect):
-        return None
+    output_rule_value = _policy_conditions(record).get("output_rule")
+    if output_rule_value is None:
+        output_rule_value = record.description
+    if (
+        not isinstance(record.category, str) or not record.category.strip()
+        or not isinstance(output_rule_value, str) or not output_rule_value.strip()
+        or record.effect != "block"
+    ):
+        raise PolicyLoadError("Output policy metadata is invalid.")
+    output_rule = output_rule_value.strip()
 
     return OutputPolicyObject(
         category=record.category,
@@ -156,23 +182,15 @@ def load_input_policy_entries(
         return _default_input_policy_entries()
 
     records = _load_enabled_policy_records("input", app_id=app_id)
-    if records is None:
-        return _default_input_policy_entries()
-
     entries = tuple(
         LoadedInputPolicy(
             source="database",
             source_id=record.id,
-            policy=policy,
+            policy=_to_input_policy_object(record),
         )
         for record in records
-        if (policy := _to_input_policy_object(record)) is not None
     )
-
-    if app_id is not None:
-        return entries
-
-    return entries or _default_input_policy_entries()
+    return entries
 
 
 def load_input_policy_objects(
@@ -194,16 +212,4 @@ def load_output_policy_objects(
         return DEFAULT_OUTPUT_POLICY_OBJECTS
 
     records = _load_enabled_policy_records("output", app_id=app_id)
-    if records is None:
-        return DEFAULT_OUTPUT_POLICY_OBJECTS
-
-    policies = tuple(
-        policy
-        for record in records
-        if (policy := _to_output_policy_object(record)) is not None
-    )
-
-    if app_id is not None:
-        return policies
-
-    return policies or DEFAULT_OUTPUT_POLICY_OBJECTS
+    return tuple(_to_output_policy_object(record) for record in records)

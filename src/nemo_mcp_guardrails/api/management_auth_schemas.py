@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ManagementSignupRequest(BaseModel):
@@ -27,6 +27,7 @@ class ManagementUserRead(BaseModel):
     name: str
     username: str
     system_role: str
+    must_change_password: bool = False
 
 
 class ManagementProfileUpdate(BaseModel):
@@ -45,6 +46,14 @@ class ManagementPasswordChange(BaseModel):
 
     current_password: str = Field(min_length=1, max_length=256)
     new_password: str = Field(min_length=15, max_length=256)
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_password_encoding(cls, value: str) -> str:
+        """Reject malformed Unicode before password hashing."""
+        value.encode("utf-8")
+        return value
+
 
 
 class ManagementTokenResponse(BaseModel):

@@ -1,3 +1,5 @@
+import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -38,45 +40,45 @@ def format_prompt_rule_block(
     return "\n".join(f"- {rule_text}" for rule_text in matching_rules)
 
 
-def indent_continuation_lines(text: str, spaces: int) -> str:
-    """Indent all but the first line for replacement inside a YAML block scalar."""
+def literal_prompt_rule_block(
+    rules: tuple[LoadedPromptRule, ...],
+    rail_type: str,
+) -> str:
+    """Encode policy rules as a literal Jinja value, never as template code."""
 
-    lines = text.splitlines()
-    if not lines:
-        return text
-
-    indentation = " " * spaces
-    return "\n".join([lines[0], *(f"{indentation}{line}" for line in lines[1:])])
+    rule_text = format_prompt_rule_block(rules, rail_type)
+    return "{{ " + json.dumps(rule_text, ensure_ascii=False) + " }}"
 
 
 def build_rails_config_with_prompt_rules(
     config_path: str = "config",
     app_id: int | None = None,
+    *,
+    prompt_rules: tuple[LoadedPromptRule, ...] | None = None,
 ) -> PromptRuleConfig:
     """Build a RailsConfig using compiled DB rules, optionally scoped to one app."""
 
     config_dir = Path(config_path)
-    prompt_rules = load_prompt_policy_rules(app_id=app_id)
+    if prompt_rules is None:
+        prompt_rules = load_prompt_policy_rules(app_id=app_id)
 
     config_yaml = yaml.safe_load((config_dir / "config.yml").read_text())
-    prompts_text = (config_dir / "prompts.yml").read_text()
+    prompts_yaml = yaml.safe_load((config_dir / "prompts.yml").read_text())
     rails_co = (config_dir / "rails.co").read_text()
 
-    input_policy_rules = indent_continuation_lines(
-        format_prompt_rule_block(prompt_rules, "input"),
-        spaces=6,
-    )
-    output_policy_rules = indent_continuation_lines(
-        format_prompt_rule_block(prompt_rules, "output"),
-        spaces=6,
-    )
+    policy_rule_blocks = {
+        "input_policy_rules": literal_prompt_rule_block(prompt_rules, "input"),
+        "output_policy_rules": literal_prompt_rule_block(prompt_rules, "output"),
+    }
 
-    rendered_prompts_text = (
-        prompts_text.replace("{{ input_policy_rules }}", input_policy_rules)
-        .replace("{{ output_policy_rules }}", output_policy_rules)
-    )
+    for prompt in prompts_yaml.get("prompts", []):
+        if isinstance(prompt.get("content"), str):
+            prompt["content"] = re.sub(
+                r"\{\{\s*(input_policy_rules|output_policy_rules)\s*\}\}",
+                lambda match: policy_rule_blocks[match.group(1)],
+                prompt["content"],
+            )
 
-    prompts_yaml = yaml.safe_load(rendered_prompts_text)
     merged_yaml = {**config_yaml, **prompts_yaml}
 
     rails_config = RailsConfig.from_content(

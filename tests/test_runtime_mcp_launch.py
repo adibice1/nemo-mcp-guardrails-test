@@ -11,6 +11,7 @@ from nemo_mcp_guardrails.runtime_factory import (
     RuntimeEnvironment,
     github_mcp_client_config,
 )
+from nemo_mcp_guardrails.github_tool_contract import REVIEWED_MCP_IMAGE
 
 
 @contextmanager
@@ -57,7 +58,8 @@ def main() -> None:
     ):
         docker_config = github_mcp_client_config(environment)
         assert docker_config["command"] == "docker"
-        assert "ghcr.io/github/github-mcp-server" in docker_config["args"]
+        assert REVIEWED_MCP_IMAGE in docker_config["args"]
+        assert "ghcr.io/github/github-mcp-server" not in docker_config["args"]
 
     with temporary_env(
         GITHUB_MCP_LAUNCH_MODE="native",
@@ -71,10 +73,14 @@ def main() -> None:
         GITHUB_MCP_LAUNCH_MODE="native",
         GITHUB_MCP_BINARY_PATH="/custom/github-mcp-server",
     ):
-        custom_config = github_mcp_client_config(environment)
-        assert custom_config["command"] == "/custom/github-mcp-server"
+        try:
+            github_mcp_client_config(environment)
+        except RuntimeError as error:
+            assert str(error) == "Native GitHub MCP requires the bundled reviewed executable."
+        else:
+            raise AssertionError("Unreviewed native executable was accepted")
 
-    for config in (docker_config, native_config, custom_config):
+    for config in (docker_config, native_config):
         assert config["transport"] == "stdio"
         assert config["env"]["GITHUB_PERSONAL_ACCESS_TOKEN"] == "fake-github-pat"
         assert config["env"]["GITHUB_READ_ONLY"] == "1"

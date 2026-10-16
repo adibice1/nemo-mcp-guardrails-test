@@ -1,7 +1,8 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from sqlalchemy import select
+from sqlalchemy import func, select
+from nemo_mcp_guardrails.request_limits import MAX_HISTORY_TURNS, MAX_MESSAGE_CHARS
 from sqlalchemy.orm import Session
 
 from nemo_mcp_guardrails.database.models import ConversationMessageRecord
@@ -27,18 +28,20 @@ def load_conversation_turns(
 ) -> list[ConversationTurn]:
     """Load stored conversation turns for one app conversation."""
 
-    records = db.scalars(
-        select(ConversationMessageRecord)
+    records = db.execute(
+        select(ConversationMessageRecord.role,
+               func.substr(ConversationMessageRecord.content, 1, MAX_MESSAGE_CHARS + 1).label("content"))
         .where(
             ConversationMessageRecord.app_id == app_id,
             ConversationMessageRecord.conversation_id == conversation_id,
         )
-        .order_by(ConversationMessageRecord.id)
+        .order_by(ConversationMessageRecord.id.desc())
+        .limit(MAX_HISTORY_TURNS + 1)
     )
 
     return [
         ConversationTurn(role=record.role, content=record.content)
-        for record in records
+        for record in reversed(records.all())
     ]
 
 

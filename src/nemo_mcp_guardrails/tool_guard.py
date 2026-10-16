@@ -1,12 +1,16 @@
-import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from time import perf_counter
 from typing import Any
 
 from langchain_core.tools import StructuredTool, ToolException
 
-from nemo_mcp_guardrails.database.policy_loader import load_input_policy_objects
-from nemo_mcp_guardrails.policy_compiler import compile_policy
+from nemo_mcp_guardrails.database.policy_loader import LoadedInputPolicy, load_input_policy_entries
+from nemo_mcp_guardrails.github_resource_bindings import GithubBranchBinding, InvalidResourceArguments
+from nemo_mcp_guardrails.github_tool_contract import GithubExecutionRule, compile_github_execution_rule
+from nemo_mcp_guardrails.policy_compiler import (
+    DEFAULT_INPUT_POLICY_OBJECTS,
+    compile_blocked_tools,
+)
 from nemo_mcp_guardrails.runtime_events import record_runtime_event
 
 STATIC_BLOCKED_GITHUB_MCP_TOOLS: frozenset[str] = frozenset()
@@ -20,9 +24,26 @@ TOOL_GUARD_REFUSAL = (
 class ToolGuardViolation(ToolException):
     """Raised before an MCP tool executes when a GMS policy matches."""
 
-    def __init__(self, tool_name: str) -> None:
+    def __init__(self, tool_name: str, rule: "ToolGuardRule | None" = None) -> None:
+        """Attach only metadata from the rule that actually matched this call."""
+
         self.tool_name = tool_name
+        self.policy_id = rule.policy_id if rule else None
+        self.policy_name = rule.policy_name if rule else None
         super().__init__(TOOL_GUARD_REFUSAL)
+
+
+TOOL_GUARD_EVALUATION_RESPONSE = "The connector request could not be checked against its resource policy."
+
+
+class ToolGuardEvaluationError(ToolException):
+    """Stop an unobservable or malformed call without asserting a policy match."""
+
+    def __init__(self, tool_name: str) -> None:
+        """Retain only the reviewed tool name and a generic explanation."""
+
+        self.tool_name = tool_name
+        super().__init__(TOOL_GUARD_EVALUATION_RESPONSE)
 
 
 @dataclass(frozen=True)
@@ -30,97 +51,38 @@ class ToolGuardRule:
     """Describe one unconditional or resource-specific tool restriction."""
 
     tool_names: frozenset[str]
-    custom_resource: str | None = None
+    custom_resource: str | None = field(default=None, repr=False)
+    execution: GithubExecutionRule | None = field(default=None, repr=False)
+    policy_id: int | None = None
+    policy_name: str | None = None
+
+    def __post_init__(self) -> None:
+        """Refuse legacy conditional wrappers and inconsistent reporting sets."""
+
+        if self.custom_resource and self.execution is None:
+            raise ValueError("Conditional guards require an executable field binding.")
+        if self.execution is not None and self.tool_names != self.execution.tool_names:
+            raise ValueError("Tool guard reporting names do not match its executable rule.")
 
 
-def _normalize_match_text(value: Any) -> str:
-    """Normalize a resource value for case-insensitive argument matching."""
+def compile_tool_guard_rules(entries: tuple[LoadedInputPolicy, ...]) -> tuple[ToolGuardRule, ...]:
+    """Compile supplied immutable policies without another database read."""
 
-    text = str(value).casefold().strip()
-    text = re.sub(r"[^a-z0-9._/\-]+", " ", text)
-    return re.sub(r"\s+", " ", text).strip(" ._/-")
-
-
-def _custom_resource_candidates(custom_resource: str) -> frozenset[str]:
-    """Extract literal target candidates from an admin-entered restriction."""
-
-    candidates = {_normalize_match_text(custom_resource)}
-    candidates.update(
-        _normalize_match_text(match)
-        for match in re.findall(r'["\']([^"\']+)["\']', custom_resource)
-    )
-
-    qualified_match = re.search(
-        r"\b(?:named|called|titled|numbered|number|path|branch)\s+(?:is\s+)?(.+)$",
-        custom_resource,
-        flags=re.IGNORECASE,
-    )
-    if qualified_match:
-        candidates.add(_normalize_match_text(qualified_match.group(1)))
-
-    number_match = re.search(r"#\s*(\d+)", custom_resource)
-    if number_match:
-        candidates.add(number_match.group(1))
-
-    return frozenset(candidate for candidate in candidates if candidate)
-
-
-def _flatten_argument_values(value: Any) -> tuple[str, ...]:
-    """Flatten nested MCP arguments into normalized scalar values."""
-
-    if isinstance(value, dict):
-        return tuple(
-            item
-            for nested_value in value.values()
-            for item in _flatten_argument_values(nested_value)
-        )
-    if isinstance(value, (list, tuple, set)):
-        return tuple(
-            item
-            for nested_value in value
-            for item in _flatten_argument_values(nested_value)
-        )
-    if value is None or isinstance(value, bool):
-        return ()
-
-    normalized = _normalize_match_text(value)
-    return (normalized,) if normalized else ()
-
-
-def custom_resource_matches(
-    custom_resource: str,
-    tool_arguments: dict[str, Any],
-) -> bool:
-    """Return whether MCP arguments refer to the restricted custom resource."""
-
-    candidates = _custom_resource_candidates(custom_resource)
-    argument_values = _flatten_argument_values(tool_arguments)
-    return any(
-        candidate == value
-        for candidate in candidates
-        for value in argument_values
-    )
-
-
-def tool_guard_rules_for_app(
-    app_id: int | None = None,
-) -> tuple[ToolGuardRule, ...]:
-    """Compile executable MCP guard rules for the optional app scope."""
-
-    rules: list[ToolGuardRule] = []
-    if STATIC_BLOCKED_GITHUB_MCP_TOOLS:
-        rules.append(ToolGuardRule(STATIC_BLOCKED_GITHUB_MCP_TOOLS))
-
-    for policy in load_input_policy_objects(app_id=app_id):
-        compiled_policy = compile_policy(policy)
-        rules.append(
-            ToolGuardRule(
-                tool_names=frozenset(compiled_policy.blocked_tools),
-                custom_resource=(policy.custom_resource or "").strip() or None,
-            )
-        )
-
+    rules = [ToolGuardRule(STATIC_BLOCKED_GITHUB_MCP_TOOLS)] if STATIC_BLOCKED_GITHUB_MCP_TOOLS else []
+    for entry in entries:
+        policy = entry.policy
+        execution = compile_github_execution_rule(policy)
+        rules.append(ToolGuardRule(
+            execution.tool_names, policy.custom_resource, execution, entry.source_id,
+            f"GitHub {policy.action} {policy.resource.replace('_', ' ')}",
+        ))
     return tuple(rules)
+
+
+def tool_guard_rules_for_app(app_id: int | None = None) -> tuple[ToolGuardRule, ...]:
+    """Compile validated enabled policies for a diagnostic's optional app scope."""
+
+    return compile_tool_guard_rules(load_input_policy_entries(app_id=app_id))
 
 
 def blocked_tool_names_for_app(
@@ -135,19 +97,25 @@ def blocked_tool_names_for_app(
     )
 
 
-BLOCKED_GITHUB_MCP_TOOLS = blocked_tool_names_for_app()
+# Compatibility summary for offline diagnostics; importing never reads the database.
+BLOCKED_GITHUB_MCP_TOOLS = compile_blocked_tools(DEFAULT_INPUT_POLICY_OBJECTS)
 
 
 def guard_mcp_tool(
     tool: Any,
-    blocked_tool_names: frozenset[str] = BLOCKED_GITHUB_MCP_TOOLS,
+    blocked_tool_names: frozenset[str] | None = None,
     guard_rules: tuple[ToolGuardRule, ...] | None = None,
+    branch_reader: Any = None,
 ) -> Any:
     """Wrap an MCP tool so matching broad or conditional rules block execution."""
 
     effective_rules = guard_rules
     if effective_rules is None:
-        effective_rules = (ToolGuardRule(blocked_tool_names),)
+        effective_rules = (
+            tool_guard_rules_for_app()
+            if blocked_tool_names is None
+            else (ToolGuardRule(blocked_tool_names),)
+        )
 
     async def guarded_coroutine(**kwargs: Any) -> Any:
         """Record guard decisions and invocation metadata without arguments."""
@@ -157,19 +125,45 @@ def guard_mcp_tool(
             tool_name=tool.name,
         )
         try:
-            for rule in effective_rules:
+            branch_state = None
+            merge_branch_rules = tool.name == "merge_pull_request" and any(
+                rule.execution is not None and any(
+                    isinstance(binding, GithubBranchBinding) and binding.tool_name == tool.name
+                    for binding in rule.execution.bindings
+                ) for rule in effective_rules
+            )
+            # Broad bans need no metadata. Keep their attribution and event path.
+            ordered_rules = sorted(effective_rules, key=lambda rule: bool(rule.execution and rule.execution.bindings)) if merge_branch_rules else effective_rules
+            broad_match = merge_branch_rules and any(
+                tool.name in rule.tool_names and (rule.execution is None or not rule.execution.bindings)
+                and (rule.execution is None or rule.execution.matches(tool.name, kwargs))
+                for rule in ordered_rules
+            )
+            if merge_branch_rules and not broad_match:
+                if branch_reader is None:
+                    raise InvalidResourceArguments("No trusted PR reader is available.")
+                branch_state = await branch_reader(kwargs)
+            for rule in ordered_rules:
                 if tool.name not in rule.tool_names:
                     continue
-                if rule.custom_resource is None or custom_resource_matches(
-                    rule.custom_resource,
-                    kwargs,
-                ):
+                if rule.execution is None or rule.execution.matches(tool.name, kwargs, branch_state=branch_state):
                     record_runtime_event(
                         "tool_guard.completed", "tool_guard", "blocked",
                         duration_ms=(perf_counter() - guard_started) * 1000,
                         tool_name=tool.name, reason_code="gms_tool_guard",
                     )
-                    raise ToolGuardViolation(tool.name)
+                    raise ToolGuardViolation(tool.name, rule)
+            if merge_branch_rules:
+                # GitHub's merge precondition pins the head SHA, not the base ref.
+                # A second read or local lock cannot close a remote retarget race.
+                raise InvalidResourceArguments("Atomic branch-conditional merging is unavailable.")
+        except InvalidResourceArguments:
+            record_runtime_event(
+                "tool_guard.completed", "tool_guard", "error",
+                duration_ms=(perf_counter() - guard_started) * 1000,
+                tool_name=tool.name, reason_code="gms_tool_guard_evaluation",
+            )
+            raise ToolGuardEvaluationError(tool.name) from None
         except ToolGuardViolation:
             raise
         except BaseException:

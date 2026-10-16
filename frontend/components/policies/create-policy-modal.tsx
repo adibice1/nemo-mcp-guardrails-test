@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, HelpCircle, Plus, X } from "lucide-react";
 import { type PolicyConnectorOption } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import { FormField } from "@/components/shared/form-field";
 import { PolicyAuthoringAssistant } from "@/components/policies/policy-authoring-assistant";
+import { BranchConditionEditor } from "@/components/policies/branch-condition-editor";
+import { formatBranchConditions, parseBranchConditions } from "@/lib/branch-conditions";
 
 export type PolicyDraft = {
   policyType: "input" | "output";
@@ -51,6 +53,7 @@ export function CreatePolicyModal({
   const [setGlobal, setSetGlobal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const policyNameRef = useRef<HTMLInputElement>(null);
+  const conditionHelpId = useId();
 
   const actionLocked = !connector;
   const resourceLocked = !action;
@@ -66,6 +69,11 @@ export function CreatePolicyModal({
   const actionOptions = selectedConnector?.actions ?? [];
   const selectedAction = actionOptions.find((option) => option.value === action);
   const resourceOptions = selectedAction?.resources ?? [];
+  const selectedResource = resourceOptions.find((option) => option.value === resourceType);
+  const conditionFields = selectedResource?.condition_fields ?? [];
+  const branchConditions = resourceType === "pull_request" ? parseBranchConditions(customResource) : null;
+  const branchDraftValid = branchConditions === null || branchConditions.every(term => term.value.trim());
+  const showBranchPreview = conditionFields.includes("source_branch") && branchConditions !== null;
 
   useEffect(() => {
     if (!open) {
@@ -84,12 +92,12 @@ export function CreatePolicyModal({
   const canCreate = useMemo(
     () =>
       Boolean(
-        policyName.trim() &&
+        policyName.trim() && branchDraftValid && customResource.length <= 1000 &&
           (policyType === "output"
             ? outputRule.trim()
-            : connector && action && resourceType)
+            : selectedResource && (!customResource.trim() || conditionFields.length > 0))
       ),
-    [action, connector, outputRule, policyName, policyType, resourceType]
+    [branchDraftValid, conditionFields.length, customResource, outputRule, policyName, policyType, selectedResource]
   );
 
   if (!open) {
@@ -256,7 +264,7 @@ export function CreatePolicyModal({
                 label="Choose Action:"
                 required
                 placeholder="Action"
-                tip="Choose the action to allow or block, such as create, update, merge, or read."
+                tip="Choose a supported write action to block, such as create, update, or merge."
                 value={action}
                 options={actionOptions}
                 disabled={actionLocked}
@@ -284,9 +292,17 @@ export function CreatePolicyModal({
             )}
           </div>
 
+          {policyType === "input" && conditionFields.includes("source_branch") && (
+            <BranchConditionEditor value={customResource} onChange={setCustomResource} merge={action === "merge"} />
+          )}
+
           {policyType === "input" ? (
             <FormField label="Customise Resource:" className="mt-6">
-              <textarea
+              {showBranchPreview ? (
+                <p className="rounded border border-gms-blue p-3 text-sm text-gms-text">
+                  {formatBranchConditions(customResource) ?? "Any source branch to any target branch."}
+                </p>
+              ) : <textarea
                 className={cn(
                   "h-[96px] w-full resize-none rounded border border-gms-blue px-3 py-3 text-sm outline-none",
                   customResourceLocked
@@ -294,12 +310,24 @@ export function CreatePolicyModal({
                     : "bg-white text-gms-text placeholder:text-[#a9bdff] dark:bg-[#252932]"
                 )}
                 disabled={customResourceLocked}
-                placeholder="Type your Resource"
+                placeholder={conditionFields.includes("number") ? "number = 17"
+                  : conditionFields.length ? `${conditionFields[0]} = "literal"` : "Leave blank for all resources"}
+                maxLength={1000}
+                aria-describedby={conditionHelpId}
                 value={customResource}
                 onChange={(event) => {
                   setCustomResource(event.target.value);
                 }}
-              />
+              />}
+              <p id={conditionHelpId} className="mt-2 text-xs text-gms-muted">
+                {showBranchPreview ? "Use the branch controls above. All selected conditions must match."
+                  : !selectedResource ? "Choose a supported connector, action and resource. Existing text is retained for review."
+                  : conditionFields.length
+                  ? `Leave blank for all resources, or use an equality with: ${conditionFields.join(", ")}. Quote text; use an unquoted positive integer for number. Title/name ignore case; paths and branches preserve case. ${conditionFields.includes("source_branch") ? "PR branch conditions also support does-not-equal and AND using the controls above." : "Other compound conditions and workflows are unsupported."}`
+                  : "This combination supports all resources only. A nonempty condition cannot be saved; clear it explicitly to use broad scope."}
+                {action === "push" && resourceType === "file" && " A conditional push cannot target README.md."}
+                {customResource.trim() && " Related writes with an unobservable target can also be refused."}
+              </p>
             </FormField>
           ) : (
             <FormField label="Output Rule:" required className="mt-6">

@@ -50,6 +50,7 @@ export function AppTopNav({ active }: AppTopNavProps) {
           !active ||
           loadManagementSession()?.access_token !== session.access_token
         ) return;
+        if (user.must_change_password) { router.replace("/setup-password"); return; }
         updateStoredManagementUser(user);
         setIsAdmin(user.system_role === "admin");
       })

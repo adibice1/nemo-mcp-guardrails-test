@@ -101,58 +101,34 @@ export const mockPolicyOptions = [
     label: "GitHub",
     actions: [
       { value: "create", label: "Create", resources: [
-        { value: "branch", label: "Branch" },
-        { value: "file", label: "File" },
-        { value: "issue", label: "Issue" },
-        { value: "pull_request", label: "Pull Request" },
-        { value: "repository", label: "Repository" }
+        { value: "branch", label: "Branch", condition_fields: [] },
+        { value: "file", label: "File", condition_fields: [] },
+        { value: "issue", label: "Issue", condition_fields: ["title"] },
+        { value: "pull_request", label: "Pull Request", condition_fields: ["title", "source_branch", "target_branch"] },
+        { value: "repository", label: "Repository", condition_fields: ["name"] }
       ] },
       { value: "update", label: "Update", resources: [
-        { value: "file", label: "File" },
-        { value: "issue", label: "Issue" },
-        { value: "pull_request", label: "Pull Request" }
+        { value: "file", label: "File", condition_fields: [] },
+        { value: "issue", label: "Issue", condition_fields: ["number"] },
+        { value: "pull_request", label: "Pull Request", condition_fields: [] }
       ] },
       { value: "delete", label: "Delete", resources: [
-        { value: "file", label: "File" }
+        { value: "file", label: "File", condition_fields: ["path"] }
       ] },
       { value: "merge", label: "Merge", resources: [
-        { value: "pull_request", label: "Pull Request" }
+        { value: "pull_request", label: "Pull Request", condition_fields: ["number", "source_branch", "target_branch"] }
       ] },
       { value: "review", label: "Review", resources: [
-        { value: "pull_request", label: "Pull Request" }
+        { value: "pull_request", label: "Pull Request", condition_fields: ["number"] }
       ] },
       { value: "comment", label: "Comment", resources: [
-        { value: "issue", label: "Issue" }
+        { value: "issue", label: "Issue", condition_fields: ["number"] }
       ] },
       { value: "fork", label: "Fork", resources: [
-        { value: "repository", label: "Repository" }
+        { value: "repository", label: "Repository", condition_fields: ["name"] }
       ] },
       { value: "push", label: "Push", resources: [
-        { value: "file", label: "File" }
-      ] },
-      { value: "search", label: "Search", resources: [
-        { value: "file", label: "File" },
-        { value: "issue", label: "Issue" },
-        { value: "pull_request", label: "Pull Request" },
-        { value: "repository", label: "Repository" }
-      ] },
-      { value: "list", label: "List", resources: [
-        { value: "branch", label: "Branch" },
-        { value: "commit", label: "Commit" },
-        { value: "issue", label: "Issue" },
-        { value: "issue_type", label: "Issue Type" },
-        { value: "pull_request", label: "Pull Request" },
-        { value: "release", label: "Release" },
-        { value: "tag", label: "Tag" }
-      ] },
-      { value: "read", label: "Read", resources: [
-        { value: "commit", label: "Commit" },
-        { value: "file", label: "File" },
-        { value: "issue", label: "Issue" },
-        { value: "label", label: "Label" },
-        { value: "pull_request", label: "Pull Request" },
-        { value: "release", label: "Release" },
-        { value: "tag", label: "Tag" }
+        { value: "file", label: "File", condition_fields: ["path"] }
       ] }
     ]
   }

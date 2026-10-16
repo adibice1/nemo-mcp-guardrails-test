@@ -5,10 +5,12 @@ from typing import Any
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     DateTime,
     Float,
     ForeignKey,
     Integer,
+    Index,
     String,
     Text,
     UniqueConstraint,
@@ -41,6 +43,8 @@ class UserRecord(Base):
         index=True,
     )
     password_hash: Mapped[str] = mapped_column(String(255))
+    must_change_password: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
+    temporary_password_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     system_role: Mapped[str] = mapped_column(
         String(20),
         default="developer",
@@ -149,6 +153,41 @@ class AppRecord(Base):
         back_populates="app",
         cascade="all, delete-orphan",
         passive_deletes=True,
+    )
+
+
+class AppLlmGrantRecord(Base):
+    """Authorize one app to use a named model or environment default for a purpose."""
+
+    __tablename__ = "app_llm_grants"
+    __table_args__ = (
+        CheckConstraint("purpose IN ('main', 'guardrail')", name="ck_app_llm_grants_purpose"),
+        Index(
+            "uq_app_llm_grants_named", "app_id", "purpose", "llm_config_id", unique=True,
+            postgresql_where=text("llm_config_id IS NOT NULL"),
+            sqlite_where=text("llm_config_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_app_llm_grants_default", "app_id", "purpose", unique=True,
+            postgresql_where=text("llm_config_id IS NULL"),
+            sqlite_where=text("llm_config_id IS NULL"),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    app_id: Mapped[int] = mapped_column(
+        ForeignKey("apps.id", ondelete="CASCADE"), index=True,
+    )
+    purpose: Mapped[str] = mapped_column(String(20))
+    llm_config_id: Mapped[int | None] = mapped_column(
+        ForeignKey("llm_configs.id", ondelete="CASCADE"), nullable=True, index=True,
+    )
+    enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(),
     )
 
 
@@ -529,6 +568,7 @@ class ConversationMessageRecord(Base):
     """Persist one runtime conversation turn for one client app."""
 
     __tablename__ = "conversation_messages"
+    __table_args__ = (Index("ix_conversation_messages_scope_tail", "app_id", "conversation_id", "id"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     app_id: Mapped[int] = mapped_column(

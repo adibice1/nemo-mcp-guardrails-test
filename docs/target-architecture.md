@@ -1,5 +1,59 @@
 # Guardrails Management System Target Architecture
 
+## PR Branch Conditions - Patch 019
+
+The input selector contract now includes bounded source/target equality and
+inequality with AND for PR creation and merge policies. Immutable parsed
+comparisons are reused across compilation and execution; canonical selectors
+remain in existing conditions JSON. New conjunction/inequality uses format 2;
+existing single equality uses format 1. No table migration is added.
+Creation checks head/base arguments. Merge checks trusted PR metadata but refuses
+nonmatching conditional merges because the pinned connector lacks an atomic
+target-branch precondition. Selective merge capability remains unfinished.
+See [019 design and verification](branch-routing-patch-019.md).
+
+## Current Security Foundation - 2026-10-16
+
+Patches 010-018 are implemented; source uses Next.js 16 rather than the historical
+Next.js 13 choice below. Existing app/connector/policy architecture and ACI ports
+are retained. Users add `must_change_password` (false for existing accounts) and
+nullable `temporary_password_expires_at`. New/reset accounts require a personal
+password within 24 hours; setup-only JWTs can read their identity and replace the
+password, and cannot access management CRUD/runtime testing. Password replacement
+atomically clears setup state and invalidates old sessions.
+
+A single explicit schema helper also adds a composite conversation tail index.
+Membership backfill never grants all-to-all access. Throttling matches the current
+single-process backend; scaling requires a shared limit. Request/history bounds,
+verification results and operational limits are in the
+[completion report](security-run-2026-10-16.md). No live schema/data rollout ran.
+## Current Input Selector Storage - 2026-10-15
+
+009c1 validates new input selectors against the supported GitHub action/field
+subset and stores canonical field equality text plus integer
+`resource_condition_version: 1` in existing conditions JSON. Path/branch case is
+preserved; title/repository-name case folds without dropping literal punctuation
+or Unicode. No schema migration is introduced. Unreviewed legacy literals are
+excluded from automatic definition reuse/deduplication; ambiguous old values
+require explicit review rather than automatic conversion.
+
+This marker describes serialization, not runtime enforcement or admin approval.
+009c2a's immutable snapshot reader and 009c2b's execution contract/compiler changes
+are implemented and offline-checked. Conditional artifacts name actual fields and
+literals; broad input combinations pass the supported-write capability gate too.
+009c2c connects the matcher/catalogue and snapshots to runtime/cache. Rails,
+tools, attribution and output phrases use one validated immutable snapshot;
+exact contents are rechecked before reuse, after lock waits and after builds.
+Indeterminate targets produce controlled evaluation errors without a false policy
+match. 009c3a now validates/canonicalizes primary and related AI input selectors
+through the storage capability gate, clears all drafts for unsupported conditions
+or changed related scope, and filters authoring options to enabled supported
+writes with conditional field names. 009c3b now uses those fields in modal help
+and submission availability, aligns authoring mocks and supported/unsupported
+samples, and preserves selector text through existing submit/edit paths. Planned
+009 source work/offline verification is complete; patch 010 is next. See the single backlog for the supported
+subset, checks and outstanding live-policy/PostgreSQL verification.
+
 ## Current Authoring Slice - 2026-10-09
 
 The implemented management plane now offers live GitHub input drafting and
@@ -361,6 +415,37 @@ users.password_hash              -> password hash, never plaintext password
 apps.api_key_hash                -> API-key hash, never plaintext API key
 llm_configs.credential_reference -> secrets-manager reference, never LLM key
 ```
+
+### app_llm_grants
+
+Patch 008a adds the ORM/storage foundation for explicit app-specific model use.
+Each row identifies an app, a constrained `main` or `guardrail` purpose, and a
+named `llm_config_id`; null explicitly identifies the Azure environment default.
+`enabled` defaults to false. Separate unique indexes prevent duplicate named
+and default grants for an app/purpose. Foreign keys cascade on app/configuration
+deletion, and rows carry created/updated timestamps.
+
+`scripts/migrate_app_llm_grants.py` previews DDL and a selection inventory with
+approval off. Schema creation and reviewed-manifest seeding require separate
+explicit apply flags. The helper never changes existing grants or app selections.
+No live migration has been run. Startup table creation may create this additive
+table but must not seed grants.
+
+008b adds admin-managed grant APIs, app/purpose options and management selection
+checks using shared validation helpers. Null/default and unchanged explicit
+choices need grants too; app creation does not grant model access. DELETE
+retains a disabled row so bootstrap replay cannot restore access.
+008c enforces both purpose grants on every runtime build request, including
+warm-cache and cache-disabled paths. The validated model/grant snapshot is part
+of cache reuse checks and is rechecked after lock waits and construction. Legacy
+credential references are validated before lookup; unavailable model access
+returns a generic setup 503. The unmounted selector uses app-scoped options.
+Offline checks passed; PostgreSQL and browser verification remain open. No live
+migration or deployment has been run. Already admitted requests may finish
+after concurrent revocation; environment/credential changes require restart.
+Existing selections require explicit administrator review before rollout; never
+grant all apps every configuration. See the single design and migration/rollback
+plan in `open-work-backlog.md#008-app-specific-modelcredential-grants`.
 
 ### policy_rules
 

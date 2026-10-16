@@ -529,14 +529,11 @@ def main() -> None:
                 output_rail_enabled=True,
             )
         )
-        assert output_filter_result.status == "passed"
-        assert output_filter_result.response == "Hello! Hope you're having a great day."
+        assert output_filter_result.status == "blocked"
+        assert output_filter_result.response == OUTPUT_FILTER_RESPONSE
         assert output_filter_result.input_rail_status == RailStatus.PASSED
-        assert output_filter_result.output_rail_status == RailStatus.PASSED
-        assert (
-            output_filter_result.output_rail_source
-            == "azure_content_filter_fallback_passed"
-        )
+        assert output_filter_result.output_rail_status == RailStatus.BLOCKED
+        assert output_filter_result.output_rail_source == "azure_content_filter"
 
         deterministic_output_result = asyncio.run(
             execute_guarded_message(

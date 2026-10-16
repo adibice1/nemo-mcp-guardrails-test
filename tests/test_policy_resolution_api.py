@@ -59,7 +59,7 @@ def cleanup_records(app_ids: list[int], condition_value: str) -> None:
             db.scalars(
                 select(PolicyRecord).where(
                     PolicyRecord.conditions["custom_resource"].astext
-                    .like(f"{condition_value}%")
+                    .like(f'title = "{condition_value}%')
                 )
             )
         )
@@ -144,7 +144,8 @@ def main() -> None:
                 stored_policy = db.get(PolicyRecord, policy_id)
                 assert stored_policy is not None
                 assert stored_policy.conditions == {
-                    "custom_resource": condition_value
+                    "custom_resource": f'title = "{condition_value}"',
+                    "resource_condition_version": 1,
                 }
 
             reused = client.post(

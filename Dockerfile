@@ -10,7 +10,7 @@ RUN apt-get update \
     && apt-get install --yes --no-install-recommends g++ \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY requirements.txt constraints.txt .
 RUN python -m pip install --upgrade pip \
     && python -m pip wheel --wheel-dir /wheels -r requirements.txt
 
@@ -26,7 +26,7 @@ WORKDIR /app
 
 COPY --from=github_mcp /server/github-mcp-server /usr/local/bin/github-mcp-server
 COPY --from=python_dependencies /wheels /wheels
-COPY requirements.txt .
+COPY requirements.txt constraints.txt .
 RUN python -m pip install --no-index --find-links=/wheels -r requirements.txt \
     && rm -rf /wheels
 
@@ -41,4 +41,4 @@ EXPOSE 8000
 HEALTHCHECK --interval=10s --timeout=5s --retries=5 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"
 
-CMD ["uvicorn", "nemo_mcp_guardrails.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "nemo_mcp_guardrails.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-proxy-headers"]

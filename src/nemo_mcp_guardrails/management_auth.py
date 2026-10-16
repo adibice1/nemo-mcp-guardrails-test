@@ -53,14 +53,12 @@ def verify_password(password: str, encoded_hash: str) -> bool:
     except (ValueError, UnicodeError):
         return False
 
-    actual_digest = hashlib.scrypt(
-        password.encode("utf-8"),
-        salt=salt,
-        n=2**14,
-        r=8,
-        p=1,
-        dklen=len(expected_digest),
-    )
+    if len(salt) != 16 or len(expected_digest) != 64:
+        return False
+    try:
+        actual_digest = hashlib.scrypt(password.encode("utf-8"), salt=salt, n=2**14, r=8, p=1, dklen=64)
+    except (ValueError, UnicodeError):
+        return False
     return hmac.compare_digest(actual_digest, expected_digest)
 
 
@@ -90,21 +88,40 @@ def _jwt_expiry_minutes() -> int:
 def _password_token_version(user: UserRecord) -> str:
     """Bind sessions to the stored password without exposing its hash."""
 
-    value = f"{user.id}:{user.password_hash}".encode("utf-8")
+    value = f"{user.id}:{user.password_hash}:{bool(user.must_change_password)}".encode("utf-8")
     return hmac.new(_jwt_secret().encode("utf-8"), value, hashlib.sha256).hexdigest()
+
+
+def temporary_password_is_valid(user: UserRecord, now: datetime | None = None) -> bool:
+    """Require an unexpired deadline for every setup-only account."""
+    if not user.must_change_password:
+        return True
+    deadline = user.temporary_password_expires_at
+    if deadline is None:
+        return False
+    if deadline.tzinfo is None:
+        deadline = deadline.replace(tzinfo=timezone.utc)
+    return (now or datetime.now(timezone.utc)) < deadline
 
 
 def create_access_token(user: UserRecord) -> str:
     """Create a signed management access token for one user."""
 
+    if not temporary_password_is_valid(user):
+        raise RuntimeError("Temporary password is expired")
     issued_at = datetime.now(timezone.utc)
+    deadline = user.temporary_password_expires_at
+    if deadline is not None and deadline.tzinfo is None:
+        deadline = deadline.replace(tzinfo=timezone.utc)
     payload = {
         "sub": str(user.id),
         "email": user.email,
         "role": user.system_role,
         "pwdv": _password_token_version(user),
         "iat": issued_at,
-        "exp": issued_at + timedelta(minutes=_jwt_expiry_minutes()),
+        "purpose": "password_setup" if user.must_change_password else "management",
+        "exp": min(issued_at + timedelta(minutes=10), deadline)
+               if user.must_change_password else issued_at + timedelta(minutes=_jwt_expiry_minutes()),
     }
     return jwt.encode(payload, _jwt_secret(), algorithm=JWT_ALGORITHM)
 
@@ -112,11 +129,17 @@ def create_access_token(user: UserRecord) -> str:
 def decode_access_token(token: str, *, user: UserRecord | None = None) -> int:
     """Verify a management token and return its user ID."""
 
-    payload = jwt.decode(token, _jwt_secret(), algorithms=[JWT_ALGORITHM])
+    payload = jwt.decode(token, _jwt_secret(), algorithms=[JWT_ALGORITHM], options={
+        "require": ["sub", "iat", "exp", "pwdv", "purpose"],
+        "verify_signature": True, "verify_exp": True, "verify_iat": True,
+    })
     subject = payload.get("sub")
     if not isinstance(subject, str) or not subject.isdigit():
         raise jwt.InvalidTokenError("Token subject is invalid")
     if user is not None:
+        expected_purpose = "password_setup" if user.must_change_password else "management"
+        if payload.get("purpose") != expected_purpose or not temporary_password_is_valid(user):
+            raise jwt.InvalidTokenError("Token purpose or setup deadline is invalid")
         version = payload.get("pwdv")
         if (int(subject) != user.id or not isinstance(version, str)
                 or not hmac.compare_digest(version.encode("utf-8"), _password_token_version(user).encode("ascii"))):

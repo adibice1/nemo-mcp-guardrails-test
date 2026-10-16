@@ -1,5 +1,22 @@
 # AGENTS.md
 
+Patch 019 was authorized with "ok apply everything". Read
+`docs/branch-routing-patch-019.md`: PR branch inequalities/conjunctions and
+creation enforcement are implemented; selective branch merging remains
+unavailable and fails closed. Do not disable/recreate legacy branch definitions
+as a workaround. The conversion helper previews by default and restricts writes
+to restored rehearsal databases. The offline runner now contains 32 checks.
+
+Current security-review status (2026-10-16): patches 010-018 were authorized for
+autonomous implementation without per-diff approvals. Read
+`docs/security-run-2026-10-16.md` and `docs/open-work-backlog.md` for the final
+source state, safe checks, remaining upstream findings and rollout requirements.
+The frontend now uses Next.js 16/React 19 and Node 24. Admin-issued passwords have
+an expiring setup-only flow. The schema helper must be reviewed/applied before
+production deployment; no production migration or deployment ran in this review.
+Default regression command: `python scripts/run_security_checks.py`. Existing
+manual database/MCP/model diagnostics remain deliberate opt-in operations.
+
 ## Project Context
 
 This project tests NVIDIA NeMo Guardrails with GitHub MCP and an LLM.
@@ -159,8 +176,8 @@ Blocked actions:
   read-only and Logout clears the frontend session.
 - App creation is system-admin-only. New apps create the admin creator's
   internal app-developer link in the same transaction.
-  `scripts/backfill_existing_app_users.py` idempotently links the current
-  pre-RBAC demo users and apps.
+  `scripts/backfill_existing_app_users.py` previews one explicitly selected
+  user/app link; `--apply` is required to persist it.
 - Normal full-run GitHub MCP tests should keep `GITHUB_MCP_READ_ONLY=1`. Manual local write testing can set `GITHUB_MCP_READ_ONLY=0` in `.env` and restart the API. Future write-capable scripted testing should be a separate opt-in harness with a throwaway repo and limited token.
 - Do not add a custom `config/policies.yml` yet unless explicitly choosing to prototype the future admin/backend policy store. It is not a standard NeMo Guardrails file.
 
@@ -257,7 +274,7 @@ Useful verification commands for the current state:
 - `python tests/test_runtime_llm_selection.py`
 - `python scripts/migrate_management_auth.py`
 - `python tests/test_management_auth_http.py`
-- `python scripts/backfill_existing_app_users.py`
+- `python scripts/backfill_existing_app_users.py --help`
 - `python tests/test_management_rbac_http.py`
 - `python scripts/debug_nemo_output_check.py`
 - `python scripts/run_api.py`

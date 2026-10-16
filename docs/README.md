@@ -1,5 +1,42 @@
 # nemo-mcp-guardrails-test
+
+Patch 019 adds configurable PR-creation branch routing and conservative merge
+handling. Selective branch merges remain unavailable with the pinned connector.
+See [019 behavior and rehearsal](branch-routing-patch-019.md) before rollout.
+
+Current status (2026-10-16): patches 010-018 are implemented locally. See the
+[completion report](security-run-2026-10-16.md) for exact versions, checks,
+remaining upstream findings and rollout order. Run
+`python scripts/run_security_checks.py` for the safe offline catalogue. Schema
+rollout is required before deploying the new API; no production changes ran.
+Earlier "010 next" notes below are historical.
 testing nemo on github mcp
+
+Security review patches: see the [patch history](security-patch-history.md) for
+applied changes, verification, and operational impact. Follow the
+[ordered remaining patch sequence](open-work-backlog.md#security-review-patch-sequence)
+to keep the work on course. Patches 001-008 are applied to source and passed
+offline checks, including runtime model grants, cache revocation checks and
+selector adaptation. PostgreSQL/browser verification and reviewed grant rollout
+remain open. Patch 009a's strict literal-condition parser is approved and applied;
+saved-source offline checks passed. 009b's bindings/read-only inventory and
+009c1's versioned storage/API validation are approved and applied unchanged;
+saved-source offline checks passed. All planned 009 source work and offline
+verification are complete; rollout checks remain open. Live
+inventory and PostgreSQL verification remain outstanding. 009c2a's immutable
+single-statement snapshot reader is approved and applied unchanged; saved-source
+offline checks passed. 009c2b's tool/compiler/contract diff is approved and applied
+unchanged; saved-source offline checks passed. Docker launches use the reviewed
+image pin and native mode requires the bundled binary path. 009c2c's fourteen-file
+runtime/cache diff is approved and applied unchanged. All nineteen saved-source
+offline diagnostics passed. The snapshot/cache checks and field-bound matcher/
+catalogue filter are active. 009c3a backend assistant/options validation is approved
+and applied unchanged; all seven saved-source offline diagnostics passed.
+009c3b's final four-file frontend diff is approved and applied unchanged; saved-
+source TypeScript, scoped lint, focused selector checks and related HTTP checks
+passed. **Patch 010 is next.** Live compatibility, browser and reviewed legacy
+repair/resync checks remain open.
+Code previews are shown in chat only; docs contain the plan and change summaries.
 
 Latest follow-up (2026-10-09): assistant controls are simplified, example
 buttons immediately load saved previews, password copying has a fallback, and

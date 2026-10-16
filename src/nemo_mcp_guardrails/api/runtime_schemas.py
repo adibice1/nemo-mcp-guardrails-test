@@ -1,13 +1,14 @@
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+from nemo_mcp_guardrails.request_limits import MAX_MESSAGE_CHARS, MAX_HISTORY_TURNS, MAX_HISTORY_CHARS
 
 
 class ConversationMessage(BaseModel):
     """One prior conversation message supplied by the client app."""
 
     role: Literal["user", "assistant"]
-    content: str = Field(min_length=1)
+    content: str = Field(min_length=1, max_length=MAX_MESSAGE_CHARS)
 
 
 class GuardrailsRunRequest(BaseModel):
@@ -32,9 +33,20 @@ class GuardrailsRunRequest(BaseModel):
         }
     )
 
-    message: str = Field(min_length=1)
-    conversation_id: str | None = None
-    conversation_history: list[ConversationMessage] = Field(default_factory=list)
+    message: str = Field(min_length=1, max_length=MAX_MESSAGE_CHARS)
+    conversation_id: str | None = Field(default=None, min_length=1, max_length=200)
+    conversation_history: list[ConversationMessage] = Field(default_factory=list, max_length=MAX_HISTORY_TURNS)
+
+    @model_validator(mode="after")
+    def validate_history_size(self):
+        """Reject aggregate context growth before constructing any runtime."""
+        if sum(len(turn.content) for turn in self.conversation_history) > MAX_HISTORY_CHARS:
+            raise ValueError("Conversation history is too large.")
+        if self.conversation_id is not None and (not self.conversation_id.strip() or any(ord(c) < 32 for c in self.conversation_id)):
+            raise ValueError("Conversation ID cannot be blank.")
+        if any("\x00" in text for text in [self.message, *(turn.content for turn in self.conversation_history)]):
+            raise ValueError("Messages cannot contain null characters.")
+        return self
 
 
 class GuardrailsRunResponse(BaseModel):

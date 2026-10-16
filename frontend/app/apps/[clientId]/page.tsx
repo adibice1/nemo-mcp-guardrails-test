@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter , useParams } from "next/navigation";
 import { ArrowLeft, Bot } from "lucide-react";
 import { AppConnectors } from "@/components/apps/app-connectors";
 import { AppOverview } from "@/components/apps/app-overview";
@@ -20,11 +20,8 @@ const tabs: Array<{ key: AppTab; label: string }> = [
   { key: "runtime", label: "Runtime Test" }
 ];
 
-export default function AppDetailPage({
-  params
-}: {
-  params: { clientId: string };
-}) {
+export default function AppDetailPage() {
+  const params = useParams<{ clientId: string }>();
   const router = useRouter();
   const routeClientId = decodeURIComponent(params.clientId);
   const [app, setApp] = useState<ClientApp | null>(null);

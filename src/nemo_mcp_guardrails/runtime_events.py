@@ -14,7 +14,7 @@ _REASONS = {
     "nemo_passed", "nemo_blocked", "nemo_modified",
     "azure_input_content_filter", "azure_content_filter",
     "azure_agent_content_filter", "azure_content_filter_fallback_passed",
-    "deterministic_output_phrase", "gms_tool_guard",
+    "deterministic_output_phrase", "gms_tool_guard", "gms_tool_guard_evaluation",
     "tool_invocation_error", "stage_not_reached", "disabled",
     "event_limit_reached",
 }

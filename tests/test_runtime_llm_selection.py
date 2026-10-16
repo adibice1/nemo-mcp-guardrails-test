@@ -1,4 +1,5 @@
 import os
+from unittest.mock import patch
 
 from _bootstrap import bootstrap_src
 
@@ -97,4 +98,8 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    with patch.dict("os.environ", {
+        "GMS_ALLOWED_LLM_ENDPOINTS": "https://referenced.openai.azure.com",
+        "GMS_ALLOWED_LLM_CREDENTIAL_ENV_VARS": "APP_SPECIFIC_AZURE_KEY",
+    }):
+        main()

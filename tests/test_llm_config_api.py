@@ -1,4 +1,5 @@
 from uuid import uuid4
+from unittest.mock import patch
 
 from _bootstrap import bootstrap_src
 
@@ -112,4 +113,8 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    with patch.dict("os.environ", {
+        "GMS_ALLOWED_LLM_ENDPOINTS": "https://created.openai.azure.com",
+        "GMS_ALLOWED_LLM_CREDENTIAL_ENV_VARS": "CREATED_AZURE_KEY",
+    }):
+        main()

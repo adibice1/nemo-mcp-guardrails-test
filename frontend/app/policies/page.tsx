@@ -100,10 +100,8 @@ export default function PoliciesPage() {
         ]);
         setApps(nextApps);
         setGlobalAssignments(nextGlobalAssignments);
-        if (
-          selectedApp &&
-          !nextApps.some((app) => app.display_label === selectedApp)
-        ) {
+        const savedSelection = window.localStorage.getItem(SELECTED_APP_STORAGE_KEY) ?? "";
+        if (savedSelection && !nextApps.some((app) => app.display_label === savedSelection)) {
           setSelectedApp("");
           window.localStorage.setItem(SELECTED_APP_STORAGE_KEY, "");
         }

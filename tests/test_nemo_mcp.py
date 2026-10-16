@@ -20,6 +20,7 @@ from nemo_mcp_guardrails.database.test_case_loader import (
     LoadedAllowedTestCase,
     load_allowed_test_cases,
 )
+from nemo_mcp_guardrails.github_tool_contract import REVIEWED_MCP_IMAGE, select_reviewed_github_tools
 from nemo_mcp_guardrails.guarded_execution import (
     GuardedExecutionResult,
     apply_output_rail,
@@ -368,7 +369,7 @@ async def main(app_id: int | None = None) -> None:
                     "GITHUB_READ_ONLY=1",
                     "-e",
                     "GITHUB_TOOLSETS=repos,issues,pull_requests",
-                    "ghcr.io/github/github-mcp-server",
+                    REVIEWED_MCP_IMAGE,
                 ],
                 "transport": "stdio",
                 "env": {
@@ -381,7 +382,7 @@ async def main(app_id: int | None = None) -> None:
     )
 
     # Convert GitHub MCP capabilities into LangChain-compatible tools.
-    raw_tools = await client.get_tools()
+    raw_tools = select_reviewed_github_tools(await client.get_tools())
     blocked_tool_names = blocked_tool_names_for_app(app_id=app_id)
     guard_rules = tool_guard_rules_for_app(app_id=app_id)
     tools = [

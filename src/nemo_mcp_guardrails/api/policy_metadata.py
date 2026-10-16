@@ -9,6 +9,9 @@ from nemo_mcp_guardrails.api.policy_schemas import (
 )
 from nemo_mcp_guardrails.api.management_auth import require_management_user
 from nemo_mcp_guardrails.database.connection import get_db
+from nemo_mcp_guardrails.github_resource_bindings import FIELD_BINDINGS, compile_resource_binding
+from nemo_mcp_guardrails.policy_compiler import InputPolicyObject
+from nemo_mcp_guardrails.resource_conditions import UnsupportedResourceCondition
 from nemo_mcp_guardrails.database.models import (
     ConnectorActionRecord,
     ConnectorRecord,
@@ -27,7 +30,7 @@ router = APIRouter(
 def list_policy_options(
     db: Session = Depends(get_db),
 ) -> list[PolicyConnectorOption]:
-    """Return enabled connector/action/resource combinations for policy forms."""
+    """Return enabled, executable input block combinations for policy forms."""
 
     rows = db.execute(
         select(
@@ -53,7 +56,9 @@ def list_policy_options(
         .where(
             ConnectorRecord.enabled.is_(True),
             ConnectorActionRecord.enabled.is_(True),
+            ConnectorActionRecord.connector_id == ConnectorRecord.id,
             ConnectorResourceRecord.enabled.is_(True),
+            ConnectorResourceRecord.connector_id == ConnectorRecord.id,
             ConnectorToolMappingRecord.enabled.is_(True),
         )
         .distinct()
@@ -76,6 +81,10 @@ def list_policy_options(
         resource_name,
         resource_label,
     ) in rows:
+        try:
+            compile_resource_binding(InputPolicyObject(connector_name, action_name, resource_name, "block"))
+        except UnsupportedResourceCondition:
+            continue
         _connector_label, actions = catalog.setdefault(
             connector_name,
             (connector_label, {}),
@@ -95,7 +104,13 @@ def list_policy_options(
                     value=action_name,
                     label=action_label,
                     resources=[
-                        PolicyResourceOption(value=value, label=label)
+                        PolicyResourceOption(
+                            value=value, label=label,
+                            condition_fields=[
+                                field for action, resource, field in FIELD_BINDINGS
+                                if (action, resource) == (action_name, value)
+                            ],
+                        )
                         for value, label in resources.items()
                     ],
                 )

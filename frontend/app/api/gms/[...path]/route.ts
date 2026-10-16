@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 
 type RouteContext = {
-  params: { path: string[] };
+  params: Promise<{ path: string[] }>;
 };
 
 async function proxyRequest(request: NextRequest, context: RouteContext) {
@@ -14,7 +14,7 @@ async function proxyRequest(request: NextRequest, context: RouteContext) {
     );
   }
 
-  const path = context.params.path
+  const path = (await context.params).path
     .map((segment) => encodeURIComponent(segment))
     .join("/");
   const upstreamUrl = new URL(`${apiBaseUrl}/${path}`);
@@ -29,13 +29,26 @@ async function proxyRequest(request: NextRequest, context: RouteContext) {
   headers.delete("content-length");
   headers.delete("accept-encoding");
 
-  const bodyBuffer =
-    request.method === "GET" || request.method === "HEAD"
-      ? undefined
-      : await request.arrayBuffer();
-
-  const body =
-    bodyBuffer && bodyBuffer.byteLength > 0 ? bodyBuffer : undefined;
+  let body: ArrayBuffer | undefined;
+  if (request.method !== "GET" && request.method !== "HEAD" && request.body) {
+    const reader = request.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    while (true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > 512 * 1024) {
+        await reader.cancel();
+        return Response.json({detail: "Request body is too large."}, {status: 413});
+      }
+      chunks.push(value);
+    }
+    const bytes = new Uint8Array(size);
+    let offset = 0;
+    for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+    if (size) body = bytes.buffer;
+  }
 
   if (!body) {
     headers.delete("content-type");

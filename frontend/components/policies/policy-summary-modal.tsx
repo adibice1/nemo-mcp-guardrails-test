@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Blocks, X } from "lucide-react";
 import { getPolicy, type PolicyRecord } from "@/lib/api-client";
+import { formatBranchConditions, MERGE_BRANCH_NOTICE, parseBranchConditions } from "@/lib/branch-conditions";
 
 type PolicySummaryModalProps = {
   open: boolean;
@@ -115,13 +116,18 @@ export function PolicySummaryModal({
                   <p className="text-xs font-semibold uppercase text-gms-muted">
                     {isOutputPolicy ? "Output Rule" : "Custom Resource"}
                   </p>
+                  {policy.action === "merge" && typeof customResource === "string" && !!parseBranchConditions(customResource)?.length && (
+                    <p className="mt-3 text-sm text-amber-700 dark:text-amber-300">{MERGE_BRANCH_NOTICE}</p>
+                  )}
                   <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gms-text">
                     {isOutputPolicy
                       ? typeof outputRule === "string" && outputRule.trim()
                         ? outputRule
                         : policy.description ?? "Not specified"
                       : typeof customResource === "string" && customResource.trim()
-                      ? customResource
+                      ? policy.resource === "pull_request"
+                        ? formatBranchConditions(customResource) ?? customResource
+                        : customResource
                       : "Any resource"}
                   </p>
                 </div>

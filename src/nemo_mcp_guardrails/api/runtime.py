@@ -1,7 +1,9 @@
 import os
+import asyncio
 from dataclasses import dataclass
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from nemo_mcp_guardrails.api.auth import require_authenticated_app
@@ -9,7 +11,9 @@ from nemo_mcp_guardrails.api.runtime_schemas import (
     GuardrailsRunRequest,
     GuardrailsRunResponse,
 )
+from nemo_mcp_guardrails.connector_credentials import ConnectorCredentialError
 from nemo_mcp_guardrails.database.connection import get_db
+from nemo_mcp_guardrails.database.policy_errors import PolicyLoadError
 from nemo_mcp_guardrails.database.models import AppRecord
 from nemo_mcp_guardrails.database.conversation_store import (
     ConversationTurn,
@@ -17,6 +21,10 @@ from nemo_mcp_guardrails.database.conversation_store import (
     load_conversation_turns,
 )
 from nemo_mcp_guardrails.guarded_execution import execute_guarded_message
+from nemo_mcp_guardrails.request_limits import MAX_HISTORY_TURNS, MAX_MESSAGE_CHARS
+from nemo_mcp_guardrails.llm_access import LlmAccessError
+from nemo_mcp_guardrails.llm_credentials import LlmCredentialError
+from nemo_mcp_guardrails.llm_security import LlmEndpointError
 from nemo_mcp_guardrails.performance import measure_stage
 from nemo_mcp_guardrails.policy_compiler import (
     GITHUB_ACTION_SYNONYMS,
@@ -242,6 +250,12 @@ def _block_explanation(
         )
 
     if getattr(execution_result, "tool_guard_status", None) == "blocked":
+        label = getattr(execution_result, "tool_guard_policy_name", None)
+        if label:
+            return RuntimeBlockExplanation(
+                stage="tool", reason=f"Blocked by the input policy: {label}.",
+                policy_id=getattr(execution_result, "tool_guard_policy_id", None), policy_name=label,
+            )
         tool_names = tuple(getattr(execution_result, "tool_names", ()))
         return _tool_policy_explanation(tool_names[0] if tool_names else None)
 
@@ -352,6 +366,7 @@ def _build_runtime_history_context(
 ) -> RuntimeHistoryContext:
     """Load, bootstrap, and trim runtime conversation history."""
 
+    _trim_history_to_context_limit((), payload.message)
     received_turns = _payload_history_turns(payload)
     stored_turns: tuple[ConversationTurn, ...] = ()
 
@@ -364,7 +379,14 @@ def _build_runtime_history_context(
             )
         )
 
-    source_turns = stored_turns or received_turns
+    bounded_turns = stored_turns[-MAX_HISTORY_TURNS:]
+    history_bounded = len(bounded_turns) < len(stored_turns)
+    for index in range(len(bounded_turns) - 1, -1, -1):
+        if len(bounded_turns[index].content) > MAX_MESSAGE_CHARS:
+            bounded_turns = bounded_turns[index + 1:]
+            history_bounded = True
+            break
+    source_turns = bounded_turns if stored_turns else received_turns
     selected_turns, truncated = _trim_history_to_context_limit(
         source_turns,
         payload.message,
@@ -375,7 +397,7 @@ def _build_runtime_history_context(
         selected_turns=selected_turns,
         received_count=len(received_turns),
         loaded_count=len(stored_turns),
-        truncated=truncated,
+        truncated=truncated or history_bounded,
     )
 
 
@@ -436,17 +458,40 @@ async def run_guardrails(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=str(error),
         ) from error
+    except (PolicyLoadError, SQLAlchemyError) as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Runtime policies are unavailable. Ask a GMS administrator to review the policy configuration.",
+        ) from error
+    except ConnectorCredentialError as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Runtime connector credentials are unavailable. Ask a GMS administrator to review the connector configuration.",
+        ) from error
+    except (LlmAccessError, LlmCredentialError) as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Runtime LLM configuration is unavailable. Ask a GMS administrator to review model grants and credentials.",
+        ) from error
+    except LlmEndpointError as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Runtime LLM endpoint is not approved. Ask a GMS administrator to review it.",
+        ) from error
 
-    execution_result = await execute_guarded_message(
-        rails=runtime_parts.rails,
-        agent=runtime_parts.agent,
-        message=payload.message,
-        output_rail_enabled=runtime_parts.output_rail_enabled,
-        conversation_history=[
-            turn.as_message() for turn in history_context.selected_turns
-        ],
-        blocked_output_phrases=runtime_parts.blocked_output_phrases,
-    )
+    try:
+        execution_result = await asyncio.wait_for(execute_guarded_message(
+            rails=runtime_parts.rails,
+            agent=runtime_parts.agent,
+            message=payload.message,
+            output_rail_enabled=runtime_parts.output_rail_enabled,
+            conversation_history=[
+                turn.as_message() for turn in history_context.selected_turns
+            ],
+            blocked_output_phrases=runtime_parts.blocked_output_phrases,
+        ), timeout=120)
+    except TimeoutError as error:
+        raise HTTPException(504, detail="Runtime execution timed out.") from error
     request.state.gms_runtime_outcome = execution_result.status
     block_explanation = _block_explanation(
         message=payload.message,
@@ -498,23 +543,14 @@ async def run_guardrails(
         history_messages_received=history_context.received_count,
         history_messages_loaded=history_context.loaded_count,
         history_messages_used=len(history_context.selected_turns),
-        debug_agent_response=(
-            execution_result.raw_agent_response if debug_enabled else None
-        ),
         debug_output_rail_source=(
             execution_result.output_rail_source if debug_enabled else None
         ),
-        debug_output_rule_texts=(
-            [
-                rule.rule_text
-                for rule in runtime_parts.prompt_rule_config.prompt_rules
-                if rule.rail_type == "output"
-            ]
-            if debug_enabled
-            else None
-        ),
         debug_tool_trace=(
-            [dict(entry) for entry in execution_result.tool_trace]
+            [
+                {"event": entry["event"], "tool_name": entry.get("tool_name")}
+                for entry in execution_result.tool_trace
+            ]
             if debug_enabled
             else None
         ),

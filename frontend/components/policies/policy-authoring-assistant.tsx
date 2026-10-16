@@ -7,6 +7,7 @@ import {
   type PolicyAssistantResult, type PolicyAssistantSuggestion
 } from "@/lib/api-client";
 import { loadManagementSession } from "@/lib/management-auth";
+import { formatBranchConditions } from "@/lib/branch-conditions";
 import type { PolicyDraft } from "@/components/policies/create-policy-modal";
 
 type SampleAction = "merge" | "create";
@@ -18,23 +19,26 @@ type Props = {
   onUseDraft: (draft: Omit<PolicyDraft, "global">) => void;
 };
 const prompts: Record<SampleAction, string> = {
-  merge: "Prevent all merging of pull requests from any non-staging branch to a production branch",
-  create: "Prevent creation of pull requests from any non-staging branch to a production branch"
+  merge: "Block merging pull request number 17",
+  create: "Block creating pull requests targeting the Production branch"
 };
 const actions: SampleAction[] = ["merge", "create"];
+const branchPrompt = "Prevent creating PRs from non-staging into production";
 const buttonClass = "rounded-md border border-gms-blue px-3 py-2 text-sm text-gms-blue disabled:opacity-50";
 
-function sampleSuggestion(action: SampleAction): PolicyAssistantSuggestion {
+function sampleSuggestion(action: SampleAction): Extract<PolicyAssistantSuggestion, {policy_type: "input"}> {
   return {
     policy_type: "input", connector: "github", action, resource: "pull_request",
-    custom_resource: "whose target branch is production and whose source branch is not staging",
-    name: action === "merge" ? "Block non-staging PR merges into production"
-      : "Block non-staging PR creation into production",
-    explanation: "Restrict requests targeting production when the source branch is not staging.",
-    examples: [
-      { prompt: `${action} a PR from feature into production`, expected: "block" },
-      { prompt: `${action} a PR from staging into production`, expected: "not_blocked_by_this_policy" },
-      { prompt: `${action} a PR from feature into staging`, expected: "not_blocked_by_this_policy" }
+    custom_resource: action === "merge" ? "number = 17" : 'target_branch = "Production"',
+    name: action === "merge" ? "Block PR 17 merges" : "Block PR creation targeting Production",
+    explanation: action === "merge" ? "Restrict merging pull request number 17."
+      : "Restrict PR creation targeting the exact branch Production, regardless of source.",
+    examples: action === "merge" ? [
+      { prompt: "Merge pull request number 17", expected: "block" },
+      { prompt: "Merge pull request number 18", expected: "not_blocked_by_this_policy" }
+    ] : [
+      { prompt: "Create a PR from staging into Production", expected: "block" },
+      { prompt: "Create a PR from feature into production", expected: "not_blocked_by_this_policy" }
     ]
   };
 }
@@ -78,7 +82,10 @@ export function PolicyAuthoringAssistant({
 
   const input = selected?.policy_type === "input" ? selected : null;
   const ruleText = selected?.policy_type === "output"
-    ? selected.output_rule : input?.custom_resource ?? "";
+    ? selected.output_rule
+    : input?.resource === "pull_request"
+      ? formatBranchConditions(input.custom_resource) ?? input.custom_resource
+      : input?.custom_resource ?? "";
   const connectorOption = policyOptions.find((option) => option.value === input?.connector);
   const actionOption = connectorOption?.actions.find((option) => option.value === input?.action);
   const resourceOption = actionOption?.resources.find((option) => option.value === input?.resource);
@@ -115,19 +122,24 @@ export function PolicyAuthoringAssistant({
     const action = actions.find((item) => prompts[item] === value);
     const sample: PolicyAssistantResult = policyType === "output"
       ? { draft: outputSample(), related: [], clarification: "" }
-      : {
-          draft: sampleSuggestion(action!),
-          related: [sampleSuggestion(action === "merge" ? "create" : "merge")],
-          clarification: ""
-        };
+      : value === branchPrompt ? {
+          draft: {...sampleSuggestion("create"), name: "Restrict PR routes into production",
+            custom_resource: 'source_branch != "staging" AND target_branch = "production"',
+            explanation: "Block creation when the target is production and the source is not staging.",
+            examples: [
+              {prompt: "Create a PR from feature into production", expected: "block"},
+              {prompt: "Create a PR from staging into production", expected: "not_blocked_by_this_policy"},
+              {prompt: "Create a PR from feature into staging", expected: "not_blocked_by_this_policy"}
+            ]}, related: [], clarification: ""
+        } : { draft: sampleSuggestion(action!), related: [], clarification: "" };
     setResult(sample);
     setSelected(sample.draft);
-    setMessage("Example loaded. Edit the description to generate a different policy.");
+    setMessage(sample.clarification || "Example loaded. Edit the description to generate a different policy.");
   }
 
   async function previewPolicy() {
     if (policyType === "output" ? prompt === outputPrompt
-      : actions.some((action) => prompt === prompts[action])) {
+      : prompt === branchPrompt || actions.some((action) => prompt === prompts[action])) {
       loadExample(prompt);
       return;
     }
@@ -189,6 +201,12 @@ export function PolicyAuthoringAssistant({
             {action === "merge" ? "Try merge example" : "Try PR creation example"}
           </button>
         ))}
+        {policyType === "input" && (
+          <button type="button" className={buttonClass} disabled={disabled}
+            onClick={() => loadExample(branchPrompt)}>
+            Try branch routing
+          </button>
+        )}
         <button type="button" className="rounded-md bg-gms-blue px-3 py-2 text-sm text-white disabled:opacity-50"
           disabled={disabled || busy || prompt.trim().length < 5} onClick={() => void previewPolicy()}>
           {busy ? "Generating..." : "Generate policy"}
@@ -230,7 +248,7 @@ export function PolicyAuthoringAssistant({
           </div>
           <div>
             <h4 className="font-semibold">{selected.policy_type === "output"
-              ? "Example assistant responses" : "Expected input-rail behaviour"}</h4>
+              ? "Example assistant responses" : "Illustrative input requests"}</h4>
             <ul className="mt-1 space-y-1">
               {selected.examples.map((example, index) => (
                 <li key={index} className="break-words">

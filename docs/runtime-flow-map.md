@@ -1,5 +1,97 @@
 # Runtime Flow Map
 
+Patch 019 adds branch conjunction evaluation to the existing tool guard. Creation
+uses head/base arguments. Branch-conditional merges read trusted PR metadata via
+the same app connector with a bounded lookup and identity checks; matching rules
+block and other conditional merges refuse before execution. Agent-provided branch
+metadata is ignored. See [019 limitations](branch-routing-patch-019.md).
+
+## Request Admission And History Bounds - 2026-10-16
+
+The outer ASGI body middleware caps raw request bytes before logging/JSON parsing.
+Runtime schemas bound messages, supplied history and IDs; malformed input errors
+do not echo values. Stored history selects at most 33 newest rows using the scoped
+composite index and projects at most 16,001 characters per turn. The extra row is
+a truncation sentinel. The runtime retains at most 32 turns, omits an oversized
+legacy turn and its older prefix, then applies the existing context-character
+budget. Stored rows prevent client-history re-bootstrap even when the usable
+suffix is empty. Execution rails/agent/tools/output are awaited for at most 120
+seconds; timeout returns a controlled 504 before conversation persistence.
+See the [completion report](security-run-2026-10-16.md) for limits and remote
+cancellation caveats. Policy snapshot/cache checks are unchanged and regression-covered.
+## GitHub Contract Integration Boundary - 2026-10-15
+
+009c2a's immutable policy snapshot reader and 009c2b's field/method-bound execution
+contract are applied and offline-checked. The compiler now includes reviewed
+indirect write routes in reporting names, describes actual conditional field
+equalities, and generates blocked prompts carrying their literal target. Broad
+input definitions pass the same supported-write gate as conditional ones.
+
+Runtime and full-runner Docker launchers use the reviewed Dockerfile image digest;
+native configuration requires the bundled executable path. The full runner
+retains hardcoded read-only mode. Image provenance is an operator/deployment
+boundary; catalogue schema checks establish compatibility rather than authenticity.
+
+009c2c is approved and applied unchanged. Rails, tools, input attribution and
+output phrases derive from one validated immutable snapshot, including legitimate
+empty scope. Exact state is rechecked before reuse, after lock waits and after
+construction, including when caching is disabled. Invalid/changed state stops
+setup with a controlled 503. Tools pass the reviewed catalogue gate before
+field/method-bound matching; an actual match supplies its policy identity.
+Malformed or unobservable targets produce controlled evaluation errors, without
+claiming a policy matched. Already admitted requests can finish on their snapshot
+after a concurrent change. Nineteen saved-source offline diagnostics passed;
+actual PostgreSQL concurrency, live catalogue compatibility and model quality
+remain unverified. Review/repair legacy conditions and resync changed conditional
+compiled text before eventual rollout. No live resync, model/MCP execution,
+migration, restart or deployment ran for these slices. Assistant/UI alignment
+remains 009c3.
+
+## Runtime Model Grant Boundary - 2026-10-15
+
+After app authentication, runtime construction reads the app's live main and
+guardrail grants, including explicit grants for environment defaults. Each
+request validates the model/grant snapshot before cache reuse; disabling caching
+does not bypass the check. Lock waits and completed construction are followed
+by another snapshot check before returning the runtime. Model/grant metadata
+changes prevent reuse even when the aggregate policy revision is unchanged.
+
+Cold construction loads policy/connector metadata before resolving approved
+credentials and building models/MCP. Unavailable grants or LLM credentials
+produce a generic setup 503 before execution or conversation writes. Credential
+references, including legacy rows, require backend name approval before lookup.
+Auth-check remains an identity-only endpoint. Already admitted requests may
+finish after concurrent revocation; environment/credential changes require
+restart. Offline checks passed; PostgreSQL/browser/rollout verification remains
+open. No live migration or deployment ran. Both purposes need reviewed grants
+before rollout; see `open-work-backlog.md` for the migration plan.
+
+## Connector Credential Boundary - 2026-10-15
+
+New connector links and explicit credential fields require system-admin management
+access. Omitted credentials are preserved on existing-link upserts. Developers
+retain existing-link toggles/unlink but cannot recreate a link using the shared
+default credential. Both numeric app IDs and client-ID aliases enforce this.
+
+Runtime GitHub credential resolution checks the default PAT variable or exact
+additional names in `GMS_ALLOWED_GITHUB_CREDENTIAL_ENV_VARS` before reading the
+referenced value. Existing stored references are checked too. Invalid/unapproved
+or missing credentials stop model/MCP construction with a generic setup 503.
+Backend environment approval changes require restart because clients are cached.
+Other connector types remain metadata-only; this adds no new runtime connector.
+
+## Policy Setup Failure Boundary - 2026-10-15
+
+Authenticated runtime construction requires database policies. After connector
+access is checked, policy rows, compiled prompt rules, tool restrictions, and
+output-phrase rules are loaded/compiled before model or MCP construction. Failed
+reads or malformed selected rows stop setup and produce a generic HTTP 503.
+Valid empty results remain empty; they are not replaced with static defaults.
+Revision-check or refresh failures cannot return an older cached runtime for
+that request. Explicit static defaults remain available to offline diagnostics,
+including prompt-rule generation, but authenticated runtime construction rejects
+that mode. Authentication/history/startup errors retain existing handling.
+
 ## Authoring Is Separate From Runtime - 2026-10-09
 
 `POST /policy-assistant/suggest` is a management-JWT endpoint for live GitHub
@@ -386,18 +478,28 @@ generated artifacts refreshed automatically by policy create/update and can
 also be regenerated through `POST /policies/compile-rules`.
 
 ```text
--> src/nemo_mcp_guardrails/prompt_rule_compiler.py:23
+-> src/nemo_mcp_guardrails/prompt_rule_compiler.py:25
    format_prompt_rule_block()
 ```
 
 Formats loaded input/output rules as prompt-ready bullet lists.
 
+`literal_prompt_rule_block()` encodes each bullet list as a literal Jinja string
+value. Policy text containing template directives, expressions, comments, or
+references to other policy placeholders stays literal and cannot assign to
+`user_input` or `bot_response` during rendering.
+
 ```text
--> src/nemo_mcp_guardrails/prompt_rule_compiler.py:52
+-> src/nemo_mcp_guardrails/prompt_rule_compiler.py:53
    build_rails_config_with_prompt_rules()
 ```
 
-Reads `config/config.yml`, `config/prompts.yml`, and `config/rails.co`, injects the loaded DB rule blocks into `{{ input_policy_rules }}` and `{{ output_policy_rules }}`, then builds the runtime `RailsConfig` in memory.
+Reads `config/config.yml`, `config/prompts.yml`, and `config/rails.co`. The YAML
+is parsed before rule substitution. A single substitution pass inserts the
+literal rule blocks into `{{ input_policy_rules }}` and
+`{{ output_policy_rules }}` in prompt content, then builds the runtime
+`RailsConfig` in memory. This protects template rendering; natural-language
+policy interpretation still depends on the classifier.
 
 ## Policy Compilation
 
@@ -610,7 +712,12 @@ test_nemo_mcp.py:75
 apply_output_rail()
 ```
 
-Runs NeMo output rails over the final assistant response.
+Runs NeMo output rails over the final assistant response. Azure refusal of
+the classification returns a controlled blocked result with source
+`azure_content_filter` and any reported categories. Text without obvious secret
+patterns is still withheld because the active output policies were not checked.
+Wrapped/raw Azure filter errors and LangChain filtered-completion ValueErrors
+are handled; unrelated errors propagate.
 
 ```text
 test_nemo_mcp.py:113
@@ -633,22 +740,28 @@ src/nemo_mcp_guardrails/tool_guard.py:10
 BLOCKED_GITHUB_MCP_TOOLS = ...
 ```
 
-The backward-compatible constant loads the no-app all-enabled blocked-tool set.
-`tool_guard_rules_for_app(app_id=...)` compiles per-app immutable rules that
-retain optional `conditions.custom_resource` values.
+The backward-compatible constant describes static diagnostic defaults without
+reading the database during import. Wrappers load current rules when no explicit
+rule set or blocked-tool set is supplied; database failures stop construction.
+`tool_guard_rules_for_app(app_id=...)` compiles validated per-app entries into
+immutable executable rules. Runtime construction instead calls the pure
+`compile_tool_guard_rules(input_policy_entries)` after deriving those entries
+from its shared snapshot.
 
 ```text
--> policy_loader.py:121
-   load_input_policy_objects()
--> policy_compiler.py
-   compile_policy()
+-> runtime_policy_snapshot.py
+   read validated input entries with compiled rules in one SELECT
 -> tool_guard.py
-   ToolGuardRule(tool_names, custom_resource)
+   compile_tool_guard_rules(entries)
+-> github_tool_contract.py
+   field/method-bound execution rules
 ```
 
-`blocked_tool_names_for_app(app_id=...)` flattens those rules for API reporting.
-At execution, broad rules block every matching tool call; conditional rules
-recursively compare normalized exact MCP argument values before blocking.
+`blocked_tool_names_for_app(app_id=...)` summarizes tool names for reporting.
+At execution, rules inspect the reviewed method and authoritative argument field;
+conditional comparisons preserve the selector's literal/case semantics. Related
+writes whose target cannot be established fail with `ToolGuardEvaluationError`.
+Manual broad tool-name sets remain available for isolated diagnostics.
 
 ```text
 issue_write
@@ -662,8 +775,10 @@ tool_guard.py
 guard_mcp_tool()
 ```
 
-Wraps each MCP tool with the supplied immutable blocked-tool set. If the tool
-name is blocked, it returns a refusal before the real MCP tool can run.
+Wraps each reviewed MCP tool with immutable execution rules. A match raises
+`ToolGuardViolation` carrying the actual policy ID/name before the real MCP tool
+can run. Evaluation failures stop execution with a controlled `tool_error`
+response and source `gms_tool_guard_evaluation`, without a matched policy ID.
 
 ```text
 tool_guard.py:23

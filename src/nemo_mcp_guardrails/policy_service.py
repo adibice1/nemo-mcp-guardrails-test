@@ -17,7 +17,11 @@ from nemo_mcp_guardrails.database.models import (
     GlobalPolicyAssignmentRecord,
     PolicyRecord,
 )
-from nemo_mcp_guardrails.policy_rule_service import refresh_compiled_policy_rule
+from nemo_mcp_guardrails.policy_rule_service import refresh_compiled_policy_rule, to_input_policy_object
+from nemo_mcp_guardrails.input_conditions import (
+    CONDITION_VERSION_KEY, canonical_versioned_conditions, prepare_input_conditions,
+)
+from nemo_mcp_guardrails.resource_conditions import UnsupportedResourceCondition
 
 
 @dataclass(frozen=True)
@@ -73,10 +77,14 @@ def canonicalize_custom_resource(
 def canonicalize_policy_conditions(
     conditions: dict[str, object] | None,
     resource: str | None,
+    *,
+    policy_type: str | None = None,
 ) -> dict[str, object]:
     """Return conditions with a canonical custom-resource identity."""
 
     normalized = dict(conditions or {})
+    if policy_type == "input" and CONDITION_VERSION_KEY in normalized:
+        return canonical_versioned_conditions(resource, normalized)
     custom_resource = normalized.get("custom_resource")
     if custom_resource is None:
         return normalized
@@ -101,14 +109,31 @@ def output_policy_rule(policy: PolicyRecord) -> str:
 def policy_conditions_for_equivalence(policy: PolicyRecord) -> dict[str, object]:
     """Return conditions excluding the separately compared output rule."""
 
-    conditions = canonicalize_policy_conditions(policy.conditions, policy.resource)
+    conditions = canonicalize_policy_conditions(
+        policy.conditions, policy.resource, policy_type=policy.policy_type,
+    )
     if policy.policy_type == "output":
         conditions.pop("output_rule", None)
     return conditions
 
 
-def resolve_policy_references(policy: PolicyRecord, db: Session) -> None:
+def resolve_policy_references(
+    policy: PolicyRecord, db: Session, *, conditions_reviewed: bool = True,
+) -> None:
     """Resolve readable connector metadata into normalized foreign keys."""
+
+    if policy.policy_type == "input" and not conditions_reviewed:
+        conditions = policy.conditions
+        try:
+            if conditions is not None and not isinstance(conditions, dict):
+                raise UnsupportedResourceCondition("Invalid conditions.")
+            if conditions and CONDITION_VERSION_KEY in conditions:
+                if canonical_versioned_conditions(policy.resource, conditions) != conditions:
+                    raise UnsupportedResourceCondition("Noncanonical selector.")
+            elif conditions and conditions.get("custom_resource"):
+                raise UnsupportedResourceCondition("Unversioned selector.")
+        except (ValueError, TypeError):
+            raise HTTPException(400, "Resubmit conditions to review a legacy custom-resource policy.") from None
 
     if policy.category:
         policy.category = policy.category.strip().lower()
@@ -197,10 +222,13 @@ def resolve_policy_references(policy: PolicyRecord, db: Session) -> None:
         policy.resource_id = None
         policy.normalized_resource = None
 
-    policy.conditions = canonicalize_policy_conditions(
-        policy.conditions,
-        policy.resource,
-    )
+    if policy.policy_type == "input":
+        try:
+            policy.conditions = prepare_input_conditions(to_input_policy_object(policy), policy.conditions)
+        except (UnsupportedResourceCondition, TypeError, AttributeError) as error:
+            raise HTTPException(400, "Unsupported input policy conditions; use a reviewed literal selector.") from error
+    else:
+        policy.conditions = canonicalize_policy_conditions(policy.conditions, policy.resource)
 
     if (
         policy.policy_type == "input"
@@ -249,13 +277,23 @@ def find_equivalent_policy(
     candidate_output_rule = output_policy_rule(candidate).casefold()
     candidate_conditions = policy_conditions_for_equivalence(candidate)
     for policy in db.scalars(statement.order_by(PolicyRecord.id)):
+        if candidate.policy_type == "input":
+            try:
+                reviewed = prepare_input_conditions(to_input_policy_object(policy), policy.conditions)
+            except (ValueError, TypeError, AttributeError):
+                continue
+            if reviewed != (policy.conditions or {}):
+                continue
         if (
             candidate.policy_type == "output"
             and output_policy_rule(policy).casefold() != candidate_output_rule
         ):
             continue
-        if policy_conditions_for_equivalence(policy) == candidate_conditions:
-            return policy
+        try:
+            if policy_conditions_for_equivalence(policy) == candidate_conditions:
+                return policy
+        except (ValueError, TypeError):
+            continue
     return None
 
 
@@ -290,9 +328,17 @@ def consolidate_equivalent_policies(db: Session) -> list[PolicyConsolidation]:
 
     groups: dict[tuple[object, ...], list[PolicyRecord]] = {}
     for policy in db.scalars(select(PolicyRecord).order_by(PolicyRecord.id)):
+        if policy.policy_type == "input":
+            try:
+                reviewed = prepare_input_conditions(to_input_policy_object(policy), policy.conditions)
+            except (ValueError, TypeError, AttributeError):
+                continue
+            if reviewed != (policy.conditions or {}):
+                continue
         policy.conditions = canonicalize_policy_conditions(
             policy.conditions,
             policy.resource,
+            policy_type=policy.policy_type,
         )
         groups.setdefault(policy_equivalence_key(policy), []).append(policy)
 

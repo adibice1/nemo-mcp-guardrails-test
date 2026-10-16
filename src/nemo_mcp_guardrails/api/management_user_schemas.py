@@ -19,6 +19,8 @@ class ManagedUserRead(BaseModel):
     username: str
     system_role: str
     enabled: bool
+    must_change_password: bool
+    temporary_password_expires_at: datetime | None
     created_at: datetime
     updated_at: datetime
 

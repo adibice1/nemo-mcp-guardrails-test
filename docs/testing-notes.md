@@ -1,5 +1,542 @@
 # Testing Notes
 
+## Branch Routing - Patch 019
+
+The safe runner now has 32 checks, including test_branch_routing. Windows/Linux
+checks cover real guarded-tool invocation, canonical branch storage/reuse,
+assignment-safe edits, scoped snapshots and exact cache invalidation. Run
+`node scripts/check_branch_editor.cjs` for actual rendered control handlers.
+Selective conditional merges are deliberately refused; passing tests do not
+certify allowed merge execution. The separate guarded
+`scripts/check_branch_conversion_postgres.py` fixture test passed on disposable
+PostgreSQL 18.6, including partial-write rollback and stale-assignment manifests.
+See [019 results](branch-routing-patch-019.md) for bounds and rollout instructions.
+
+## Final Security Regression Entry Point - 2026-10-16
+
+`python scripts/run_security_checks.py` explicitly runs 31 offline/disposable
+checks with inherited credentials removed, dotenv disabled, SQLite selected and
+external sockets blocked. Windows internal asyncio socket pairs are permitted.
+`--list` identifies excluded external/database diagnostics; no unrestricted test
+discovery occurs. New `test_security_controls.py` covers rate-limit recovery and
+capacity, setup sessions/expiry/reset/revocation, malformed-password safety,
+raw/schema/history bounds, indexed tail reads, targeted membership preview and
+idempotent schema additions. See the [completion report](security-run-2026-10-16.md)
+for final cross-platform/image/advisory results and limits.
+
+`npm --prefix frontend run lint` checks the full frontend. Production container
+verification uses `scripts/check_frontend_container.cjs` mounted read-only in the
+frontend image, with `--network none`; it starts only an internal fake upstream.
+No real model, GitHub MCP or hosted PostgreSQL tests were run. Existing direct
+manual diagnostics retain their documented opt-in requirements.
+
+The separate guarded `scripts/check_backend_container.py` passed against an
+empty disposable PostgreSQL 16 container and the real backend HTTP listener.
+It verified the setup-password lifecycle, session revocation, committed-reset
+versus stale-update handling and idempotent legacy schema migration. Test data
+was synthetic, ports were private and the containers/network were removed.
+
+Sections below are dated historical records; their earlier "next patch" and
+verification limits do not override the current completion report.
+
+## Frontend Authoring Checks (009c3b) - 2026-10-15
+
+The approved four-file frontend diff is applied unchanged. Whole-project
+saved-source TypeScript passed with `node node_modules/typescript/bin/tsc
+--noEmit --incremental false` from `frontend/`, with no generated output.
+All four files passed scoped ESLint using the installed Next core-web-vitals
+configuration; no repository lint configuration or dependency changes were made.
+
+A temporary Node/TypeScript harness executes actual extracted saved functions and
+existing page payload/edit helpers with controlled callbacks. It checks supported,
+unsupported and output examples, cleared selection for unsupported scope, six exact
+selector submit/edit round trips, and unavailable/broad-only submission gates.
+It does not mount React or exercise browser events. The unchanged summary view
+was reviewed to confirm it displays stored custom-resource text verbatim.
+Saved-source samples and mock options also pass the actual Python storage/
+execution contract: all fourteen tuples/field lists match, PR numbers compare
+correctly and branch case remains significant.
+
+Saved-source assistant HTTP, policy-options HTTP and input-storage HTTP diagnostics
+passed with dotenv disabled, SQLite selected before imports, real JWT and a fake
+provider. All four saved frontend files match the approved drafts exactly;
+unchanged patch SHA256, reverse-patch and whitespace checks passed. No browser is connected
+(the available-browser inventory is empty), so visual layout and browser interaction
+remain open checks. No real environment, live DB/model/MCP, package installation,
+server restart, migration, resync or deployment ran. The complete approved code
+diff remains in chat only. Planned patch 009 source work and offline verification
+are complete; patch 010 is next. Live compatibility,
+legacy-policy repair/resync and browser checks stay in the deployment backlog.
+
+## Assistant/Options Checks (009c3a) - 2026-10-15
+
+The approved five-file backend diff is applied unchanged. Saved-source
+`tests/test_policy_assistant_http.py` and `tests/test_policy_options_capabilities.py`
+passed using `.\.venv\Scripts\python.exe -B`. Both use real JWT authentication, disposable SQLite and
+fake provider responses. Coverage includes canonical literal/case/Unicode/quotes,
+accepted related scopes, unsupported primary/related selectors, cleared drafts
+on failure, changed related scope, output isolation, authentication/provider
+errors, supported-write options, selector fields, connector ownership and all
+four metadata enable flags.
+
+Five existing diagnostics passed against saved source: input-condition
+storage, runtime policy integration, GitHub tool contract, resource bindings and
+literal grammar. Child processes set `PYTHON_DOTENV_DISABLED=1` and
+`DATABASE_URL=sqlite://` before imports. All five saved Python files parsed and
+matched approved drafts exactly; unchanged patch SHA256, reverse-patch and
+whitespace checks passed. No real environment, live database/model/MCP, migration, resync, restart
+or deployment ran. These checks establish executable contract validity, not
+natural-language interpretation quality. The frontend remains unchanged;
+009c3b now completes examples, field help, draft application and focused
+edit/display checks above.
+The complete approved code diff remains in chat only. No frontend code was
+changed in this patch.
+
+## Runtime Policy Integration Checks (009c2c) - 2026-10-15
+
+The approved fourteen-file diff is applied unchanged. Saved-source
+`.\.venv\Scripts\python.exe -B tests/test_runtime_policy_integration.py` passed
+with real app-key authentication, in-memory SQLite, actual runtime construction,
+snapshot queries, rails configuration, catalogue filtering, guarded tools,
+execution coordination, HTTP serialization and conversation persistence. Only
+environment/model/rails execution, MCP transport and agent construction are faked;
+the fake agent calls the actual wrapped tools. Independent policy/prompt reloads
+raise in this test, including for legitimate empty scope.
+
+Coverage includes global/app isolation, literal case/field matching, malformed
+and unobservable targets, matched-policy attribution, output phrase enforcement,
+warm-cache changes despite unchanged versions/timestamps/aggregate revision,
+stale/global/legacy failures, schema drift, TTL zero, lock-wait changes and changes
+during construction. Setup failures reach neither execution nor history storage;
+tool guards stop underlying invocation. Evaluation errors have a distinct source
+and event reason with no false policy ID or raw argument content.
+The installed LangGraph tool node, run in a compiled graph without a model,
+propagates both matched-policy and evaluation failures instead of swallowing them.
+
+Eighteen existing offline diagnostics passed against saved source: tool guard,
+runtime cache, policy fail-closed, model grants, connector credential security,
+GitHub contract, snapshot, input storage, inventory, bindings, grammar, literal
+prompt rendering, MCP launch, connector credential resolution, output fail-closed,
+debug privacy, runtime events (six unit cases), and model selection. Child processes
+set `PYTHON_DOTENV_DISABLED=1` and `DATABASE_URL=sqlite://` before runtime imports. Updated independent
+grant/credential/cache fixtures explicitly supply empty policy snapshots.
+
+All fourteen saved Python files parsed and matched the approved drafts exactly;
+approved-patch reverse verification, unchanged patch SHA256 and whitespace checks
+passed. Full GitHub runner parsed only. No real `.env`, live database,
+PostgreSQL concurrency, real binary/catalogue, model/MCP process, migration,
+compiled-rule resync, restart or deployment ran. Interleavings are simulated,
+and live model classification remains unverified. Runtime integration is active;
+009c3 assistant/UI alignment is next. Requests already admitted may finish on
+their validated snapshot after a concurrent policy change. Review/repair legacy
+conditions and resync changed compiled text through the admin path before rollout.
+
+## GitHub Tool Contract Checks (009c2b) - 2026-10-15
+
+The approved seven-file diff is applied unchanged. Saved-source
+`.\.venv\Scripts\python.exe -B tests/test_github_tool_contract.py` passed,
+forbidding dotenv loading
+and invoking no database/model/MCP boundary. Independent minimal schema fixtures
+are based on the previously reviewed pinned upstream source. Checks cover shared
+methods, authoritative fields, case/punctuation/numbers, nested paths, indirect
+write routes, indeterminate-target errors, immutable rules, narrow generated
+prompts, unsupported broad/conditional policies, catalogue exclusions, schema
+drift and the image pin matching the Dockerfile.
+
+Twelve existing diagnostics passed against saved source: MCP launch configuration,
+runtime policy snapshots, input condition storage, condition inventory, GitHub
+bindings, grammar, legacy tool wrappers, literal prompt rendering, policy
+fail-closed behavior, runtime model grants, connector credentials and cache reuse.
+Child processes set `PYTHON_DOTENV_DISABLED=1` and `DATABASE_URL=sqlite://`
+before runtime imports;
+the storage/snapshot fixtures use disposable in-memory SQLite. The full GitHub
+runner was parsed only; its image pin is updated while read-only mode is retained.
+The standalone compiler CLI also completed against saved source without external
+services; its direct-file entry point retains source-path bootstrapping.
+All seven changed/new Python files parsed and matched the approved drafts exactly;
+approved-patch reverse verification and whitespace checks passed. An earlier
+baseline reproduction confirmed missing indirect branch-tool
+coverage and generated conditional tests lacking their literal target.
+
+No real `.env`, live database, Docker image pull/container process, model/MCP call,
+migration, restart or deployment ran. Binary provenance and real server catalogue
+compatibility are not tested by fake schema fixtures. Alternate native binary
+paths now reject. At 009c2b the matcher/catalogue and snapshot/cache were not
+integrated; 009c2c now connects them as recorded above.
+New conditional compiler text will require reviewed compiled-rule resync before
+eventual rollout. See the single backlog for remaining scope and limitations.
+
+## Policy Snapshot Checks (009c2a) - 2026-10-15
+
+The approved two-file diff is applied unchanged. Saved-source
+`.\.venv\Scripts\python.exe -B tests/test_runtime_policy_snapshot.py` passed
+using disposable in-memory SQLite. Dotenv loading raises if attempted. The test
+counts one SELECT despite pending ORM changes; covers enabled global/app scope,
+normalized metadata precedence/consistency, disabled/unassigned exclusions,
+authorized empty scope, missing/unauthorized apps, malformed/versionless selectors,
+unsupported broad combinations, output fallback and invalid output values.
+It rejects missing, stale, duplicate or mismatched compiled rules and catches a
+literal case change while versions/timestamps remain unchanged. Detached frozen
+values retain their old contents and suppress literal text in default reprs.
+Database errors produce the same controlled message without raw details.
+
+Four existing saved-source diagnostics passed: input condition storage,
+inventory, GitHub bindings and grammar. Both saved Python files parsed;
+approved-patch reverse verification and workspace whitespace checks passed.
+PostgreSQL SELECT SQL was compiled only. No live database, actual PostgreSQL concurrency, environment load,
+HTTP runtime/cache integration, model/MCP call, migration, restart or deployment
+ran in 009c2a. 009c2b and 009c2c are now applied above; runtime wiring and offline
+HTTP/cache checks passed. 009c3 remains next.
+
+## Versioned Input Condition Storage (009c1) - 2026-10-15
+
+The approved six-file diff is applied unchanged. All four saved-source commands
+passed with `.\.venv\Scripts\python.exe -B`: `tests/test_input_condition_storage.py`,
+`tests/test_resource_condition_inventory.py`, `tests/test_github_resource_bindings.py`
+and `tests/test_resource_conditions.py`. All six changed/new Python files parsed;
+approved-patch reverse verification and workspace whitespace checks passed.
+
+The new HTTP diagnostic uses real JWT/RBAC, disposable in-memory SQLite and
+dotenv disabled. It covers supported versioned storage, case/punctuation/Unicode
+identity, duplicate rejection, invalid creates/updates, metadata-only legacy
+refusal, explicit disabling, assignment-safe App A edits without changing App B,
+global resolution and deduplication that retains legacy definitions. Inventory
+recognizes canonical versioned selectors as candidates still requiring review.
+
+The existing PostgreSQL resolution diagnostic's format expectation and cleanup
+prefix were updated but not run. No real `.env`, live database inventory,
+PostgreSQL check, migration, model/MCP call, restart or deployment ran. Storage
+validation is implemented; the runtime guard is unchanged. 009c2 covers runtime,
+cache and compiler integration; 009c3 covers assistant/UI alignment and closure.
+
+## Resource Bindings And Compatibility Inventory (009b) - 2026-10-15
+
+The approved four-file patch is applied unchanged. Both saved-source commands
+passed: `.\.venv\Scripts\python.exe -B tests/test_github_resource_bindings.py`
+and `.\.venv\Scripts\python.exe -B tests/test_resource_condition_inventory.py`.
+The existing `tests/test_resource_conditions.py` diagnostic passed too. All four
+new Python files parsed; approved-patch reverse verification and whitespace
+checks passed.
+
+Binding checks cover authoritative fields, unrelated look-alike values, method
+discriminators, case-sensitive paths/branches, punctuation, qualified PR heads,
+integral numeric arguments, malformed/missing targets, nested file paths and
+unsupported state-dependent combinations. Inventory checks use disposable
+in-memory SQLite with real models, normalized metadata and app/global
+assignments. They prove default execution loads neither dotenv nor an engine,
+pending ORM changes are not flushed, disabled/unassigned definitions remain
+visible, output rows are excluded, literal values are omitted and an attempted
+write through the CLI connection is refused. CLI tests substitute the engine
+and dotenv loader; SQLite executes the real read-only restriction. No real
+`.env` was loaded.
+
+Earlier review read the pinned image's public version/revision labels and four
+public upstream source files; no container or MCP process started. No actual
+database inventory, PostgreSQL transaction verification, migration, model call,
+restart or deployment ran. At 009b these helpers had no management/runtime
+consumers; 009c1 now uses them for storage validation. Runtime enforcement
+remains unchanged. 009c2/009c3 must cover runtime, assistant, cross-tool routes
+and the local launcher's unpinned image contract. See the single backlog for
+scope and remaining rollout checks.
+
+## Literal Resource-Condition Grammar (009a) - 2026-10-15
+
+The approved two-file patch is applied. Saved-source
+`.\.venv\Scripts\python.exe -B tests/test_resource_conditions.py` passed 22 supported
+selectors and 32 rejection cases without database, environment loading or
+external services. Checks cover explicit and legacy literal syntax, resource
+field restrictions, positive issue/PR numbers, escaped/Unicode titles, retained
+path case and punctuation, compound comparisons/workflows, trailing input,
+malformed values, control characters, invalid Unicode surrogates and the input
+length boundary. Both saved Python files parsed. Reverse-patch verification
+matched the approved diff and whitespace checks passed.
+
+At 009a the parser had no management/runtime consumers. These checks establish the
+grammar foundation, not enforcement of saved policies or MCP argument binding.
+009b adds the binding/inventory helpers above; 009c1 adds management validation.
+Live compatibility inventory remains open, along with runtime/assistant
+integration and their regressions in 009c2/009c3.
+No real `.env`, database, migration, Azure/GitHub request, restart or deployment
+was used. See `open-work-backlog.md` for the remaining ordered plan.
+
+## Runtime LLM Grants And Cache Revocation (008c) - 2026-10-15
+
+The approved 12-file patch is applied. Saved-source
+`.\.venv\Scripts\python.exe -B tests/test_runtime_llm_grants.py` passed with real
+app-key/JWT authentication, disposable SQLite and fake external boundaries.
+The test exercises the real public runtime builder and shared live grant loader,
+while model/tool construction and execution use substitutes. It covers both
+purposes, named/default choices, app isolation, warm-cache revocation with an
+unchanged aggregate revision, model metadata changes, unreadable grants,
+malformed credential approval, cache-disabled requests, lock-wait revocation,
+and model changes during construction. Denied HTTP requests reach neither
+execution nor conversation storage.
+
+A missing default credential also exercises the real uncached coordinator with
+policy/connector metadata substituted, proving model/MCP construction is skipped
+and setup returns 503. Direct model construction tests reject legacy JWT-secret
+references without reading that variable, reject missing approved named keys,
+and pass only the approved fake key to the model constructor. Real Azure/GitHub
+requests and live model quality are outside this diagnostic.
+
+Eight related saved-source diagnostics passed: `test_runtime_cache.py`,
+`test_policy_fail_closed.py`, `test_connector_credential_security.py`,
+`test_llm_endpoint_security.py`, `test_runtime_llm_selection.py`,
+`test_app_llm_grants_http.py`, `test_runtime_connector_credentials.py`, and
+`test_runtime_mcp_launch.py`. The model-selection, connector-credentials and
+MCP-launch diagnostics import runtime code before their fixtures, so they were
+run in child wrappers with dotenv loading disabled and `DATABASE_URL=sqlite://`;
+no real `.env` was read.
+
+Full saved-source frontend TypeScript passed with incremental output disabled;
+scoped ESLint passed for the API client and model settings component. All ten
+changed/new Python files parsed. Reverse-patch verification matched the approved
+diff and whitespace checks passed. The selector remains unmounted, so browser
+verification was not performed. PostgreSQL constraints/locking/concurrency and
+live deployment remain unverified. No live database, migration, environment
+edit, service restart or deployment ran. Before rollout, review existing named
+and default selections and approve grants for both purposes. Requests already
+admitted can finish after concurrent revocation; credential/environment changes
+still require restart.
+
+## App LLM Grant Management (008b) - 2026-10-15
+
+The approved 13-file patch is applied. The saved-source command
+`.\.venv\Scripts\python.exe -B tests/test_app_llm_grants_http.py` passed using
+real JWT/RBAC, disposable SQLite and fake metadata with dotenv loading disabled.
+It verifies both app-ID/client-ID routes, app/purpose isolation even for a user
+linked to both apps, refusal of query aliases that target another app, explicit
+null/unchanged/unknown selections, admin-only grants and guardrail selections,
+new-app provisioning, independent default grants, and rejection before any
+partial app edit. Grant deletion retains a disabled row; bootstrap replay cannot
+restore it, while explicit admin PUT can re-enable it.
+
+The diagnostic also checks legacy invalid grant choices, backend-approved
+credential names without secret resolution, malformed approval settings, safe
+errors, generic grant-store 503s, and audit actor/outcome metadata without
+credential references or request bodies. Global catalogue reads require admin;
+developers use per-app options. Runtime calls are outside this diagnostic.
+
+Five related saved-source diagnostics passed: `test_llm_endpoint_security.py`,
+`test_app_llm_grant_migration.py`, `test_management_audit_http.py`,
+`test_app_authorization_http.py` (24 protected-field cases), and
+`test_connector_credential_security.py` (60 protected-field cases). AST parsing
+passed for all 12 changed/new Python files. Reverse-patch verification confirmed
+the saved code matches the approved diff, and whitespace checks passed.
+
+`test_llm_config_api.py` and `test_management_rbac_http.py` have updated live-
+PostgreSQL fixtures/expectations but were not run. PostgreSQL DDL compiled in
+008a's diagnostic; actual constraints, row locks and concurrent transactions
+remain unverified. No frontend files changed. No real `.env`, live database,
+Azure/GitHub call, live migration, restart or deployment ran. Legacy runtime
+credential validation, cold/warm grant enforcement and selector adaptation were
+added by 008c above; 008b alone did not enforce the runtime boundary.
+
+## App LLM Grant Foundation (008a) - 2026-10-15
+
+The approved three-file patch is applied. The saved-source command
+`.\.venv\Scripts\python.exe -B tests/test_app_llm_grant_migration.py` passed using
+disposable SQLite and fake metadata with dotenv loading disabled. It verifies
+that ordinary previews issue no DDL/data writes, schema creation touches only
+the grant table, grants default to disabled, named/default grants have separate
+uniqueness constraints, purpose checks and foreign-key cascades hold, and
+inventory reads only non-secret environment metadata.
+
+Manifest checks cover strict field types, unknown/duplicate entries, stale app,
+configuration and default-deployment metadata, disabled configurations, complete
+validation before insert, transaction rollback after an actual insert, repeated
+application, and preservation of existing disabled grants. Errors do not echo
+invalid manifest contents. Existing app selections/authorization remain intact.
+
+Saved-source `test_app_authorization_http.py` and
+`test_connector_credential_security.py` also passed, including their 24 and 60
+protected-field cases. AST parsing passed for the three changed/new Python
+files. Reverse-patch verification confirmed the saved code matches the approved
+preview, and whitespace checks passed. No frontend code changed.
+
+PostgreSQL DDL compiled only; PostgreSQL constraints, row locking and concurrent
+transactions remain unverified. No real `.env`, live database, Azure/GitHub call,
+live migration, service restart or deployment ran. Only in-memory SQLite fixture
+schema/data changed. 008a adds storage/tooling; it does not enforce app grants
+in management selection or runtime execution. See 008b/008c in the backlog.
+
+## Connector Credential Provisioning - 2026-10-15
+
+Approved patch 007 is applied. The old resolver's ability to resolve the management
+JWT secret as a GitHub credential was reproduced with fake values before the fix.
+The saved-source `tests/test_connector_credential_security.py` passed 60 protected-
+field cases plus new-link and default provisioning, admin null/blank clearing,
+omitted-field upsert preservation, developer toggle/unlink, delete/relink denial,
+app scope, malformed backend approval, and legacy/runtime failure checks.
+
+The diagnostic uses disposable SQLite, real JWT/RBAC and app authentication,
+and fake environment values. Runtime checks exercise the real credential path
+through `/run` with policy loaders replaced; unapproved or missing default/named
+credentials stop before model/MCP construction and agent execution. A direct
+lookup spy verifies a rejected JWT reference never reads that secret variable.
+No external Azure/GitHub calls occur. This does not verify PostgreSQL-specific
+behavior, concurrent transactions, or historical ownership of legacy references.
+
+Six related saved-source diagnostics passed: runtime credential resolution,
+Docker/native launch configuration, app authorization, policy loading, LLM endpoint
+security, and management audit. The first two ran with dotenv disabled and a
+SQLite URL supplied in their child processes. The live-Postgres connector API
+diagnostic's vault-reference rejection/count expectations were updated but it
+was not run. Python AST checks passed for all seven changed/new Python files.
+
+Full frontend TypeScript passed with no emit or incremental build output. Scoped
+ESLint passed for the connector component and API client. Browser verification
+was not performed. Diff checks and comparison with the approved patch passed.
+No real `.env` edit, live database test, migration, service restart, image publish,
+or deployment ran. Custom GitHub variable names now require
+`GMS_ALLOWED_GITHUB_CREDENTIAL_ENV_VARS`; environment approval changes require a
+backend restart because constructed clients are cached.
+
+## Administrator-Controlled App Authorization - 2026-10-15
+
+Approved patch 006 is applied. `tests/test_app_authorization_http.py` reproduced
+the old developer reauthorization bypass before application and passed against
+saved source. It uses real management JWT authentication, real RBAC and app-key
+authentication queries, and disposable SQLite users, apps, and app links.
+
+The 24 protected-field requests cover app admin/owner links, enabled/disabled
+apps, true/false/null values, and mixed updates containing an invalid model ID.
+Rejected updates leave stored name, client ID, authorization, model IDs, key hash,
+and timestamp unchanged. Other cases check missing/unlinked management access,
+the existing guardrail-model restriction, admin enable/disable without membership,
+ordinary developer edits, unsupported metadata PUT by client ID, and runtime
+authentication after revocation and client-ID rename. Disabled `/run` requests
+are rejected before a mocked runtime builder runs.
+
+Saved-source password-change, management-audit, and policy-loading diagnostics
+also passed. Python AST and diff checks passed. No frontend code changed, so no
+new frontend build or visual verification was needed. This does not verify
+PostgreSQL concurrency or cancellation of already-authenticated requests.
+No real `.env` edits, live database tests, Azure/GitHub calls, migrations, service
+restarts, image publication, or deployments ran.
+
+## Fail-Closed Database Policy Loading - 2026-10-15
+
+The approved patch is applied. The old silent fallback was reproduced before
+application, then `tests/test_policy_fail_closed.py` passed against saved source.
+It uses disposable SQLite tables and mocked external boundaries to check global
+and app scope, disabled assignments, stale compiled rows, loader failures,
+legitimate empty results, malformed rows, explicit offline defaults, import
+behavior, policy checks before model/MCP construction, cache failure/recovery,
+and generic HTTP 503 responses without internal error markers.
+
+The SQLite schema is copied from metadata with JSONB adapted locally to JSON;
+this exercises ORM selection/scope but does not prove PostgreSQL-specific DDL,
+JSONB behavior, or transaction concurrency. Runtime authentication is replaced
+in the HTTP fixture; setup errors are injected without external calls.
+
+Seven existing saved-source diagnostics passed: tool guard, runtime cache, model
+selection, debug privacy (six HTTP cases), literal prompt rendering (24 prompts),
+LLM endpoint security, and output classification (12 HTTP/history/log cases).
+The tool-guard/cache/model-selection checks ran in child processes with dotenv
+disabled, a SQLite URL, and fake credentials. Tool-guard fixtures explicitly used
+default policy mode; cache/model-selection checks used database mode with their
+existing mocked or construction-only boundaries. Python AST and diff checks passed.
+
+No live PostgreSQL diagnostic, Azure/GitHub request, migration, service restart,
+image publication, or deployment ran. Unavailable/malformed policies now stop
+runtime setup; deployment must use database policies for authenticated runtime
+construction. Defaults remain an explicit offline diagnostic option. The 503
+mapping covers runtime setup, not authentication/history failures or startup
+database checks. Transaction-wide policy snapshots and detection of missing
+active compiled rows remain separate work.
+
+## Fail-Closed Output Classification - 2026-10-15
+
+Azure refusal of an output self-check no longer falls back to allowing text
+that passes a short secret-pattern scan. Recognized NeMo-wrapped Azure errors,
+raw Azure content-filter errors, and LangChain's filtered-completion ValueError
+all produce a controlled blocked result. Unrelated errors still propagate.
+Normal NeMo passed, blocked, and modified outcomes retain their existing behavior.
+
+The regression failed against the previous implementation and passed against
+the approved saved-source patch. It covers 12 HTTP cases across
+debug enabled/disabled, two response types with/without obvious secret patterns,
+and three provider-error representations. Each checks the real execution path,
+response serialization, disposable SQLite conversation history, and metadata
+and user-log values captured at the persistence boundary. Auth and runtime
+construction are replaced with isolated fixtures; no real connector or LLM runs.
+
+Additional controls verify normal classifications and unrelated provider errors.
+The older `test_app_auth_http.py` expectation is updated from a fallback pass
+to a block; that live-Postgres diagnostic was not run in this review.
+
+```powershell
+.\.venv\Scripts\python.exe -B tests/test_output_classifier_fail_closed.py
+.\.venv\Scripts\python.exe -B tests/test_runtime_debug_privacy.py
+.\.venv\Scripts\python.exe -B tests/test_prompt_rule_literals.py
+.\.venv\Scripts\python.exe -B tests/test_llm_endpoint_security.py
+```
+
+All four saved-source diagnostics passed. Python AST parsing and diff checks
+also passed. These checks used no external services; no service restart,
+migration, or deployment was performed.
+
+No database migration or new environment setting is required. Harmless responses
+can now be blocked if Azure refuses classification; this deliberately withholds
+output that did not complete the active policy check. Database policy-loader
+fallbacks require a separate patch.
+
+## LLM Credential Destination Security - 2026-10-15
+
+The approved saved-source patch passed the new offline security diagnostic:
+
+```powershell
+.\.venv\Scripts\python.exe -B tests/test_llm_endpoint_security.py
+.\.venv\Scripts\python.exe -B tests/test_runtime_debug_privacy.py
+.\.venv\Scripts\python.exe -B tests/test_prompt_rule_literals.py
+```
+
+The new diagnostic uses real management JWT checks against disposable SQLite
+users/configurations. It checks administrator creation, developer rejection,
+authenticated catalogue access, endpoint normalization, 12 invalid endpoint
+forms, rejection of legacy runtime endpoints before selected credential
+resolution, malformed backend approval settings, and controlled runtime 503
+responses without internal-marker disclosure. Actual SDK synchronous and
+asynchronous calls use HTTP mock transports to verify redirects are refused
+and fake API keys stay at the approved origin. No external requests occur.
+
+`test_runtime_llm_selection.py` also passed with dotenv disabled, a disposable
+SQLite URL, default policy fixtures, and a fake Azure key supplied in the child
+process environment. The earlier privacy suite passed six HTTP cases and the
+literal rendering suite passed 24 classifier prompts. Full frontend TypeScript
+passed using `node node_modules/typescript/bin/tsc --noEmit --incremental false`.
+Python AST parsing and `git diff --check` passed.
+
+No live PostgreSQL tests, Azure/GitHub calls, migrations, service restarts, or
+deployment ran. The orphan LLM settings component was typechecked, not mounted
+or browser-tested. Additional deployed origins need `GMS_ALLOWED_LLM_ENDPOINTS`
+and a backend restart; existing unapproved stored endpoints now fail closed.
+App-specific model/credential grants remain outside this patch.
+
+## Literal Policy Prompt Rendering - 2026-10-14
+
+The approved compiler patch keeps database rule text literal during NeMo Jinja
+rendering. YAML is parsed first, and both policy placeholders are replaced in
+one pass with encoded string values. Policy text cannot assign to the actual
+user-input or assistant-response variables or recursively expand placeholders.
+
+The saved regression test passed 24 prompt-rendering cases using the installed
+NeMo `LLMTaskManager` and fake loaded policy rows. Cases cover both rails,
+global-rule preservation, variable-assignment directives, expressions,
+comments, raw-block delimiters, malformed syntax, placeholder references,
+quotes, backslashes, newlines, Unicode, YAML-like text, and empty rule sets.
+The previous compiler failed this check before the patch was applied.
+
+```powershell
+.\.venv\Scripts\python.exe -B tests/test_prompt_rule_literals.py
+.\.venv\Scripts\python.exe -B tests/test_runtime_debug_privacy.py
+```
+
+These checks use no external database, LLM call, or GitHub tool. The patch
+protects template rendering; it does not establish resistance to natural-language
+prompt injection. No policy data migration is required.
+
 ## Assistant UI, Password Copy And Self-Service Change - 2026-10-09
 
 Approved changes were applied after their exact diffs were reviewed. The
@@ -283,16 +820,19 @@ agent. Missing config IDs fall back to `.env` Azure OpenAI settings. Only
 Azure OpenAI providers are executable in the current prototype; unsupported
 providers fail clearly.
 
-For local debugging only, start the API with `NEMO_RUNTIME_DEBUG=true` to expose
-`debug_agent_response`, `debug_output_rail_source`, and
-`debug_output_rule_texts` from `POST /v1/guardrails/run`. Do not enable this in
-production because raw agent output may include content later blocked by output
-rails.
+Runtime debug is disabled in `.env.example`. With `NEMO_RUNTIME_DEBUG=true`,
+`POST /v1/guardrails/run` exposes the output-rail source and tool-event/tool-name
+metadata only. Raw agent output, tool arguments/results/errors, and output rule
+text are excluded even when output passes, is blocked, or is modified. Legacy
+`debug_agent_response` and `debug_output_rule_texts` fields remain null.
 
-When Azure content-filters an output self-check prompt, runtime applies a
-deterministic local secret-pattern fallback to the raw assistant response.
-Obvious secret-like output remains blocked; harmless output is allowed and the
-debug source is `azure_content_filter_fallback_passed`.
+Run `python tests/test_runtime_debug_privacy.py` for six offline HTTP cases
+covering debug enabled/disabled with passed, blocked, and modified output.
+The check uses fake rails/agent, dependency overrides, and no external services.
+
+When Azure content-filters an output self-check, runtime returns a controlled
+block with source `azure_content_filter` and preserves reported categories.
+Unclassified output is withheld even if it contains no obvious secret pattern.
 
 The runtime wraps MCP tools with `src/nemo_mcp_guardrails/tool_guard.py`. This execution-level safety layer blocks restricted GitHub MCP tool names before the underlying MCP tool can run. Normal automated tests should keep GitHub MCP in read-only mode.
 
@@ -337,7 +877,7 @@ Management authentication HTTP check:
 python scripts/migrate_management_auth.py
 python tests/test_management_auth_http.py
 python tests/test_management_users_http.py
-python scripts/backfill_existing_app_users.py
+python scripts/backfill_existing_app_users.py --help
 python tests/test_management_rbac_http.py
 ```
 
@@ -840,7 +1380,9 @@ Compiled blocked tools
 - merge_pull_request
 ```
 
-If Postgres is not running, this diagnostic falls back to default compiler policies through `policy_loader.py`.
+If Postgres is unavailable, database policy loading now fails explicitly.
+Select `NEMO_POLICY_SOURCE=defaults` deliberately for static compiler diagnostics;
+that mode is rejected by authenticated runtime construction.
 
 ## Policy Compiler Test
 

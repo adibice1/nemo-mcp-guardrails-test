@@ -1,5 +1,30 @@
 # Frontend API Map
 
+Patch 019 keeps the existing policy/assignment endpoints and conditions JSON.
+PR create/merge options advertise source_branch and target_branch fields; the
+shared builder supports equality/inequality with AND. Merge summaries and AI
+explanations disclose that nonmatching branch-conditional merges are refused.
+See [019 contract](branch-routing-patch-019.md); no selective merge guarantee is
+implied by a saved policy or a field being available in the catalogue.
+
+## Current Auth And Request Contracts - 2026-10-16
+
+Login/current-user responses include `must_change_password`. Temporary credentials
+receive a setup-only JWT; only `GET /management-auth/me` and
+`PUT /management-auth/me/password` are allowed until successful replacement.
+Other management endpoints return 403. Expired setup credentials return the same
+401 as invalid credentials. `/setup-password` uses the existing password-change
+endpoint, then clears the session and returns to Login. Normal password changes
+retain the current-password check. Creation/reset secrets and login tokens use
+`Cache-Control: no-store`.
+
+Login, password change/reset and policy AI may return 429 with `Retry-After`.
+Raw requests above 512 KiB return 413 from the proxy or API. Runtime schema limits
+are message 16,000 characters, history 32 turns / 64,000 characters and ID 200
+characters; invalid/control/null values return generic 422 without echoing input.
+The proxy uses asynchronous Next route params and keeps credential headers and
+manual redirects. See the [completion report](security-run-2026-10-16.md) for
+history and timeout semantics and the prerequisite database rollout.
 This map is for the Next.js 13 Guardrails Management System frontend. The
 current backend base URL in local development is:
 
@@ -24,7 +49,7 @@ X-API-Key: <plaintext app api key>
 This endpoint requires the current management JWT. Request body:
 
 ```json
-{"policy_type": "input", "prompt": "Prevent merging PRs from non-staging into production"}
+{"policy_type": "input", "prompt": "Block merging pull request number 17"}
 ```
 
 Response: `draft` (or null), `related` (at most two drafts), and `clarification`.
@@ -44,12 +69,24 @@ remains input, and mismatched draft rails/unknown fields are rejected.
 
 Only enabled GitHub action/resource combinations supported by the write-policy
 compiler are accepted for input drafts; other-connector input authoring is deferred.
+009c3a validates primary and related selectors through the same preparation used
+by storage and returns canonical equality text. Related input suggestions must
+retain the primary connector, resource and canonical selector. Unsupported
+conditions or changed related scope return HTTP 200 with `draft: null`,
+`related: []` and clarification; no partial draft or broader substitute is returned.
+Compound/negated conditions, workflows and branch-based merge restrictions require
+additional capabilities. Structural, rail and tuple errors retain controlled
+errors. This validation proves executable shape, not faithful interpretation of
+the user request; drafts still require review before saving.
 The AI uses the backend Azure environment defaults and never receives assignment
 scope or browser credentials. Generation reads
 authentication rows and input metadata, but does not create policies/assignments
 or invoke connector tools.
 Responses use `no-store`. Provider failures, invalid drafts and timeouts produce
-controlled errors. Example buttons load saved previews immediately; edited
+controlled errors. Current input samples cover PR 17 merges and PR creation
+targeting exact branch Production. The unsupported compound-merge example returns
+clarification with no draft; independent samples do not suggest one another as
+related scopes. Output hello behavior is unchanged. Example buttons load saved previews immediately; edited
 descriptions use live AI through the single Generate policy button.
 
 ## Runtime Logs
@@ -96,8 +133,11 @@ end users; they send `X-App-ID` and `X-API-Key` from their own backend. The
 runtime result is displayed as a three-step progress bar:
 `Input -> Tool guard -> Output`, with blocked stages shown in red and skipped
 stages shown in grey.
-When backend `.env` sets `NEMO_RUNTIME_DEBUG=1`, Runtime Test also renders the
-sanitized connector debug trace returned by `/v1/guardrails/run`.
+Runtime debug is disabled in `.env.example`. With `NEMO_RUNTIME_DEBUG=1`,
+Runtime Test displays tool event names and tool names only. Runtime responses
+never expose raw agent output, tool arguments/results/errors, or output rule
+text through debug fields. Legacy `debug_agent_response` and
+`debug_output_rule_texts` fields remain null for response compatibility.
 
 The current `/policies` page reads:
 
@@ -139,25 +179,51 @@ Browser access from the local frontend is controlled by:
 NEMO_CORS_ORIGINS=http://127.0.0.1:3000,http://localhost:3000
 ```
 
-Optional custom-resource text is stored under
-`conditions.custom_resource`. The compiler includes it in the NeMo input rule,
-and the execution-level tool guard recursively compares the normalized value
-against exact MCP argument values. Leaving it blank keeps the action/resource
-policy broad.
+009c1 validates new input `conditions.custom_resource` values against the
+supported GitHub action/field subset before storage or duplicate resolution.
+Nonempty selectors store canonical field equality text with integer
+`conditions.resource_condition_version: 1`. For issue creation, `issue name test`
+and `Issues named test` resolve to the same canonical title equality. Path/branch
+case is significant; title/repository-name case folds while punctuation and
+Unicode remain intact. Blank selectors keep the action/resource policy broad.
 
-Before storage and duplicate resolution, custom-resource phrases are
-canonicalized. For an Issue policy, `issue name test`, `Issue name test`,
-`Issues name test`, and `issues named test` all resolve to `test` and reuse the
-same policy definition.
+Unsupported conditions, unknown condition keys, invalid markers and canonical
+text exceeding 1,000 characters return HTTP 400. Metadata-only edits cannot
+promote legacy literals: resubmit conditions explicitly to review them, or use
+an exact disable-only update. Unversioned literal definitions are excluded from
+automatic reuse/deduplication. Assignment-safe resolution can create a reviewed
+definition without changing another app's legacy assignment. Output storage is
+unchanged. The version marker describes serialization, not runtime enforcement.
+
+009c2b now validates broad input combinations against the supported-write gate
+too; unsupported read-block definitions return HTTP 400 even though read tools
+remain in connector metadata. Conditional compiler text and generated blocked
+prompts name the actual field/literal/comparison. Existing conditional compiled
+rows need reviewed resync before eventual rollout; no live resync ran.
+
+009c2c connects the field-bound matcher/catalogue and immutable snapshots to
+execution and exact-content cache checks. A matched tool rule supplies its actual
+policy ID/name. Indeterminate targets return `tool_error` with source
+`gms_tool_guard_evaluation` and no matched policy ID. No frontend code changed
+in 009c2c or 009c3a. 009c3b now aligns frontend samples, mock options, field help
+and submission availability; focused selector submit/edit checks passed. The version marker alone proves no enforcement.
 
 ## Policy Options
 
 | Screen | Method | Endpoint | Purpose |
 | --- | --- | --- | --- |
-| Create/Edit Policy | `GET` | `/policy-options` | Enabled connector/action/resource combinations from normalized tool mappings |
+| Create/Edit Policy | `GET` | `/policy-options` | Enabled supported input-block combinations and conditional fields |
 
-The frontend filters actions by connector and resources by action. The demo UI
-currently offers only GitHub in connector selectors; SharePoint remains hidden
+009c3a excludes unsupported read-block combinations and connector-inconsistent
+metadata. Connectors, actions, resources and mappings must all be enabled. Each
+resource includes additive `condition_fields`, such as `["number"]` for PR merges
+or `["title", "source_branch", "target_branch"]` for PR creation. An empty list
+means broad scope only; it does not permit arbitrary conditions. Field names
+describe available selector bindings, not all remote state or argument values.
+The frontend filters actions by connector and resources by action. 009c3b consumes
+these field names in help/placeholders and prevents submission of unavailable
+combinations or nonempty conditions on broad-only combinations. Existing condition
+text is retained for explicit review/clearing; backend validation remains authoritative. The demo UI currently offers only GitHub; SharePoint remains hidden
 until its executable runtime workflow is implemented.
 
 ## Health
@@ -243,10 +309,16 @@ tabs.
 Developers see only apps linked through `app_users` with the active app
 developer role. App creation is system-admin-only. Linked app developers can
 mutate their assigned apps; system admins can access every app. Only system
-admins can change `guardrail_llm_config_id` or mutate global policy
+admins can submit `authorized`, change `guardrail_llm_config_id`, or mutate global policy
 assignments. Normal developer-facing app detail screens currently hide direct
 LLM editing; app LLM metadata remains a backend/admin concern until the
 workflow is confirmed.
+
+Developer update bodies must omit `authorized`; even unchanged values or null
+return 403, and mixed requests are rejected before other fields are assigned.
+Administrators can enable/disable through `PUT /apps/{app_id}`. The client-ID
+alias has no general app metadata PUT route. Existing developer API name/client-ID
+edits remain available and do not restore runtime access to a disabled app.
 
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
@@ -258,8 +330,45 @@ workflow is confirmed.
 | `POST` | `/apps/{app_id}/api-key` | Regenerate and display one app API key once |
 | `POST` | `/apps/by-client-id/{client_id}/api-key` | Regenerate by readable client ID |
 | `DELETE` | `/apps/{app_id}` | Delete app |
-| `GET` | `/llm-configs` | List readable LLM choices without credentials |
-| `POST` | `/llm-configs` | Create Azure LLM metadata with an env reference |
+| `GET` | `/llm-configs` | System-admin-only model catalogue without credentials |
+| `POST` | `/llm-configs` | System-admin-only Azure LLM metadata creation with an env reference |
+| `GET` | `/apps/{app_id}/llm-grants` | List this app's grants, including disabled rows, without credential references |
+| `GET` | `/apps/{app_id}/llm-options?purpose=main` | Read enabled, valid choices and default approval for `main` or `guardrail` |
+| `PUT` | `/apps/{app_id}/llm-grants/{purpose}/{config_ref}` | System-admin-only explicit grant enable/disable; config reference is an ID or `default` |
+| `DELETE` | `/apps/{app_id}/llm-grants/{purpose}/{config_ref}` | System-admin-only revocation retaining a disabled row |
+
+All grant/options routes also exist under `/apps/by-client-id/{client_id}` and
+use the same app access checks. Grant PUT requires an explicit boolean `enabled`;
+unknown fields are rejected. Developers cannot create/re-enable/revoke grants,
+including when their app link role is admin/owner. System admins need no app
+membership, but must explicitly grant a choice before selecting it.
+
+Every explicitly supplied app model selection needs an enabled app/purpose
+grant, including null and unchanged values. Missing/unavailable choices return
+generic 403 responses before any field mutation; grant-store failures return
+generic 503 responses. Omitted selections are untouched. New apps must be
+created without named selections, then granted choices and updated separately.
+Null initial values do not create environment-default grants. Removing a grant
+does not silently change selections or prevent ordinary app metadata edits.
+
+LLM metadata creation rejects unapproved endpoints with HTTP 400. Runtime
+construction rechecks stored endpoints and returns a controlled HTTP 503 when
+approval is missing. `AZURE_OPENAI_ENDPOINT` is automatically approved; extra
+exact HTTPS origins require backend `GMS_ALLOWED_LLM_ENDPOINTS` and a restart.
+Runtime model clients refuse redirects. The reusable app LLM settings component
+restricts Add Configuration to administrators, but is currently unmounted by
+application routes; management API provisioning and assignment remain available.
+LLM credential names require backend approval in
+`GMS_ALLOWED_LLM_CREDENTIAL_ENV_VARS`; `AZURE_OPENAI_API_KEY` is approved
+automatically. Provisioning validates names without reading secret values.
+Invalid references return 400; invalid granted configurations are excluded from
+app options. The unmounted selector now uses separate app-scoped options for
+each purpose and disables unavailable choices. It is not mounted by a route.
+008c checks live grants on every runtime build request, including warm caches
+and disabled caching, and validates legacy credential references before lookup.
+Unavailable runtime model grants/credentials return a generic 503. Before
+rollout, administrators must review and grant both named/default selections;
+PostgreSQL and browser verification remain open. Auth-check remains identity-only.
 
 Create app body:
 
@@ -303,6 +412,13 @@ main connector.
 
 `connector_ref` can be `github` or the numeric connector ID.
 
+New links and explicit `credential_reference` fields are system-admin-only,
+including null/blank/unchanged values. Linked developers can toggle/unlink
+existing links and POST an upsert without that field; omitted credentials are
+preserved for admins too. Creating a link without credentials still requires an
+admin, preventing delete/relink from switching to the shared default PAT.
+The frontend disables provisioning controls for developers.
+
 Create/update body:
 
 ```json
@@ -315,9 +431,15 @@ Create/update body:
 
 Runtime behavior:
 
-- `credential_reference="env:APP_A_GITHUB_PAT"` reads that PAT from `.env`.
+- `credential_reference="env:APP_A_GITHUB_PAT"` reads that PAT only after its name
+  is approved in backend `GMS_ALLOWED_GITHUB_CREDENTIAL_ENV_VARS`.
 - A blank credential reference falls back to `GITHUB_PERSONAL_ACCESS_TOKEN`.
-- `vault:...` is not supported yet and will fail clearly.
+- The default PAT name is automatically approved. Extra names are exact and
+  comma-separated; wildcard/unsupported references are rejected. Restart the
+  backend after approval changes because MCP clients are cached.
+- Invalid/unapproved GitHub API writes return 400. Runtime checks existing rows;
+  unapproved/missing credentials return a generic setup 503 before model/MCP startup.
+- `vault:...` is not supported. Other connector types remain metadata-only.
 
 ## Policies
 

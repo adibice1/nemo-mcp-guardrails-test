@@ -25,15 +25,17 @@ async def run_checks() -> None:
     original_revision_loader: Callable[[int], tuple[Any, ...]] = (
         runtime_factory.load_runtime_revision
     )
-    original_builder: Callable[[int], Awaitable[Any]] = (
+    original_builder: Callable[..., Awaitable[Any]] = (
         runtime_factory._build_guardrails_runtime_parts_uncached
     )
+    original_snapshot_loader = runtime_factory.load_runtime_policy_snapshot
+    original_selection_loader = runtime_factory.load_runtime_llm_selection
     original_ttl = os.environ.get("NEMO_RUNTIME_CACHE_TTL_SECONDS")
     original_max_apps = os.environ.get("NEMO_RUNTIME_CACHE_MAX_APPS")
     revisions = {1: ("revision-1",)}
     builds: list[int] = []
 
-    async def fake_builder(app_id: int) -> object:
+    async def fake_builder(app_id: int, selection: Any = None, policy_snapshot: Any = None) -> object:
         builds.append(app_id)
         await asyncio.sleep(0.01)
         return object()
@@ -41,6 +43,9 @@ async def run_checks() -> None:
     try:
         os.environ["NEMO_RUNTIME_CACHE_TTL_SECONDS"] = "300"
         os.environ["NEMO_RUNTIME_CACHE_MAX_APPS"] = "32"
+        selection = object()
+        runtime_factory.load_runtime_policy_snapshot = lambda app_id: runtime_factory.RuntimePolicySnapshot(app_id, ())
+        runtime_factory.load_runtime_llm_selection = lambda app_id: selection
         runtime_factory.load_runtime_revision = lambda app_id: revisions[app_id]
         runtime_factory._build_guardrails_runtime_parts_uncached = fake_builder
         runtime_factory.clear_guardrails_runtime_cache()
@@ -69,6 +74,8 @@ async def run_checks() -> None:
         assert uncached_first is not uncached_second
         assert builds == [1, 1, 1]
     finally:
+        runtime_factory.load_runtime_policy_snapshot = original_snapshot_loader
+        runtime_factory.load_runtime_llm_selection = original_selection_loader
         runtime_factory.load_runtime_revision = original_revision_loader
         runtime_factory._build_guardrails_runtime_parts_uncached = original_builder
         runtime_factory.clear_guardrails_runtime_cache()

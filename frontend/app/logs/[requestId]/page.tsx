@@ -1,5 +1,7 @@
 "use client";
 
+import { useParams } from "next/navigation";
+
 import Link from "next/link";
 import { useCallback } from "react";
 import { ArrowLeft, RefreshCw } from "lucide-react";
@@ -11,9 +13,8 @@ import {
   LogsLayout, LogStatus, logDuration, logTime
 } from "@/components/logs/log-ui";
 
-export default function RuntimeLogDetailPage({ params }: {
-  params: { requestId: string };
-}) {
+export default function RuntimeLogDetailPage() {
+  const params = useParams<{ requestId: string }>();
   const load = useCallback(
     async (signal: AbortSignal) => {
       const record = await getRuntimeLog(params.requestId, signal);

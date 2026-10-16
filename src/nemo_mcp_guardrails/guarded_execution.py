@@ -11,7 +11,9 @@ from openai import BadRequestError
 from nemo_mcp_guardrails.output_guard import find_blocked_output_phrase
 from nemo_mcp_guardrails.performance import measure_stage
 from nemo_mcp_guardrails.runtime_events import record_runtime_event
-from nemo_mcp_guardrails.tool_guard import TOOL_GUARD_REFUSAL, ToolGuardViolation
+from nemo_mcp_guardrails.tool_guard import (
+    TOOL_GUARD_REFUSAL, TOOL_GUARD_EVALUATION_RESPONSE, ToolGuardEvaluationError, ToolGuardViolation,
+)
 
 
 ChatMessage = dict[str, str]
@@ -71,6 +73,8 @@ class GuardedExecutionResult:
     tool_guard_source: str | None = None
     blocked_output_phrase: str | None = None
     tool_trace: tuple[dict[str, Any], ...] = ()
+    tool_guard_policy_id: int | None = None
+    tool_guard_policy_name: str | None = None
 
 
 MAX_TOOL_TRACE_CONTENT_CHARS = 1200
@@ -334,21 +338,11 @@ async def apply_output_rail(
                 ],
                 rail_types=[RailType.OUTPUT],
             )
-    except LLMCallException as error:
+    except (LLMCallException, BadRequestError, ValueError) as error:
         if not is_azure_content_filter_error(error):
             raise
 
         categories = extract_azure_filter_categories(get_azure_error_payload(error))
-
-        if not contains_obvious_secret_value(response):
-            result = SyntheticRailResult(
-                status=RailStatus.PASSED,
-                content=response,
-                source="azure_content_filter_fallback_passed",
-                categories=categories,
-            )
-            _record_rail_result("output", result)
-            return response, result
 
         result = SyntheticRailResult(
             status=RailStatus.BLOCKED,
@@ -456,14 +450,16 @@ async def execute_guarded_message(
                     )
                 }
             )
-    except ToolGuardViolation as error:
+    except (ToolGuardViolation, ToolGuardEvaluationError) as error:
+        indeterminate = isinstance(error, ToolGuardEvaluationError)
+        source = "gms_tool_guard_evaluation" if indeterminate else "gms_tool_guard"
         record_runtime_event(
-            "agent.blocked", "agent", "blocked",
-            reason_code="gms_tool_guard",
+            "agent.failed" if indeterminate else "agent.blocked", "agent", "error" if indeterminate else "blocked",
+            reason_code=source,
         )
         return GuardedExecutionResult(
-            status="blocked",
-            response=TOOL_GUARD_REFUSAL,
+            status="tool_error" if indeterminate else "blocked",
+            response=TOOL_GUARD_EVALUATION_RESPONSE if indeterminate else TOOL_GUARD_REFUSAL,
             input_rail_status=input_result.status,
             output_rail_status=None,
             tool_names=(error.tool_name,),
@@ -474,11 +470,13 @@ async def execute_guarded_message(
             output_rail_source=None,
             input_rail_source=get_rail_source(input_result),
             input_rail_categories=get_rail_categories(input_result),
-            tool_guard_status="blocked",
-            tool_guard_source="gms_tool_guard",
+            tool_guard_status="error" if indeterminate else "blocked",
+            tool_guard_source=source,
+            tool_guard_policy_id=getattr(error, "policy_id", None),
+            tool_guard_policy_name=getattr(error, "policy_name", None),
             tool_trace=(
                 {
-                    "event": "blocked",
+                    "event": "error" if indeterminate else "blocked",
                     "tool_name": error.tool_name,
                     "content": compact_tool_trace_content(error),
                 },

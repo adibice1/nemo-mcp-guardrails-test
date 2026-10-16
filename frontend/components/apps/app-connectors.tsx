@@ -11,6 +11,7 @@ import {
   updateAppConnector,
   type AppConnector
 } from "@/lib/api-client";
+import { loadManagementSession } from "@/lib/management-auth";
 
 export function AppConnectors({ clientId }: { clientId: string }) {
   const [connectors, setConnectors] = useState<AppConnector[]>([]);
@@ -18,6 +19,7 @@ export function AppConnectors({ clientId }: { clientId: string }) {
   const [credentialReference, setCredentialReference] = useState(
     "env:GITHUB_PERSONAL_ACCESS_TOKEN"
   );
+  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
 
@@ -35,10 +37,15 @@ export function AppConnectors({ clientId }: { clientId: string }) {
   }, [clientId]);
 
   useEffect(() => {
+    setIsAdmin(loadManagementSession()?.user.system_role === "admin");
     void loadConnectors();
   }, [loadConnectors]);
 
   async function handleLink() {
+    if (!isAdmin) {
+      setMessage("Only administrators can provision connector links and credentials.");
+      return;
+    }
     if (connectorName !== "github") {
       setMessage("Only GitHub is available for this demo.");
       return;
@@ -92,6 +99,7 @@ export function AppConnectors({ clientId }: { clientId: string }) {
           Connector
           <select
             className="detail-input mt-2"
+            disabled={!isAdmin}
             value={connectorName}
             onChange={(event) => {
               const value = event.target.value;
@@ -108,7 +116,7 @@ export function AppConnectors({ clientId }: { clientId: string }) {
           Credential Reference
           <input
             className="detail-input mt-2 font-mono text-xs"
-            disabled={connectorName !== "github"}
+            disabled={!isAdmin || connectorName !== "github"}
             placeholder="env:VARIABLE_NAME"
             value={credentialReference}
             onChange={(event) => setCredentialReference(event.target.value)}
@@ -116,7 +124,7 @@ export function AppConnectors({ clientId }: { clientId: string }) {
         </label>
         <button
           className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-gms-blue px-5 text-sm font-semibold text-white shadow-button disabled:opacity-50"
-          disabled={connectorName !== "github"}
+          disabled={!isAdmin || connectorName !== "github"}
           type="button"
           onClick={handleLink}
         >
@@ -124,6 +132,13 @@ export function AppConnectors({ clientId }: { clientId: string }) {
           Link Connector
         </button>
       </div>
+
+      {!isAdmin && (
+        <p className="mt-4 text-sm text-gms-muted">
+          An administrator provisions connector links and credentials. You can
+          enable, disable, or unlink existing connectors.
+        </p>
+      )}
 
       <div className="mt-6 space-y-3">
         {connectors.map((connector) => (

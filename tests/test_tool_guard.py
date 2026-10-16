@@ -12,16 +12,20 @@ bootstrap_src()
 from nemo_mcp_guardrails.tool_guard import (
     BLOCKED_GITHUB_MCP_TOOLS,
     TOOL_GUARD_REFUSAL,
-    ToolGuardRule,
+    compile_tool_guard_rules,
     ToolGuardViolation,
     guard_mcp_tool,
 )
+
+from nemo_mcp_guardrails.database.policy_loader import LoadedInputPolicy
+from nemo_mcp_guardrails.policy_compiler import InputPolicyObject
 
 
 class FakeIssueArguments(BaseModel):
     """Match the structured title argument exposed by the GitHub issue tool."""
 
     title: str
+    method: str = "create"
     repository: str = "nemo-mcp-guardrails-test"
 
 
@@ -33,7 +37,7 @@ class FakeTool:
 
         self.name = name
         self.description = "Fake MCP tool for guard testing."
-        self.args_schema = args_schema
+        self.args_schema = args_schema or {"type": "object", "properties": {}}
         self.calls: list[dict[str, Any]] = []
 
     async def ainvoke(self, kwargs: dict[str, Any]) -> dict[str, Any]:
@@ -68,7 +72,7 @@ async def main() -> None:
 
     for blocked_tool in blocked_tools:
         guarded_blocked_tool = guard_mcp_tool(blocked_tool)
-        await assert_guard_violation(guarded_blocked_tool, {})
+        await assert_guard_violation(guarded_blocked_tool, {"method": "create"})
 
         assert blocked_tool.calls == []
 
@@ -103,12 +107,9 @@ async def main() -> None:
     conditional_issue_tool = FakeTool("issue_write", FakeIssueArguments)
     conditional_issue_guard = guard_mcp_tool(
         conditional_issue_tool,
-        guard_rules=(
-            ToolGuardRule(
-                tool_names=frozenset({"issue_write"}),
-                custom_resource='issue named "test"',
-            ),
-        ),
+        guard_rules=compile_tool_guard_rules((LoadedInputPolicy(
+            "default", None, InputPolicyObject("github", "create", "issue", "block", 'title = "test"'),
+        ),)),
     )
 
     await assert_guard_violation(conditional_issue_guard, {"title": "test"})
@@ -123,6 +124,7 @@ async def main() -> None:
     assert conditional_issue_tool.calls == [
         {
             "title": "another issue",
+            "method": "create",
             "repository": "nemo-mcp-guardrails-test",
         }
     ]

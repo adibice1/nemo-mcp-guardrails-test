@@ -1,5 +1,34 @@
 # Frontend Screen Plan
 
+## Security Foundation Screens - 2026-10-16
+
+The frontend is upgraded to Next 16.4.2/React 19.3.1. Login and navigation route
+setup-only accounts to `/setup-password`, which reuses the existing password
+change form. No management menu is offered there; backend authorization remains
+the enforcement boundary. Successful replacement clears the setup session and
+requires login with the new personal password. Expired/unavailable setup sessions
+show a safe sign-in/admin-reset message. See the
+[completion report](security-run-2026-10-16.md) for tested scope and rollout limits.
+## Executable Policy Authoring Alignment - 2026-10-15
+
+009c3a/009c3b align input drafting and the form with the executable capability
+subset. Current saved samples cover PR 17 merges and PR creation targeting the
+exact case-sensitive branch Production. The non-staging-to-production compound
+merge example returns clarification and no draft; it does not substitute a
+broader ban or suggest PR creation as an equivalent scope. Output hello is unchanged.
+
+The resource field uses backend `condition_fields` for equality guidance and
+placeholders. Blank means broad scope; unavailable combinations and nonempty
+conditions on broad-only combinations cannot be submitted. Existing text is kept
+for review/explicit clearing. Canonical selectors retain case and literal text
+through the existing submission/edit conversion and summary display; backend
+storage validation remains authoritative. Mock authoring options match all
+fourteen supported write combinations; read metadata stays separate from policy
+creation. Browser interaction/visual layout remains unverified in this session.
+
+The dated prototype sections below are historical; their compound executable
+samples were replaced by 009c3b.
+
 ## Live AI Policy Authoring - 2026-10-09
 
 The normal Create Policy input/output form uses live AI for custom descriptions
@@ -203,6 +232,8 @@ Table columns:
 
 The backend retains `authorized` as a runtime kill switch. The normal developer
 UI hides the status because managed apps are authorized by default.
+Only system administrators may submit that field through app-update APIs;
+developer updates omit it. The current Client ID control remains read-only.
 
 Actions:
 
@@ -278,6 +309,11 @@ Data:
 - `GET /apps/by-client-id/{client_id}/connectors`
 
 For MVP, show GitHub as the primary connector.
+
+New-link and credential provisioning controls are enabled only for system
+admins. Linked developers can enable/disable or unlink existing connectors;
+relinking requires an administrator. Omitted credential fields are preserved
+on upsert. Runtime approval/configuration details are in `frontend-api-map.md`.
 
 Columns/cards:
 
