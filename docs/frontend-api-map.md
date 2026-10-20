@@ -331,7 +331,7 @@ edits remain available and do not restore runtime access to a disabled app.
 | `POST` | `/apps/by-client-id/{client_id}/api-key` | Regenerate by readable client ID |
 | `DELETE` | `/apps/{app_id}` | Delete app |
 | `GET` | `/llm-configs` | System-admin-only model catalogue without credentials |
-| `POST` | `/llm-configs` | System-admin-only Azure LLM metadata creation with an env reference |
+| `POST` | `/llm-configs` | System-admin-only Azure/compatible model profile creation with an env reference |
 | `GET` | `/apps/{app_id}/llm-grants` | List this app's grants, including disabled rows, without credential references |
 | `GET` | `/apps/{app_id}/llm-options?purpose=main` | Read enabled, valid choices and default approval for `main` or `guardrail` |
 | `PUT` | `/apps/{app_id}/llm-grants/{purpose}/{config_ref}` | System-admin-only explicit grant enable/disable; config reference is an ID or `default` |
@@ -635,3 +635,9 @@ the backend test runner, not allow/block policy records.
 | `GET` | `/allowed-test-cases/{test_case_id}` | Get one allowed test prompt |
 | `PUT` | `/allowed-test-cases/{test_case_id}` | Update allowed test prompt |
 | `DELETE` | `/allowed-test-cases/{test_case_id}` | Delete allowed test prompt |
+
+The app detail Models tab mounts profile creation and app/purpose approval/revocation
+for administrators, plus approved main-agent selection for linked developers.
+Guardrail selection is admin-only. Creating a profile grants nothing. Compatible
+API profiles can point to an approved external provider gateway; backend secrets
+and endpoint approvals remain operator-controlled. See model-gateway-integration.md.

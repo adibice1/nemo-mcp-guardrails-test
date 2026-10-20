@@ -189,10 +189,13 @@ request.
 
 Current implementation note: the runtime now respects separate
 `main_llm_config_id` and `guardrail_llm_config_id` selections on each app.
-Only Azure OpenAI-compatible provider rows are executable in the prototype.
-Rows for providers such as Gemini can be stored as target metadata, but runtime
-execution returns a clear unsupported-provider error until provider adapters are
-implemented.
+The model boundary supports the existing Azure API and an approved
+openai_compatible chat API profile. A separately operated gateway translates
+native provider APIs (for example Gemini or Claude); GMS does not infer a native
+protocol from a URL. Both runtime choices retain purpose grants and independent
+selection. Compatible classifiers validate complete yes/no decisions before
+NeMo parses them. See model-gateway-integration.md for gateway controls and
+required live model acceptance tests.
 
 ## Proposed Runtime Endpoint
 
@@ -391,7 +394,7 @@ apps        -> created
 connectors  -> migrated from the former connector-shaped apps table
 ```
 
-The prototype now lists and creates Azure-compatible `llm_configs` through the
+The prototype now lists and creates Azure or standard compatible `llm_configs` through the
 API. Credential references are limited to backend `env:VARIABLE_NAME` values;
 raw LLM keys are never accepted by or returned to the frontend.
 

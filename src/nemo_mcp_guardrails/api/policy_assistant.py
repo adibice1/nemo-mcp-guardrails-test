@@ -6,8 +6,12 @@ import os
 from typing import Annotated, Literal
 
 from dotenv import load_dotenv
+
+from nemo_mcp_guardrails.llm_credentials import LlmCredentialError, resolve_llm_credential
+from nemo_mcp_guardrails.llm_profiles import AZURE_PROVIDERS, COMPATIBLE_PROVIDER, validate_profile_metadata
+from nemo_mcp_guardrails.llm_security import LlmEndpointError
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from openai import APIError, APITimeoutError, AsyncAzureOpenAI, RateLimitError
+from openai import APIError, APITimeoutError, AsyncAzureOpenAI, AsyncOpenAI, DefaultAsyncHttpxClient, RateLimitError
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, ValidationError, model_validator
 from sqlalchemy.orm import Session
 
@@ -134,12 +138,41 @@ def validate_combinations(
 async def generate_suggestions(
     prompt: str, allowed: list[tuple[str, str, str]], policy_type: str = "input",
 ) -> SuggestionResult:
-    """Use backend Azure settings to generate validated JSON-only drafts."""
+    """Use the backend authoring profile to generate validated JSON-only drafts."""
     load_dotenv()
-    names = ["AZURE_OPENAI_API_KEY", "AZURE_OPENAI_ENDPOINT",
-             "AZURE_OPENAI_API_VERSION", "AZURE_OPENAI_DEPLOYMENT"]
-    settings = {name: os.getenv(name, "") for name in names}
-    if not all(settings.values()):
+    provider = os.getenv("GMS_POLICY_AI_PROVIDER", "azure_openai").strip().lower()
+    if provider == COMPATIBLE_PROVIDER:
+        try:
+            endpoint, reference = validate_profile_metadata(
+                provider, os.getenv("GMS_POLICY_AI_ENDPOINT"),
+                os.getenv("GMS_POLICY_AI_CREDENTIAL_REFERENCE"),
+            )
+            model_name = os.getenv("GMS_POLICY_AI_MODEL", "").strip()
+            if not model_name:
+                raise ValueError("Authoring model is required.")
+            credential = resolve_llm_credential(reference)
+        except (LlmCredentialError, LlmEndpointError, ValueError) as error:
+            raise assistant_error(503, "Policy AI is not configured on the backend.") from error
+        client_type = AsyncOpenAI
+        client_options = {"base_url": endpoint, "api_key": credential}
+        generation_options = {}
+    elif provider in AZURE_PROVIDERS:
+        names = ["AZURE_OPENAI_API_KEY", "AZURE_OPENAI_ENDPOINT",
+                 "AZURE_OPENAI_API_VERSION", "AZURE_OPENAI_DEPLOYMENT"]
+        settings = {name: os.getenv(name, "") for name in names}
+        if not all(settings.values()):
+            raise assistant_error(503, "Policy AI is not configured on the backend.")
+        try:
+            validate_profile_metadata(provider, settings["AZURE_OPENAI_ENDPOINT"], None)
+        except (LlmCredentialError, LlmEndpointError, ValueError) as error:
+            raise assistant_error(503, "Policy AI is not configured on the backend.") from error
+        client_type = AsyncAzureOpenAI
+        client_options = {"azure_endpoint": settings["AZURE_OPENAI_ENDPOINT"],
+                          "api_key": settings["AZURE_OPENAI_API_KEY"],
+                          "api_version": settings["AZURE_OPENAI_API_VERSION"]}
+        model_name = settings["AZURE_OPENAI_DEPLOYMENT"]
+        generation_options = {"temperature": 0}
+    else:
         raise assistant_error(503, "Policy AI is not configured on the backend.")
 
     instructions = (
@@ -203,18 +236,16 @@ async def generate_suggestions(
             "\nJSON schema: " + json.dumps(SuggestionResult.model_json_schema())
         )
     try:
-        async with AsyncAzureOpenAI(
-            azure_endpoint=settings["AZURE_OPENAI_ENDPOINT"],
-            api_key=settings["AZURE_OPENAI_API_KEY"],
-            api_version=settings["AZURE_OPENAI_API_VERSION"],
-            timeout=25, max_retries=0,
+        async with client_type(
+            **client_options, timeout=25, max_retries=0,
+            http_client=DefaultAsyncHttpxClient(follow_redirects=False),
         ) as client:
             completion = await asyncio.wait_for(client.chat.completions.create(
-                model=settings["AZURE_OPENAI_DEPLOYMENT"],
+                model=model_name,
                 messages=[{"role": "system", "content": instructions},
                           {"role": "user", "content": prompt}],
                 response_format={"type": "json_object"},
-                temperature=0, max_tokens=2200,
+                max_tokens=2200, **generation_options,
             ), timeout=30)
         if not completion.choices:
             raise ValueError("Empty completion.")

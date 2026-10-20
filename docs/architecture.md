@@ -340,13 +340,13 @@ Current implemented path:
 User prompt
 -> deterministic Python pre-check report only
 -> compiled_policy_rules injected into config/prompts.yml template
--> NeMo self_check_input using injected AzureChatOpenAI
+-> NeMo self_check_input using the selected Azure or strict compatible chat model
 -> LangChain agent
 -> src/nemo_mcp_guardrails/tool_guard.py MCP tool wrapper
 -> blocked tool names compiled from enabled Postgres input policies
 -> GitHub MCP server with GITHUB_READ_ONLY=1
    (native executable in backend images; Docker launcher for direct source runs)
--> NeMo self_check_output using injected AzureChatOpenAI
+-> NeMo self_check_output using the selected Azure or strict compatible chat model
 -> final answer
 ```
 
@@ -456,7 +456,7 @@ Next implementation direction:
 
 ```text
 authenticated POST /v1/guardrails/run execution already exists
--> runtime_factory.py builds Azure, NeMo rails, read-only guarded MCP tools, and agent objects
+-> runtime_factory.py builds selected Azure/compatible models, NeMo rails, read-only guarded MCP tools, and agent objects
 -> execute_guarded_message() runs the submitted message
 -> return final structured execution JSON
 -> keep normal GitHub MCP tests read-only
@@ -470,3 +470,14 @@ Important current decision:
 - No custom `config/policies.yml` is being used yet.
 - `policies.yml` is not a standard NeMo Guardrails file.
 - The future database-backed policy store should replace the current in-Python prototype when the backend/admin system is built.
+
+## Provider-Neutral Model Boundary
+
+The model factory supports the existing Azure API and approved standard Chat
+Completions profiles. An optional external gateway translates native vendor APIs.
+Main-agent and classifier selections remain independent and app/purpose-granted;
+policy authoring uses its independent backend profile. Compatible classification
+requires complete yes/no decisions before NeMo parsing. See
+[model gateway integration](model-gateway-integration.md) for controls, deployment
+boundaries and evidence limits. A gateway/model still needs real role acceptance
+tests; universal model/feature compatibility is not asserted.

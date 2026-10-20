@@ -1,11 +1,18 @@
 # AGENTS.md
 
+The provider-neutral model integration was approved with "ok" and applied on
+2026-10-20. Read `docs/model-gateway-integration.md`: direct Azure and approved
+`openai_compatible` profiles are implemented; native vendor protocols use a
+separately provisioned gateway. The applied source passed all 33 offline checks.
+Actual gateway/model, clean pinned-install/image and browser verification remain
+open. No gateway deployment or database change ran for this integration.
+
 Patch 019 was authorized with "ok apply everything". Read
 `docs/branch-routing-patch-019.md`: PR branch inequalities/conjunctions and
 creation enforcement are implemented; selective branch merging remains
 unavailable and fails closed. Do not disable/recreate legacy branch definitions
 as a workaround. The conversion helper previews by default and restricts writes
-to restored rehearsal databases. The offline runner now contains 32 checks.
+to restored rehearsal databases. The offline runner now contains 33 checks.
 
 Current security-review status (2026-10-16): patches 010-018 were authorized for
 autonomous implementation without per-diff approvals. Read
@@ -48,7 +55,7 @@ The test pipeline is:
 User prompt
 -> deterministic Python pre-check report only
 -> DB compiled prompt rules are injected into `config/prompts.yml` templates
--> NeMo Guardrails input rail using the app's guardrail AzureChatOpenAI config
+-> NeMo Guardrails input rail using the app's selected Azure or strict compatible guardrail config
 -> LangChain agent
 -> `src/nemo_mcp_guardrails/tool_guard.py` wraps GitHub MCP tools and blocks DB-derived restricted tool names before execution
 -> GitHub MCP tools, normally read-only; the backend image uses its bundled native executable while direct local source runs default to the Docker launcher
@@ -147,7 +154,7 @@ Blocked actions:
 - `src/nemo_mcp_guardrails/api/auth.py` provides the reusable FastAPI `require_authenticated_app` dependency. It reads `X-App-ID` and `X-API-Key`, authenticates before runtime work begins, and returns the same generic `401` response for every invalid case.
 - `GET /v1/guardrails/auth-check` is the first protected runtime proof endpoint. It verifies credentials and returns only the authenticated app identity; it does not load policies, NeMo, Docker, or MCP tools.
 - `POST /v1/guardrails/run` is now the authenticated guarded runtime endpoint. It validates app credentials, loads stored `conversation_messages` for the app conversation, bootstraps from client-supplied `conversation_history` when needed, trims older turns by `NEMO_MAX_RUNTIME_CONTEXT_CHARS`, builds app-scoped NeMo rails and guarded GitHub MCP tools, calls `execute_guarded_message()`, stores the latest user/assistant turn when `conversation_id` is present, and returns a JSON execution response with history metadata. Blocked responses also include `block_stage`, `block_reason`, `blocked_policy_id`, and `blocked_policy_name` where available; the returned response text is replaced with the readable reason.
-- `src/nemo_mcp_guardrails/runtime_factory.py` respects separate `main_llm_config_id` and `guardrail_llm_config_id` values on the authenticated app. The guardrail config is injected into NeMo rails, and the main config is used by the LangChain agent. Missing config IDs fall back to `.env` Azure OpenAI settings. Only Azure OpenAI-compatible provider rows are executable for now; other providers return a clear unsupported-provider error.
+- `src/nemo_mcp_guardrails/runtime_factory.py` respects separate `main_llm_config_id` and `guardrail_llm_config_id` values on the authenticated app. The guardrail config is injected into NeMo rails, and the main config is used by the LangChain agent. Missing config IDs fall back to `.env` Azure OpenAI settings. Azure API and approved openai_compatible chat profiles are executable; native vendor protocols require translation through an approved external gateway. Compatible classifiers require complete yes/no decisions. Read docs/model-gateway-integration.md before changing model protocols, credential handling or gateway topology.
 - `src/nemo_mcp_guardrails/guarded_execution.py` now owns the reusable single-request sequence: input rail, early block, agent/guarded tools with optional trimmed history, controlled `tool_error` responses for connector `ToolException` failures, output rail, controlled blocked responses for Azure output `content_filter` failures, and structured result. `tests/test_nemo_mcp.py` still chooses test prompts and prints the familiar workflow sections.
 - `tests/test_app_auth_http.py` is a self-cleaning HTTP authentication diagnostic covering missing headers, wrong keys, unknown clients, unauthorized apps, and valid credentials.
 - `tests/test_guardrails_run_http.py` is a self-cleaning HTTP runtime diagnostic proving authenticated `/run` loads real app-scoped policy assignments, compiled prompt rules, and blocked tools while using fake rails/agent to avoid Docker and Azure.
@@ -229,7 +236,7 @@ POST /v1/guardrails/run executes app-scoped guarded requests
 runtime_schemas.py defines the future-compatible message request and execution response
 guarded_execution.py coordinates input rail, agent/tools, and output rail
 test_nemo_mcp.py displays GuardedExecutionResult without owning coordination
-runtime_factory.py selects app main/guardrail LLM configs, then builds Azure-backed NeMo rails, env-configured GitHub MCP tools, and the LangChain agent
+runtime_factory.py selects app main/guardrail LLM configs, then builds NeMo rails with the selected Azure/compatible classifier, env-configured GitHub MCP tools, and the LangChain agent
 policy CRUD auto-refreshes compiled_policy_rules
 frontend-api-map.md maps backend endpoints to UI screens
 frontend-screen-plan.md defines the first Next.js 13 screens/components

@@ -9,6 +9,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 OFFLINE_TESTS = (
+    "test_model_gateway",
     "test_branch_routing",
     "test_security_controls", "test_management_password_change", "test_management_audit_http",
     "test_app_authorization_http", "test_app_llm_grant_migration", "test_app_llm_grants_http",

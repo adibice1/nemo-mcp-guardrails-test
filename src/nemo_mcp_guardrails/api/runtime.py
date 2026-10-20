@@ -3,6 +3,8 @@ import asyncio
 from dataclasses import dataclass
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from nemoguardrails.exceptions import LLMCallException
+from openai import APIError
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -492,6 +494,8 @@ async def run_guardrails(
         ), timeout=120)
     except TimeoutError as error:
         raise HTTPException(504, detail="Runtime execution timed out.") from error
+    except (LLMCallException, APIError) as error:
+        raise HTTPException(503, detail="Runtime model evaluation is unavailable. Review model compatibility and service availability.") from error
     request.state.gms_runtime_outcome = execution_result.status
     block_explanation = _block_explanation(
         message=payload.message,

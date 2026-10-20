@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from nemo_mcp_guardrails.database.models import AppLlmGrantRecord, LlmConfigRecord
 from nemo_mcp_guardrails.llm_credentials import LlmCredentialError, validate_llm_credential_reference
 from nemo_mcp_guardrails.llm_security import LlmEndpointError, validate_llm_endpoint
+from nemo_mcp_guardrails.llm_profiles import AZURE_PROVIDERS, SUPPORTED_PROVIDERS, validate_profile_metadata
 
 
 LlmPurpose = Literal["main", "guardrail"]
@@ -23,17 +24,21 @@ def validate_llm_choice(config: LlmConfigRecord | None) -> None:
     """Validate a model bundle without reading its credential value."""
 
     if config is not None and (
-        not config.enabled or config.provider.strip().lower() not in {"azure", "azure_openai"}
+        not config.enabled or config.provider.strip().lower() not in SUPPORTED_PROVIDERS
         or not config.model_name.strip()
     ):
         raise LlmAccessError("LLM selection is unavailable.")
     try:
-        validate_llm_endpoint(
-            (config.endpoint if config else None) or os.getenv("AZURE_OPENAI_ENDPOINT", ""),
-        )
-        validate_llm_credential_reference(config.credential_reference if config else None)
-    except (LlmEndpointError, LlmCredentialError) as error:
+        if config is not None:
+            validate_profile_metadata(config.provider, config.endpoint, config.credential_reference)
+        if config is None or config.provider.strip().lower() in AZURE_PROVIDERS:
+            validate_llm_endpoint(
+                (config.endpoint if config else None) or os.getenv("AZURE_OPENAI_ENDPOINT", ""),
+            )
+            validate_llm_credential_reference(config.credential_reference if config else None)
+    except (LlmEndpointError, LlmCredentialError, ValueError) as error:
         raise LlmAccessError("LLM selection is unavailable.") from error
+
 
 
 def require_llm_grant(

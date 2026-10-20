@@ -220,7 +220,7 @@ export type AppLlmOptions = {
 
 export type LlmConfigCreatePayload = {
   name: string;
-  provider: "azure" | "azure_openai";
+  provider: "azure" | "azure_openai" | "openai_compatible";
   model_name: string;
   endpoint: string | null;
   credential_reference: string | null;
@@ -865,5 +865,27 @@ export function deleteAppPolicyAssignment(
 export function deleteGlobalPolicyAssignment(assignmentId: number) {
   return apiRequest<void>(`/global-policy-assignments/${assignmentId}`, {
     method: "DELETE"
+  });
+}
+
+export type AppLlmGrant = {
+  id: number;
+  app_id: number;
+  purpose: "main" | "guardrail";
+  llm_config_id: number | null;
+  enabled: boolean;
+  config_name: string;
+  config_enabled: boolean;
+};
+
+export function listAppLlmGrants(appId: number) {
+  return apiRequest<AppLlmGrant[]>(`/apps/${appId}/llm-grants`);
+}
+
+export function setAppLlmGrant(
+  appId: number, purpose: "main" | "guardrail", configId: number | null, enabled: boolean
+) {
+  return apiRequest<AppLlmGrant>(`/apps/${appId}/llm-grants/${purpose}/${configId ?? "default"}`, {
+    method: "PUT", body: JSON.stringify({ enabled })
   });
 }

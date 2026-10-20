@@ -3,6 +3,62 @@
 This file tracks unfinished implementation work so active plans do not get lost
 across machines or Codex sessions.
 
+## Provider-Neutral Model Switching - Source Applied 2026-10-20
+
+The user approved the exact 26-file provider integration patch with "ok". Patch
+and baseline fingerprints were verified before applying; the applied application
+contents matched the review copy. The standard compatible API adapter, separate
+app/purpose grants, strict compatible classifier, Models tab and independently
+configured policy-authoring profile are implemented. Direct Azure support is
+preserved. A separately operated gateway translates native vendor protocols.
+See [the integration guide](model-gateway-integration.md).
+
+The applied source passed all 33 offline checks in one complete run, whole-project
+TypeScript, changed-file legacy lint, Python syntax and whitespace checks. Current
+source ESLint 9 and clean pinned-install/image validation remain open because home
+dependencies are older. No gateway, database, .env, image or deployment changed.
+
+The [Claude/Ollama walkthroughs](model-switch-walkthroughs.md) now provide exact
+Windows commands and UI entries. Claude's official compatible endpoint can be
+evaluated directly; a gateway is needed only for APIs/features requiring translation
+or routing. The walkthrough profiles and PowerShell syntax were validated without
+real credentials, provider calls or database operations.
+
+The [NVIDIA supported-provider guide](supported-llm-setup-guide.md) now maps
+every named upstream engine/alias and compatible-provider example to concrete
+GMS steps, serving prerequisites or an explicit extra-integration boundary. Its
+example profile contracts, PowerShell syntax and coverage/navigation were checked
+offline. This does not certify live providers or upgrade the pinned NeMo version.
+
+Remaining work for this slice:
+
+1. Provision a separately reviewed compatible gateway/server with fixed/versioned
+   aliases, appropriate provider adapters and model-restricted credentials.
+2. Configure approved base URLs/key references on the GMS backend, restart it,
+   and create/grant/select profiles through the Models tab or documented APIs.
+3. Verify browser interactions and actual main-agent tool calls, input/output
+   classification, structured authoring, error behavior, latency and accuracy on
+   rehearsal targets. Every selected model must support its role.
+4. Complete clean pinned dependencies/current lint and image verification before
+   release. Preserve the existing schema/policy rollout requirements below.
+
+The original Azure-only handover audit preceded this implementation: six request
+examples, 15 route definitions and five offline names were checked against source.
+Local Ollama inference was established separately; real GMS/provider behavior
+remains unverified. The unrelated Next.js compatibility patch remains parked.
+
+## Home Offline Continuation - 2026-10-20
+
+Azure port 5432 currently times out from the home session. Continue independent
+work by aligning the home dependencies and completing offline/UI verification.
+All 32 isolated regressions, the branch-editor check and TypeScript passed on
+the existing home environment; lint is blocked by old installed ESLint. The
+frontend still has Next 13/React 18 installed and 19 Python packages differ from
+the committed pins. Refresh dependencies and rerun before claiming the patched
+baseline is verified at home. See [home verification](testing-notes.md#home-offline-checkpoint---2026-10-20).
+No database change, dependency installation or deployment ran. Preserve the
+existing rehearsal order below once network access is restored.
+
 ## Current Completion Status - 2026-10-16
 
 Patches 010-018 are implemented under the user's autonomous authorization. Passed

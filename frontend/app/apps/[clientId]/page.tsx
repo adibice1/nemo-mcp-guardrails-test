@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter , useParams } from "next/navigation";
 import { ArrowLeft, Bot } from "lucide-react";
 import { AppConnectors } from "@/components/apps/app-connectors";
+import { AppModels } from "@/components/apps/app-models";
 import { AppOverview } from "@/components/apps/app-overview";
 import { AppPolicySummary } from "@/components/apps/app-policy-summary";
 import { AppRuntimeTest } from "@/components/apps/app-runtime-test";
@@ -11,11 +12,12 @@ import { AppTopNav } from "@/components/shared/app-top-nav";
 import { getApp, type ClientApp } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
-type AppTab = "overview" | "connectors" | "policies" | "runtime";
+type AppTab = "overview" | "connectors" | "models" | "policies" | "runtime";
 
 const tabs: Array<{ key: AppTab; label: string }> = [
   { key: "overview", label: "Overview" },
   { key: "connectors", label: "Connectors" },
+  { key: "models", label: "Models" },
   { key: "policies", label: "Policies" },
   { key: "runtime", label: "Runtime Test" }
 ];
@@ -115,6 +117,7 @@ export default function AppDetailPage() {
               {activeTab === "connectors" && (
                 <AppConnectors clientId={app.client_id} />
               )}
+              {activeTab === "models" && <AppModels key={app.id} app={app} onUpdated={handleUpdated} />}
               {activeTab === "policies" && <AppPolicySummary app={app} />}
               {activeTab === "runtime" && (
                 <AppRuntimeTest clientId={app.client_id} />

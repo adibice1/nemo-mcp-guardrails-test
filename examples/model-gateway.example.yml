@@ -1,0 +1,18 @@
+# Optional external LiteLLM gateway example. Review/deploy separately from GMS.
+# These are placeholders, not executable model IDs or credentials.
+# Select and pin an operator-reviewed gateway release/image before deployment.
+model_list:
+  - model_name: main-v1
+    litellm_params:
+      model: anthropic/REPLACE_WITH_APPROVED_CHAT_MODEL_ID
+      api_key: os.environ/ANTHROPIC_API_KEY
+  - model_name: guardrail-v1
+    litellm_params:
+      model: gemini/REPLACE_WITH_APPROVED_CLASSIFIER_MODEL_ID
+      api_key: os.environ/GEMINI_API_KEY
+# Require authentication even for local gateway evaluation. GMS production
+# profiles should use model-restricted virtual keys, not this master key.
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+# No wildcard models, fallback routing, external log callbacks or MCP routing.
+# Keep model aliases/version mappings fixed for each approved GMS profile.

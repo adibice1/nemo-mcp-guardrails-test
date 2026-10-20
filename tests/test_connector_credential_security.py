@@ -200,7 +200,8 @@ def main() -> None:
                 stack.enter_context(patch.object(factory, "SessionLocal", sessions))
                 stack.enter_context(patch.object(factory, "load_runtime_policy_snapshot",
                     side_effect=lambda app_id: factory.RuntimePolicySnapshot(app_id, ())))
-                stack.enter_context(patch.object(factory, "load_runtime_llm_selection", return_value=object()))
+                stack.enter_context(patch.object(factory, "load_runtime_llm_selection",
+                                                 return_value=factory.RuntimeLlmSelection(None, None, (0, 0))))
                 external = [stack.enter_context(patch.object(factory, name)) for name in (
                     "build_chat_model", "LLMRails", "create_agent",
                 )]

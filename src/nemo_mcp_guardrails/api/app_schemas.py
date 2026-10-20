@@ -131,7 +131,7 @@ class AppLlmOptions(BaseModel):
 
 
 class LlmConfigCreate(BaseModel):
-    """Request body for creating one Azure-compatible LLM configuration."""
+    """Request body for creating one approved LLM API configuration."""
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -147,7 +147,7 @@ class LlmConfigCreate(BaseModel):
     )
 
     name: str = Field(min_length=1, max_length=200)
-    provider: Literal["azure", "azure_openai"] = "azure_openai"
+    provider: Literal["azure", "azure_openai", "openai_compatible"] = "azure_openai"
     model_name: str = Field(min_length=1, max_length=200)
     endpoint: str | None = Field(default=None, max_length=500)
     credential_reference: str | None = Field(default=None, max_length=500)

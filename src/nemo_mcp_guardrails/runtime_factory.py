@@ -8,13 +8,15 @@ from typing import Any
 from dotenv import load_dotenv
 from langchain.agents import create_agent
 from langchain_mcp_adapters.client import MultiServerMCPClient
-from langchain_openai import AzureChatOpenAI
+from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_openai import AzureChatOpenAI, ChatOpenAI
 from nemoguardrails import LLMRails
 from openai import DefaultAsyncHttpxClient, DefaultHttpxClient
 from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
 
 from nemo_mcp_guardrails.connector_credentials import resolve_github_credential
+from nemo_mcp_guardrails.classifier_model import StrictClassifierModel
 from nemo_mcp_guardrails.database.connection import SessionLocal
 from nemo_mcp_guardrails.database.policy_errors import PolicyLoadError
 from nemo_mcp_guardrails.database.models import (
@@ -42,6 +44,7 @@ from nemo_mcp_guardrails.llm_credentials import (
     LlmCredentialError, resolve_llm_credential, validate_llm_credential_reference,
 )
 from nemo_mcp_guardrails.llm_security import validate_llm_endpoint
+from nemo_mcp_guardrails.llm_profiles import COMPATIBLE_PROVIDER, validate_profile_metadata
 from nemo_mcp_guardrails.github_tool_contract import (
     REVIEWED_MCP_IMAGE, REVIEWED_NATIVE_BINARY, select_reviewed_github_tools,
 )
@@ -218,8 +221,9 @@ def clear_guardrails_runtime_cache() -> None:
 
 def load_runtime_environment(
     github_credential_reference: str | None = None,
+    *, llm_selection: RuntimeLlmSelection | None = None,
 ) -> RuntimeEnvironment:
-    """Load required Azure OpenAI and GitHub MCP environment settings."""
+    """Load connector settings and optional Azure defaults; validate models when selected."""
 
     load_dotenv()
     validate_llm_credential_reference(None)
@@ -230,19 +234,16 @@ def load_runtime_environment(
         "AZURE_OPENAI_API_VERSION": os.getenv("AZURE_OPENAI_API_VERSION"),
         "AZURE_OPENAI_DEPLOYMENT": os.getenv("AZURE_OPENAI_DEPLOYMENT"),
     }
-    missing = [name for name, value in values.items() if not value]
-
-    if missing:
-        raise LlmCredentialError("Runtime LLM environment is unavailable.")
+    selected = (llm_selection.main_llm_config, llm_selection.guardrail_llm_config) if llm_selection else (None,)
+    if any(config is None or config.provider.strip().lower() in SUPPORTED_AZURE_PROVIDERS for config in selected):
+        if any(not value for value in values.values()):
+            raise LlmCredentialError("Runtime Azure environment is unavailable.")
 
     azure_api_key = values["AZURE_OPENAI_API_KEY"] or ""
     github_pat = resolve_github_credential(github_credential_reference)
     github_mcp_read_only = os.getenv("GITHUB_MCP_READ_ONLY", "1").strip()
     if github_mcp_read_only not in {"0", "1"}:
         raise RuntimeError("GITHUB_MCP_READ_ONLY must be 0 or 1")
-
-    os.environ["OPENAI_API_KEY"] = azure_api_key
-    os.environ["AZURE_OPENAI_API_KEY"] = azure_api_key
 
     return RuntimeEnvironment(
         azure_api_key=azure_api_key,
@@ -342,8 +343,24 @@ def build_chat_model(
     environment: RuntimeEnvironment,
     config: RuntimeLlmConfig | None,
     purpose: str,
-) -> AzureChatOpenAI:
+) -> BaseChatModel:
     """Build the chat model for guardrails or main-agent execution."""
+
+    if config is not None and config.provider.strip().lower() == COMPATIBLE_PROVIDER:
+        if not config.enabled or not config.model_name.strip():
+            raise RuntimeError("Compatible LLM configuration is unavailable.")
+        endpoint, reference = validate_profile_metadata(
+            config.provider, config.endpoint, config.credential_reference,
+        )
+        api_key = resolve_llm_credential(reference)
+        model = ChatOpenAI(
+            model=config.model_name, base_url=endpoint, api_key=api_key,
+            http_client=DefaultHttpxClient(follow_redirects=False),
+            http_async_client=DefaultAsyncHttpxClient(follow_redirects=False),
+            timeout=60, max_retries=0, use_responses_api=False,
+            # Provider-specific generation options belong to reviewed gateway profiles.
+        )
+        return StrictClassifierModel(wrapped=model) if purpose == "guardrail" else model
 
     if config is None:
         deployment = environment.azure_deployment
@@ -353,7 +370,7 @@ def build_chat_model(
         if provider not in SUPPORTED_AZURE_PROVIDERS:
             raise RuntimeError(
                 f"Unsupported {purpose} LLM provider: {config.provider}. "
-                "Only Azure OpenAI is wired in this prototype."
+                "Use azure_openai or an approved openai_compatible gateway."
             )
         if not config.enabled:
             raise RuntimeError(f"{purpose} LLM config is disabled: {config.name}")
@@ -363,8 +380,8 @@ def build_chat_model(
     endpoint = validate_llm_endpoint(endpoint, default_endpoint=environment.azure_endpoint)
     reference = validate_llm_credential_reference(config.credential_reference if config else None)
     api_key = resolve_llm_credential(reference) if reference else environment.azure_api_key
-    if not api_key:
-        raise LlmCredentialError("LLM credential is unavailable.")
+    if not api_key or not environment.azure_api_version or not deployment:
+        raise LlmCredentialError("Azure LLM configuration is unavailable.")
 
     return AzureChatOpenAI(
         azure_deployment=deployment,
@@ -511,6 +528,7 @@ async def _build_guardrails_runtime_parts_uncached(
         llm_selection = load_runtime_llm_selection(app_id)
     environment = load_runtime_environment(
         github_credential_reference=github_connector.credential_reference,
+        llm_selection=llm_selection,
     )
     guardrail_model = build_chat_model(
         environment,

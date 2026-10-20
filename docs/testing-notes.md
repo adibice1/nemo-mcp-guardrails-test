@@ -1,5 +1,117 @@
 # Testing Notes
 
+## NVIDIA Supported-Provider Guide - 2026-10-20
+
+Added supported-llm-setup-guide.md against the user-linked NVIDIA Latest page
+and primary vendor references. Coverage checks found all 17 concrete inference
+engine names, the generic community entry and all 9 named compatible examples;
+specialist rail models and all 8 embedding entries are addressed separately.
+The guide distinguishes NeMo library support from this project's pinned 0.21.0
+factory/schema, and marks in-process/native protocols and IAM refresh limits.
+
+20 representative compatible profile bundles and both Azure aliases passed the
+actual Pydantic schemas and endpoint/credential-name validators. Eight incorrect
+NeMo-engine-as-GMS-provider values were rejected, and main-only update semantics
+were verified. External sockets were denied, dotenv disabled and no secrets
+resolved. All 22 PowerShell blocks parsed without execution (zero syntax errors),
+and all 25 table navigation links resolved to explicit anchors. Linux serving
+commands were checked against operator documentation, not executed or hardware
+tested. No dependency, code, .env, database, model download, gateway or provider
+call changed/ran for this documentation task. Live provider/model capabilities
+and the existing release verification work remain outstanding.
+
+## Claude/Ollama Walkthrough Validation - 2026-10-20
+
+Added model-switch-walkthroughs.md with direct compatible Claude and local Ollama
+steps, separate database-free probes and DB-backed profile/grant/runtime steps.
+Checked current UI labels, credential-name handling, app-key Runtime Test fields
+and main-only selection semantics. Both example profile bundles passed the
+actual request schema and endpoint/reference validators with fake settings,
+dotenv disabled and external sockets denied. Seven PowerShell snippets parsed
+without execution and had zero syntax errors. This does not establish successful
+live Claude/Ollama GMS behavior. No .env, code, database, gateway or provider
+request changed/ran for this documentation task.
+
+## Provider-Neutral Gateway Applied - 2026-10-20
+
+The approved source integration adds a dedicated test_model_gateway check, increasing
+the explicit offline catalogue to 33. It covers real standard SDK transports,
+JWT/RBAC profile creation and purpose grants, revocation/cache changes, agent/tool
+round trips, actual NeMo yes/no rails and invalid/truncated classifications,
+redirect refusal and independent policy authoring. External sockets and dotenv
+are disabled, and database fixtures are disposable SQLite.
+
+After exact-diff approval, all patch/baseline fingerprints were checked and the
+patch was applied without source conflicts. A fresh complete run on the applied
+source passed 33/33 checks (0 failures), including the corrected connector fixture.
+Whole-project TypeScript, changed-file lint using the available older ESLint 8 /
+Next 13 toolchain, Python syntax (12 changed/new Python files) and whitespace
+checks passed. Source ESLint 9, clean pinned dependencies/image builds, browser
+interaction, PostgreSQL, real gateway/provider calls and latency/accuracy remain
+unverified. These are home-environment results, not upstream model certification.
+No .env, database, gateway or deployment configuration was changed. See the
+[integration guide](model-gateway-integration.md) for the remaining live workflow.
+
+
+## Model Handover Guide Audit - 2026-10-20
+
+The initial objective was to confirm the model-switching handover instructions,
+before the later provider-neutral integration request above. docs/llm-provider-guide.md was rewritten against current
+source. It now distinguishes supported Azure switching, main/guardrail purpose
+grants, the independent authoring model and unimplemented provider adapters.
+It removes obsolete selector references and documents the always-required Azure
+defaults, shared API version, fixed temperature and API-only provisioning path.
+
+All six JSON request examples validated against actual Pydantic schemas; 15
+method/path definitions matched source routers, and five CLI test names matched
+the explicit offline catalogue. Example endpoint/credential approvals passed
+and provider=ollama rejected. Dotenv/external sockets were disabled. This is
+schema/source contract verification, not execution of a live switching sequence.
+No application code, .env, database or provider configuration changed.
+
+The user reported four model/security offline checks passing and a successful
+qwen3:4b download/local response. ollama ps showed model ID 359d7dd4bcda,
+3.2 GB, 100% CPU and context 4096. The exact READY probe failed to follow the
+requested format; response termination/thinking metadata was not supplied, so
+its cause remains undiagnosed. No reasoning content is copied into these notes.
+The result proves local inference, not GMS/NeMo or tool-calling integration.
+Actual alternate-Azure switching, model-quality evaluation and other-provider
+adapters remain unverified/unimplemented respectively. The Next.js patch remains
+parked and unapplied.
+
+## Home Offline Checkpoint - 2026-10-20
+
+The Azure connection is currently blocked by a port-5432 TCP timeout. The home
+checkout was clean before verification. The following checks ran without local
+or hosted PostgreSQL, real Azure model calls, or GitHub MCP execution:
+
+- The explicit credential-isolated security runner passed all 32 checks. Its
+  database fixtures are disposable SQLite, with dotenv disabled and external
+  sockets blocked.
+- The branch-editor handler/English-formatting check passed.
+- Whole-project TypeScript passed with no emit and incremental output disabled.
+- pip check reported no broken installed requirements.
+- Full lint could not start: installed ESLint 8.57.1 lacks the config export
+  required by the current flat configuration. The source requires ESLint 9.39.5.
+
+These are home-environment results, not verification against the committed
+security dependency baseline. Installed frontend packages are still Next 13.5.11
+and React 18.2.0, whereas the source/lockfile target Next 16.4.2 and React 19.3.1.
+Nineteen unique Python packages differ from requirements.txt/constraints.txt,
+including PyJWT, Starlette, LangChain core/graph, MCP and cryptography. A passing
+pip check does not establish equality with those pins. Home Node is 22.15.0;
+the manifest permits it, but the recorded release baseline uses Node 24.
+
+Next: align the local runtime/dependencies using the existing pinned requirements
+and npm lockfile, then repeat the security runner, branch-editor, TypeScript and
+full-lint checks. No dependency installation or .env/source edit was performed
+in this verification. The /policy-preview route explicitly uses mock options
+and disables live AI, so its browser/layout checks can follow without a backend.
+Record draft application/cancel, branch controls/English text, merge limitation
+notice, mobile layout and dark mode; saving there is in-memory only. Real policy
+209 edit/cancel, actual grants, hosted-database behavior and real GitHub branch
+routing remain the separate rehearsal checks in the handoff/backlog.
+
 ## Branch Routing - Patch 019
 
 The safe runner now has 32 checks, including test_branch_routing. Windows/Linux
