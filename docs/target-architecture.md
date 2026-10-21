@@ -1,5 +1,15 @@
 # Guardrails Management System Target Architecture
 
+## Confirmed Per-App Classifier Scope - 2026-10-21
+
+After considering a global classifier, the user chose to keep the existing
+admin-only per-app classifier selection. Main-agent models remain app-specific
+and selectable by linked developers/admins within approved grants. The earlier
+global proposal was not implemented; no global-selection migration is planned.
+See [the decision and access boundaries](policy-authoring-and-global-classifier-review.md#2-admin-controlled-per-app-classifiers).
+Preserve app-scoped policies/prompts/history, endpoint/credential controls,
+strict classification and tool enforcement.
+
 ## PR Branch Conditions - Patch 019
 
 The input selector contract now includes bounded source/target equality and

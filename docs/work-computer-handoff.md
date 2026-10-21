@@ -1,5 +1,89 @@
 # Work/Home Computer Handoff
 
+## Current Home Entry Point - 2026-10-21
+
+Start with [the current home handover](home-handoff-2026-10-21.md). Home cannot
+access Azure. Capture the read-only online inventory at work if possible, then
+continue with home-local PostgreSQL on port 5433 or isolated offline tests.
+Database capture is now complete: app 221 uses Azure defaults, its four effective
+policies each have one current artifact, and policy 210 needs repair in Test App
+Two (214). Review app 221's unused Qwen classifier grant. Two manual groups
+remain (proxy and browser/timing/logs); source/finding/release work is separate.
+PR 39 cleanup is complete, read-only restoration is user-confirmed, and no
+production migration/deployment ran. Older access/setup instructions below are
+historical where they conflict with this checkpoint and the acceptance record.
+
+## Current Acceptance Checkpoint - 2026-10-21
+
+Resume from [automated results and remaining manual tests](work-acceptance-2026-10-21.md).
+Azure rehearsal identity is user-verified; Qwen is installed and selected for the
+test app. Automated work now includes the full offline suite, frontend Node 24
+image and real pinned MCP catalogue schemas. One legacy PostgreSQL runtime
+explanation assertion and three Python dependency advisory findings remain open.
+The user chose to perform the live browser checks manually after Escape stopped
+Computer Use, and confirmed the Qwen-to-Azure-to-Qwen read sequence passed all
+rails without a backend restart. The later user-submitted GMS write test is
+recorded below; the agent did not submit a valid-key runtime request. No
+production migration or deployment ran.
+Policy 209 is now unassigned from all apps according to the user, with its
+definition retained. Current active PR-create/merge conditions are source !=
+staging AND target = production. Edit/cancel and both input-condition cases are
+user-confirmed. Draft PR 39 development -> staging was created and independently
+verified; the GitHub connection's cleanup returned 403. Cleanup then succeeded
+with the project's existing credential: PR 39 is closed/unmerged. The user
+confirmed read-only restoration. Do not repeat creation or reattach 209.
+Scoped automated work and subsequent database capture are finished. Review the
+policy 210 finding and unused Qwen classifier grant recorded in the home entry
+point. Remaining manual evidence is local proxy alignment and browser/timing/log
+checks; the acceptance record keeps source/advisory fixes separate.
+
+## Earlier User Acceptance And Pending Access - 2026-10-21 (Historical)
+
+The user confirms login, corrected AI drafts and all supplied injection previews
+work; developers can select main models and cannot change the app classifier.
+The developer Add model action is missing because creation remains admin-only.
+The user clarified that developers must add/use their own main-agent models;
+only classifier controls remain admin-only and per app. The registration flow
+still needs an app-scoped credential/destination design and exact code preview.
+Read the
+[latest follow-up](policy-authoring-and-global-classifier-review.md#developer-model-registration-follow-up)
+for auth needs, verified existing repository branches and the remaining test gaps.
+No connected browser session is exposed to the agent; user sign-in alone does not
+provide agent API/browser authentication. No PR test or production database move
+has run. Keep release/cutover deferred until the remaining work is complete.
+
+Current read-only runtime inspection supersedes the older local-backend diagnosis
+below: the backend now has an Azure PostgreSQL socket, but the actual database
+name is unverified. Do not infer it from root .env or DBeaver. Ollama is already
+running locally; qwen2.5:1.5b has not been downloaded on this machine. Follow
+[runtime verification, browser access and Ollama setup](work-runtime-access-and-ollama.md)
+before live acceptance. No database or secret configuration was changed by these
+checks.
+
+## Earlier Request Before Manual Rehearsal - 2026-10-21 (Historical)
+
+Read the [policy-authoring/global-classifier review](policy-authoring-and-global-classifier-review.md)
+before the planned 22 October checklists. The user requested correcting inverted
+AI branch drafts, then chose to KEEP admin-only per-app classifiers and Next.js 16.
+The earlier global classifier proposal is withdrawn without implementation;
+existing per-app permissions already implement the chosen model-access split.
+No classifier scope migration is planned. The user approved the exact authoring
+fix; all three files match the review and all 33 normal offline checks passed
+after application. It compiles structured branch intent and derives consistent
+wording/examples, rejecting conflicting or missing branch intent. Restart the
+backend before live authoring tests. Actual model understanding/injection results
+are still pending. The linked review records automated results, injection prompts,
+test ownership and the ordered remaining acceptance checklist.
+
+The user's subsequent login traceback reports missing users.must_change_password.
+Read-only checks confirmed that the running backend connects to local 5432,
+whose users table lacks both security password-state columns. This happens before
+password verification. Restore the Azure rehearsal session override before
+testing existing accounts; no password reset or automatic local migration ran.
+User-supplied rehearsal identities are admin@gmail.com and dev@gmail.com (roles
+not yet verified there). PR tests may use adibice1/nemo-mcp-guardrails-test and
+created test PRs may be closed afterward; verify actual branches/scoped access.
+
 ## Resume At Work - Security And Optimization Tests - 2026-10-22
 
 Start with the [security/optimization continuation checklist](work-computer-security-test-checklist.md),
@@ -9,10 +93,9 @@ controlled PR-creation enforcement, actual grants/legacy definitions and
 performance measurements. Azure rehearsal login/search and the five branch
 conversions were already completed; do not repeat their migrations/manifests.
 
-The Next.js 13 compatibility patch remains unapplied, pending the supervisor's
-decision. Its saved diff targets an older source baseline and must be refreshed
-and reviewed before application. Keep backend security checks moving while
-that decision is pending. No production rollout is included in this checklist.
+The user chose to retain Next.js 16. The Next.js 13 compatibility draft remains
+unapplied and its older baseline is not a current task. No production rollout is
+included in this checklist; older supervisor-pending notes are superseded.
 
 ## Work Model-Test Handoff - 2026-10-22
 
@@ -37,7 +120,9 @@ new `.env` target and clear a terminal DATABASE_URL override if present. See
 
 ## Resume Here At Home - 2026-10-16
 
-This section supersedes the older dated continuation instructions below. Read
+Historical checkpoint: use the [21 October home handover](home-handoff-2026-10-21.md)
+for current home work; its local-database instructions supersede this section's
+Azure continuation steps. At the time, this section superseded older notes. Read
 the [single backlog](open-work-backlog.md) and [019 behavior/limitations](branch-routing-patch-019.md)
 next. Patches 010-018 and the 019 source work are implemented; do not restart
 historical 009 subdivisions or the old "010 next" sequence. The user approved

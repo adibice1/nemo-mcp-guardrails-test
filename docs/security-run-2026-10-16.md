@@ -1,5 +1,11 @@
 # Security Review Completion Report - 2026-10-16
 
+For current results, read [21 October acceptance and open findings](work-acceptance-2026-10-21.md).
+The report below is the dated 16 October snapshot. A fresh advisory scan now
+reports findings in three Python pins; the earlier clean scan is not a current
+security clearance. Current offline/image results and the remaining diagnostic
+assertion are recorded in that acceptance checkpoint.
+
 The user authorized autonomous local implementation of patches 010-018, without
 per-diff approval. Earlier work was preserved. These patches are implemented;
 final verification is recorded below. No production migration, credential change,

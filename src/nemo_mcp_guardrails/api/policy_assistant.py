@@ -16,6 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints, Validation
 from sqlalchemy.orm import Session
 
 from nemo_mcp_guardrails.api.management_auth import require_management_user
+from nemo_mcp_guardrails.api.policy_assistant_branches import BranchIntent, branch_preview
 from nemo_mcp_guardrails.api.policy_metadata import list_policy_options
 from nemo_mcp_guardrails.database.connection import get_db
 from nemo_mcp_guardrails.github_resource_bindings import FIELD_BINDINGS
@@ -63,6 +64,9 @@ class PolicySuggestion(AssistantModel):
     custom_resource: str = Field(max_length=1000)
     explanation: str = Field(min_length=3, max_length=400)
     examples: list[PolicyExample] = Field(min_length=1, max_length=3)
+
+    # Authoring metadata only; the public draft keeps the existing condition format.
+    branch_intent: BranchIntent | None = Field(default=None, exclude=True)
 
 
 class OutputPolicySuggestion(AssistantModel):
@@ -116,17 +120,26 @@ def validate_combinations(
         if isinstance(suggestion, PolicySuggestion):
             if (suggestion.connector, suggestion.action, suggestion.resource) not in allowed:
                 raise ValueError("Unsupported policy combination.")
-            conditions = prepare_input_conditions(
-                InputPolicyObject(suggestion.connector, suggestion.action, suggestion.resource, "block"),
-                {"custom_resource": suggestion.custom_resource},
-            )
+            policy = InputPolicyObject(suggestion.connector, suggestion.action, suggestion.resource, "block")
+            conditions = prepare_input_conditions(policy, {"custom_resource": suggestion.custom_resource})
+            if suggestion.branch_intent is not None:
+                if suggestion.resource != "pull_request" or suggestion.action not in {"create", "merge"}:
+                    raise UnsupportedResourceCondition("Branch intent requires PR creation or merging.")
+                intended = prepare_input_conditions(policy, {
+                    "custom_resource": suggestion.branch_intent.selector(),
+                })
+                if conditions and conditions != intended:
+                    raise UnsupportedResourceCondition("The branch interpretation and condition disagree.")
+                conditions = intended
             suggestion.custom_resource = conditions.get("custom_resource", "")
             condition = parse_resource_condition(suggestion.resource, suggestion.custom_resource)
-            if suggestion.action == "merge" and condition is not None and any(
+            if condition is not None and any(
                 term.field in {"source_branch", "target_branch"} for term in condition_terms(condition)
             ):
-                notice = " Selective merging is unavailable: matching merges block; other branch-conditional merges are refused."
-                suggestion.explanation = suggestion.explanation[:400 - len(notice)] + notice
+                if suggestion.branch_intent is None:
+                    raise UnsupportedResourceCondition("Branch drafts require an explicit interpretation.")
+                suggestion.name, suggestion.explanation, examples = branch_preview(condition, suggestion.action)
+                suggestion.examples = [PolicyExample.model_validate(example) for example in examples]
     if isinstance(result.draft, PolicySuggestion) and any(
         (suggestion.connector, suggestion.resource, suggestion.custom_resource)
         != (result.draft.connector, result.draft.resource, result.draft.custom_resource)
@@ -187,6 +200,15 @@ async def generate_suggestions(
         "Do not invent branch names, identifiers, conditions, or permissions. "
         "For PR creation/merge only, source_branch and target_branch support = and != with up to "
         "two distinct fields joined by AND. For example source_branch != \"staging\" AND target_branch = \"production\". "
+        "For EVERY branch draft, supply branch_intent and leave custom_resource empty; the backend "
+        "compiles it and generates the branch name, explanation and example decisions. "
+        "Use mode=block_matching with the prohibited comparisons for a direct block request. "
+        "Use mode=restrict_target_to_source with two eq terms for an informal request such as "
+        "'only allow PRs from source X into target Y'. This blocks source != X AND target = Y; "
+        "it does NOT block X into Y or unrelated targets, and does not override other policies. "
+        "Each term has field=source_branch or target_branch, operator=eq or neq, and the exact value. "
+        "If the user means to prohibit every other destination too, the complement requires OR: "
+        "return clarification rather than dropping that scope or inventing a broader ban. "
         "All branch predicates must match to block. No OR, prefixes, arbitrary negation, ordering or workflows. "
         "Merge branch policies inspect trusted PR metadata; nonmatching merges are also refused because "
         "atomic target-branch preconditions are unavailable. Explain that limitation in merge drafts; "
@@ -194,8 +216,9 @@ async def generate_suggestions(
         "Pushing README.md under a conditional file restriction is unsupported. "
         "For non-staging to production preserve BOTH comparisons; never remove a condition "
         "or substitute a broad ban to make the request fit. Apply this rule to related drafts too. "
-        "Use an empty custom_resource only for an explicitly unrestricted resource scope. "
-        "If the request is ambiguous, unsupported, or asks for allow policies, return draft=null, "
+        "Without branch_intent, use an empty custom_resource only for an explicitly unrestricted resource scope. "
+        "Apart from the scoped branch restriction above, if the request is ambiguous, contradictory, "
+        "unsupported, or asks for allow policies, return draft=null, "
         "related=[], and a concise clarification question. "
         "For a valid draft return clarification='' and at most two genuinely related, independent "
         "block suggestions only when the same resource scope is observable for the related action. "
@@ -267,9 +290,9 @@ async def generate_suggestions(
         return SuggestionResult(
             draft=None, related=[], clarification=(
                 "A draft uses an unsupported resource condition or changes related-policy scope. "
-                "Only one supported field equality "
-                "is available; compound conditions, negation and workflows need additional capabilities. "
-                "Please clarify the intended scope."
+                "PR branch drafts need a consistent explicit interpretation; they support equality, "
+                "inequality and AND for source/target branches. Other resources support one literal "
+                "equality. Please clarify the intended scope without broadening it."
             ),
         )
     except (ValidationError, ValueError) as error:

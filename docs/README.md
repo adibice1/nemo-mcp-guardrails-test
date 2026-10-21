@@ -1,16 +1,33 @@
 # nemo-mcp-guardrails-test
 
+Continuing at home: start with the [21 October home handover](home-handoff-2026-10-21.md).
+Azure is unavailable from the home laptop. Database capture is complete; two
+manual groups remain, plus finding resolution and implementation/release work.
+The handover records policy 210's app-specific repair finding and identifies
+what can use home-local PostgreSQL.
+
+Latest acceptance checkpoint: [21 October results and remaining manual tests](work-acceptance-2026-10-21.md).
+The Azure rehearsal target is user-verified and Qwen is installed/selected; do
+not repeat setup, completed authoring/injection checks or old migrations.
+
+Current 21 October request: read the [authoring/classifier review and test matrix](policy-authoring-and-global-classifier-review.md).
+For the running server/database check, private browser access and local Ollama,
+follow [work runtime access and Ollama setup](work-runtime-access-and-ollama.md).
+The exact AI branch-draft fix is approved/applied and passed all 33 offline checks.
+Follow the [remaining acceptance tests](policy-authoring-and-global-classifier-review.md#remaining-acceptance-tests-after-this-patch).
+The user chose admin-only per-app classifiers and Next.js 16; no global classifier is planned.
+The earlier login 500 was a local DB schema/target mismatch; login now works
+against the user-verified Azure rehearsal copy.
+
 For work on 22 October, start with the [security/optimization test checklist](work-computer-security-test-checklist.md),
 then the [model-switch test checklist](work-computer-model-test-checklist.md).
-The online rehearsal tests resume from the recorded checkpoint; Next.js 13
-remains a supervisor-dependent, unapplied draft.
+The online rehearsal tests resume from the recorded checkpoint. Next.js 13
+remains an unapplied historical draft; the user chose Next.js 16.
 
-Continuing at home: start with the [2026-10-16 handoff checkpoint](work-computer-handoff.md#resume-here-at-home---2026-10-16)
-and [current backlog](open-work-backlog.md#resume-from-home---rehearsal-checkpoint-2026-10-16).
-Azure rehearsal migrations/conversions, login and a real read-only search are
-confirmed. Branch conditions display in English. Write execution and production
-cutover are not confirmed; selective merging remains unavailable. The handoff
-contains exact database targets, private-credential setup and the next tests.
+The [current backlog](open-work-backlog.md) tracks remaining source work.
+Rehearsal login, model switching, English edit/cancel, input routing and real PR
+creation are confirmed. Test PR 39 is closed/unmerged and read-only is restored.
+Production cutover remains deferred; selective merging remains unavailable.
 
 Patch 019 adds configurable PR-creation branch routing and conservative merge
 handling. Selective branch merges remain unavailable with the pinned connector.

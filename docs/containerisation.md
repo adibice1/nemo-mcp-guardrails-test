@@ -1,5 +1,10 @@
 # Container Images And Azure Container Instances
 
+Latest local verification is in the [21 October acceptance record](work-acceptance-2026-10-21.md):
+fresh Linux AMD64 images and isolated real proxy/backend/PostgreSQL checks passed.
+The package audit now flags three Python pins for review; these images are local
+test artifacts and have not been published or approved for production.
+
 ## Verified Security Baseline - 2026-10-16
 
 Frontend stages now use digest-pinned Node 24.21.0 Alpine with Next 16.4.2/React
