@@ -1,10 +1,108 @@
 # Home continuation - 21 October 2026
 
+## Home verification complete - 22 October 2026
+
+All four current home verification groups are completed under the user's
+explicit autonomous authority. The final Linux backend image passed 35 offline
+checks; 16 PostgreSQL diagnostics, migration/idempotency/constraint checks and
+real model registration/RBAC/native-MCP image-pair reads passed. The explanation
+assertion failure is fixed. The final frontend image builds on pinned Node 24
+and serves the loopback proxy on non-root port 80. Model guides now describe the
+shared API Type-first form, Provider API key main registration and admin-only
+Advanced credentials. See [the final results](home-verification-results-2026-10-22.md).
+
+The original home PostgreSQL container remains healthy on 5433; the home app
+selections, private .env/key, host venv and running servers were preserved.
+Restart only the Windows backend in its same verified terminal to load saved
+source (reload=False). Test containers/networks were removed; images stay local.
+Older pending profile/schema/key/browser descriptions below are historical;
+work-network findings and production/gateway acceptance remain separate.
+
+
+## API-type-first UI applied - 22 October 2026
+
+The user approved the exact one-file form correction with "ok". The applied
+modal matches its reviewed hash. API Type is the first field for both roles;
+default endpoint/API-key fields match. Admin backend-credential selection is
+inside collapsed Advanced credentials, with developer main-only access retained.
+Applied TypeScript and full ESLint passed. Earlier synthetic rendering verified
+matching default forms and hidden/collapsed role-specific controls. No backend,
+database, private environment or model selection operation ran for this change.
+The user previously reported saving the developer Ollama profile; its live
+guarded runtime test remains the next acceptance step. The preview-only section
+below is historical.
+
+
+## Unified model-profile UI applied - 22 October 2026
+
+User approval "ok" applied the reviewed three-file UI correction. Models uses
+one Add model profile button, aligned to the far right of Save model selections.
+Developers enter their own endpoint/key and receive main-only access; admins
+have the backend-credential path in the same form for main/classifier profiles.
+TypeScript, full ESLint and both targeted registration/grant checks passed on
+applied source. User refresh/layout and live developer registration acceptance
+remain pending. Existing home schema/key setup was user-completed; no new
+database or private environment operation ran for this UI change.
+
+
+## Model-profile UI follow-up - 22 October 2026
+
+The user confirmed the encryption key was saved privately and the model button
+was visible after the restart/refresh. Do not regenerate or request that key.
+They requested replacing the two add buttons/forms with one right-aligned
+Add model profile action. A three-file frontend preview is prepared and checked,
+but awaits exact-diff approval. Developers get main-only endpoint/key
+registration; admins retain backend-credential classifier provisioning in the
+same form. New model creation/live provider acceptance remains pending. See
+[the current review](developer-main-model-registration-review.md).
+
+
+## Home schema applied by user - 22 October 2026
+
+The user ran scripts/migrate_app_main_models.py --apply with expected database
+nemo_restore_check_ollama_20261020_153213 and supplied the successful verified-
+rehearsal completion message. Record the home PostgreSQL schema application as
+user-confirmed. This does not establish a second-run idempotency test or a
+production migration. The next step is private encryption-key provisioning;
+the backend is to remain stopped until setup is complete. Older no-migration
+statements below describe the preceding source-only application checkpoint.
+
+
+## Approved source application - 22 October 2026
+
+The user approved the developer main-model registration patch with "ok". All 17
+source/config/test files are applied and match the reviewed hashes. Existing
+backend/frontend processes were not restarted. The schema helper ran only in
+no-connection preview mode; the home database and private .env are unchanged.
+Before restarting the backend, continue with reviewed home schema/key setup;
+see [the applied feature record](developer-main-model-registration-review.md).
+The older preview-only checkpoints below are historical.
+
 This is the current home entry point. It supersedes older home instructions
 that require connecting to Azure. The home laptop cannot reach the online
 database; continue with its local database or isolated offline tests.
 The [single backlog](open-work-backlog.md) owns implementation scope, and the
 [acceptance record](work-acceptance-2026-10-21.md) contains detailed evidence.
+
+## Home verification update - 22 October 2026
+
+Home proxy health, authenticated safe runtime read with actual list_branches
+events, lazy/reused policy options, selected-policy GET and Audit filtering are
+now recorded in the home startup checkpoint below. User supplied three Azure-
+selected timing samples (10.13 s, 6.71 s, 5.90 s). Timing detail, warm stage
+confirmation and timing attribution remain narrow evidence gaps; Qwen restoration
+and final pagination acceptance were subsequently user-confirmed. The original checklist below predates these home results. Implementation
+findings, Azure-specific verification and release work remain open.
+
+## Developer model registration preview - 22 October 2026
+
+The user chose entering an endpoint and API key for app-specific main models.
+An isolated 17-file source preview is ready, with encrypted app-owned keys,
+main-only registration, app/purpose isolation and a rehearsal-only schema helper.
+All 34 preview offline checks, TypeScript, full ESLint and patch applicability
+passed. Active source, private .env and databases are unchanged. See the
+[review and verification limits](developer-main-model-registration-review.md).
+Exact code approval is still required before applying the preview.
 
 ## What remains
 
@@ -190,6 +288,83 @@ The browser/timing/log bundle may take 10-20 minutes or longer, depending on mod
 latency. See [Manual Test 6](work-acceptance-2026-10-21.md#manual-test-6---browser-requests-timing-and-logs).
 If leaving soon, capture inventory first and defer this bundle. Mark Azure
 measurements pending rather than substituting home-local timings for them.
+
+## Home startup checkpoint - 21 October 2026
+
+- User confirmed the home PostgreSQL container is healthy on host port 5433 and
+  the restored `nemo_restore_check_ollama_20261020_153213` database exists.
+  Backend startup was reported complete; application database identity has not
+  been independently queried through that backend.
+- Home Node is 22.15.0 and npm is 11.3.0. Existing frontend node_modules held
+  Next.js 13.5.11 while package.json/lockfile specify 16.4.2. User completed
+  `npm.cmd --prefix frontend ci`; local package inspection confirms Next 16.4.2.
+  The earlier Next 13 startup reported changing tsconfig.json JSX to preserve;
+  review generated/configuration differences before treating source as unchanged.
+- User full npm audit now reports seven high-severity package entries rooted
+  in braces advisory GHSA-vfj7-8cjw-p6xm. Locked affected packages are marked
+  development-only through Tailwind and Next ESLint tooling. The advisory lists
+  no patched braces version at review. No forced upgrade was performed.
+- User `npm.cmd --prefix frontend audit --omit=dev` reports zero vulnerabilities.
+  This is a production-dependency scanner result, not closure of the full
+  development audit or proof about the contents of a newly built image.
+  The earlier work zero-advisory report is historical evidence; retain this
+  home finding as open alongside the Python advisory backlog.
+- User restarted the frontend successfully with Next 16.4.2 and the process
+  settings `NEXT_PUBLIC_API_BASE_URL=/api/gms` and
+  `GMS_API_BASE_URL=http://127.0.0.1:8000`. Next reported JSX configuration
+  changed to react-jsx. The user opened `/api/gms/health` and received
+  `{"status":"ok"}`.
+- With Qwen2.5 1.5B main and Azure environment-default classification displayed,
+  the user reported the safe branch read passed all stages and returned
+  development, feat/add-user-management, main, production and staging. Record
+  the home authenticated read under the configured proxy as user-confirmed.
+  Subsequent Traffic evidence below supplies the per-call execution events;
+  model identity is still inferred only from the displayed selection, not logged
+  independently per call.
+- User checked Policies Network with the policy-options filter: zero requests
+  on reload, one after first Create, still one after Cancel/reopen. This confirms
+  lazy option loading/reuse for this home browser session.
+- User opened Edit and captured GET `/api/gms/policies/5` with status 200 and
+  Server-Timing `gms;dur=42.8`. Saved-field rendering was not separately confirmed;
+  that management-request timing is not a runtime/model benchmark.
+- After an authentication header was accidentally shared, user confirmed the
+  instructed home-account password change and sign-in steps were complete.
+  No credential or token is retained in these notes.
+- User supplied Traffic details for app 33, conversation
+  `home-proxy-read-20261021-01`, request
+  `eeb8c322dafe4a959a312c2e2f9e3eae`: HTTP 200, passed, total 28447.5 ms.
+  Input rail passed (1535.0 ms); list_branches tool guard passed (0.2 ms),
+  tool started/returned (1421.7 ms); agent/tools returned (21338.7 ms); output
+  phrase check returned and output rail passed (1289.1 ms). Tool duration is
+  included in agent/tools duration, not an additional independent phase.
+  This establishes actual tool execution, not merely a plausible response.
+  User reported the Traffic check passed; exact pagination state was not supplied.
+  One request does not establish cold/warm performance or a model benchmark.
+- On 22 October (Singapore), user supplied Audit rows with actor/action/route,
+  entity, UTC timestamps and succeeded outcomes. A subsequent filtered view
+  showed two llm_config.created entries with entity llm config and succeeded
+  outcome; the user reported it passed. Record Audit loading and the supplied
+  entity/outcome filtering as user-confirmed. No new management operation was
+  requested or executed for this log check.
+- On 22 October (Singapore), user confirmed saving Azure environment-default
+  main with Azure classification retained and restarting the read-only backend.
+  For the same safe branch-list prompt with new conversation IDs, user reported
+  10.13 s for the first request after restart (all stages passed), followed by
+  6.71 s and 5.90 s for warm requests; warm mean 6.305 s. The two warm stage
+  results were not separately restated. Timing source was not identified in
+  the replies; no Server-Timing breakdown was supplied. These are three home
+  samples under the reported fixed selections, not independently traced model
+  identity, Azure rehearsal measurements or proof of general performance gains.
+  User subsequently confirmed saving Qwen2.5 1.5B main again; Azure classifier
+  remained the requested unchanged selection.
+- User subsequently confirmed the final Traffic/Audit pagination check was all
+  fine. Record user-confirmed pagination acceptance, without inventing which
+  arrows were enabled or how many pages existed. Home browser functional checks
+  are complete; detailed timing attribution and explicit warm stage results were
+  not separately supplied. Do not repeat completed cases to fill those details.
+- After the dependency refresh, agent ran current home frontend TypeScript
+  (no emit/no incremental writes) and full ESLint; both passed on 22 October.
+  Azure-specific timing/log evidence remains work-network-only.
 
 ## Resume on the home laptop
 

@@ -1,5 +1,12 @@
 # Change Models: Claude And Ollama On Windows
 
+
+Current form/API instructions were reconciled with the applied source on
+22 October 2026. All 11 JSON examples across the model guides validate against
+the current schemas; app-owned Azure registration and a real guarded native-MCP
+read pass in the final clean image. This does not certify every provider recipe.
+See [the final home results](home-verification-results-2026-10-22.md).
+
 Local-classifier follow-up: qwen2.5:1.5b and qwen2.5:7b were tested on
 2026-10-21 with the real NeMo checks. Neither met acceptance; Azure guardrail
 classification remains selected. See [the measured results](local-classifier-test-results.md).
@@ -22,10 +29,10 @@ computer. Start by changing only the MAIN AGENT. Keep the existing working,
 explicitly granted guardrail model selected. This separates agent compatibility
 from classification behavior. Both purposes still need valid grants at runtime.
 
-| Candidate | GMS API type | API base URL | Model value | Credential variable name in the form |
+| Candidate | GMS API type | API base URL | Model value | Provider API key in the default form |
 | --- | --- | --- | --- | --- |
-| Claude direct compatibility API | Compatible API / Model Gateway | https://api.anthropic.com/v1 | Exact model ID available in your Claude Console | ANTHROPIC_API_KEY |
-| Your installed Ollama model | Compatible API / Model Gateway | http://127.0.0.1:11434/v1 | qwen3:4b | OLLAMA_LOCAL_KEY |
+| Claude direct compatibility API | Compatible API / Model Gateway | https://api.anthropic.com/v1 | Exact model ID available in your Claude Console | Actual Claude key, entered privately |
+| Your installed Ollama model | Compatible API / Model Gateway | http://127.0.0.1:11434/v1 | qwen3:4b | ollama-local-placeholder (local no-auth only) |
 
 The provider probes below do not need PostgreSQL. Saving a model profile,
 management login, grants and a full GMS Runtime Test DO need a reachable,
@@ -68,7 +75,12 @@ For Claude, provision ANTHROPIC_API_KEY privately on the backend. The steps belo
 can set it only for the current PowerShell session so it is not typed into shell
 history. For persistent setup, store it privately in the ignored root .env or the
 backend deployment's secret environment. Do not put it in frontend/.env.local,
-a committed example, the model form or a chat message.
+a committed example or a chat message. The default app-owned form is the approved
+place to enter that provider key for encrypted backend storage. Environment
+variables in this probe section are for direct probes or the admin Advanced
+credentials path; app-owned registration does not require a credential-variable
+approval. Both paths still require endpoint approval and the backend encryption
+key/schema must be ready for app-owned registration.
 
 Process environment values take precedence over .env values. Restart an existing
 backend after changing approvals/credentials; a running process does not reload
@@ -219,48 +231,54 @@ any session-only Claude key, start the API from the repository root:
 2. In a separate terminal, start the frontend from the repository root:
 
 ~~~powershell
-$env:NEXT_PUBLIC_API_BASE_URL = 'http://127.0.0.1:8000'
+$env:NEXT_PUBLIC_API_BASE_URL = '/api/gms'
+$env:GMS_API_BASE_URL = 'http://127.0.0.1:8000'
 npm.cmd --prefix frontend run dev
 ~~~
 
-The local direct-API address above is appropriate for this walkthrough. It is
-not the production ACI address/proxy contract. Open http://127.0.0.1:3000/login
+The local frontend uses its same-origin /api/gms proxy to the backend on 8000.
+The production frontend listens on port 80; the backend remains private on 8000. Open http://127.0.0.1:3000/login
 and sign in as a system administrator. Finish any required password setup first.
 If startup fails because PostgreSQL is unreachable, the provider probe can still
 be completed independently, but management/runtime switching must wait.
 
 ## 4. Create A Profile In GMS
 
-1. Open Apps, select the existing test app, then open Models.
-2. Record its current Main agent and Guardrail classifier selections for rollback.
-3. Click Add model profile. Fill in ONE of these profiles:
+1. Sign in as a linked developer or administrator. Open Apps -> your app ->
+   Models and record the current selections for rollback.
+2. Click the single Add model profile button at the right of Save model selections.
+   API Type is the first field for both roles. The default fields are:
 
 | Field | Claude example | Ollama example |
 | --- | --- | --- |
 | API Type | Compatible API / Model Gateway | Compatible API / Model Gateway |
-| Configuration Name | Claude main test v1 | Ollama Qwen3 4B main test v1 |
-| Model / Gateway Alias | Your exact tested Claude model ID | qwen3:4b |
+| Profile Name | Claude main test v1 | Ollama Qwen main test v1 |
+| Model / Gateway Alias | Your exact tested Claude model ID | Your installed tested model, e.g. qwen2.5:1.5b |
 | API Base URL | https://api.anthropic.com/v1 | http://127.0.0.1:11434/v1 |
-| Credential Environment Variable | ANTHROPIC_API_KEY | OLLAMA_LOCAL_KEY |
+| Provider API key | Actual Claude key, entered privately | ollama-local-placeholder, only for deliberate local no-auth |
 
-Enter only the credential variable NAME in the UI, not the actual secret and
-not the env: prefix. The form constructs that reference. Choose API type
-Compatible API / Model Gateway even when talking directly to Claude or Ollama.
-If the profile already exists, use it; configuration names must be unique.
-There is no configuration edit/delete API, so changed model/endpoint bundles
-should use a new versioned profile.
+3. Click Add model profile. This app-owned path encrypts the key and immediately
+   creates main-only access for the app. Select the new Main agent and click
+   Save model selections. Keep the working Guardrail classifier unchanged.
+   Creating a profile does not test its connection or automatically select it.
 
-4. Click Add Configuration. This saves metadata; it does NOT prove connectivity
-or grant access. In Approve model access for this app, select the new profile,
-choose Main agent, and click Approve access.
-5. Select that profile in the top Main agent dropdown. Keep the existing valid
-Guardrail classifier selected, then click Save model selections.
+Administrators using an existing backend key instead expand Advanced credentials
+and check Use a backend-managed credential in the same form. In that mode,
+Credential Environment Variable replaces Provider API key: enter ANTHROPIC_API_KEY
+or OLLAMA_LOCAL_KEY as a NAME only, without a value or env: prefix. Those variables
+must be privately provisioned/approved on the backend first. Click Add model
+profile, explicitly Approve access for the intended app/purpose, then select/save.
+Only this admin-managed mode can provision a classifier; owned models are main-only
+even for administrators. Developers do not see Advanced credentials or grants.
 
-If Current selection unavailable appears for the guardrail model, an admin must
-review its existing profile/default approval and restore/select a valid guardrail
-choice before running. Do not grant every profile or turn off rails to bypass it.
-Selecting an approved stored profile does not need an API restart; changing
-backend environment settings/secrets does.
+Profile names are unique. There is no profile edit/delete API: use a new versioned
+profile for a changed endpoint/model/key bundle and verify it before switching.
+An unavailable classifier needs an admin to restore a valid existing grant/choice;
+do not turn off rails or grant every profile. Selection changes do not need a
+restart; backend environment/approval changes do.
+
+For exact payloads and both registration routes, see
+[Common Steps C](supported-llm-setup-guide.md#common-steps-c-register-approve-and-select-the-profile).
 
 ## 5. Verify The Real GMS Flow
 

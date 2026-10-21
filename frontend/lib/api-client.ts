@@ -204,6 +204,7 @@ export type AppApiKeyResponse = {
 };
 
 export type LlmConfig = {
+  owner_app_id?: number | null;
   id: number;
   name: string;
   provider: string;
@@ -225,6 +226,14 @@ export type LlmConfigCreatePayload = {
   endpoint: string | null;
   credential_reference: string | null;
   enabled: boolean;
+};
+
+export type AppMainModelCreatePayload = {
+  name: string;
+  provider: "azure_openai" | "openai_compatible";
+  model_name: string;
+  endpoint: string;
+  api_key: string;
 };
 
 export type AppConnector = {
@@ -662,6 +671,12 @@ export function createLlmConfig(payload: LlmConfigCreatePayload) {
   return apiRequest<LlmConfig>("/llm-configs", {
     method: "POST",
     body: JSON.stringify(payload)
+  });
+}
+
+export function createAppMainModel(appId: number, payload: AppMainModelCreatePayload) {
+  return apiRequest<LlmConfig>(`/apps/${appId}/main-models`, {
+    method: "POST", body: JSON.stringify(payload)
   });
 }
 

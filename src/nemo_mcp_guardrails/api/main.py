@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from nemo_mcp_guardrails.api.allowed_test_cases import router as allowed_test_cases_router
 from nemo_mcp_guardrails.api.audit_logs import router as audit_logs_router
 from nemo_mcp_guardrails.api.app_llm_grants import router as app_llm_grants_router
+from nemo_mcp_guardrails.api.app_main_models import router as app_main_models_router
 from nemo_mcp_guardrails.api.apps import router as apps_router
 from nemo_mcp_guardrails.api.global_policy_assignments import (
     router as global_policy_assignments_router,
@@ -74,6 +75,7 @@ app.include_router(allowed_test_cases_router)
 app.include_router(audit_logs_router)
 app.include_router(apps_router)
 app.include_router(app_llm_grants_router)
+app.include_router(app_main_models_router)
 app.include_router(global_policy_assignments_router)
 app.include_router(llm_configs_router)
 app.include_router(management_auth_router)

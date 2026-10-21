@@ -1,5 +1,33 @@
 # Frontend API Map
 
+## Current model-profile form - 22 October 2026
+
+Models has one Add model profile action at the right of Save model selections.
+Both roles start with API Type and an app-owned Provider API key form calling
+POST /apps/{app_id}/main-models (also by-client-id), with automatic main-only
+access and separate selection save. Admin Advanced credentials enables the
+backend-managed /llm-configs route with a variable NAME, then explicit main/
+classifier approval. Approve access is aligned to the section's right edge.
+Developers cannot use advanced credentials or select classifiers. See
+[the exact field/payload guide](llm-provider-guide.md).
+
+
+## App-owned main models - 22 October 2026
+
+App Models now exposes one right-aligned Add model profile action to linked developers/admins. The form sends
+name, provider, model_name, endpoint and api_key to POST /apps/{app_id}/main-models;
+POST /apps/by-client-id/{client_id}/main-models is equivalent. The response uses
+safe LlmConfigRead metadata including owner_app_id, with no plaintext key,
+ciphertext or credential_reference. Creation adds the app's main-only grant;
+selection still uses the existing app update. The same form offers backend
+credential provisioning only to admins through the existing /llm-configs route.
+API Type appears first for both roles; the default endpoint/API-key form is
+identical. Admins expand Advanced credentials to use a backend-managed key.
+Classifier controls remain
+admin-only, and owned profiles are excluded from classifier/cross-app choices.
+See [schema/key setup and acceptance](developer-main-model-registration-review.md).
+
+
 Patch 019 keeps the existing policy/assignment endpoints and conditions JSON.
 PR create/merge options advertise source_branch and target_branch fields; the
 shared builder supports equality/inequality with AND. Merge summaries and AI

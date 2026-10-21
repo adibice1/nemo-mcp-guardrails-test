@@ -1,6 +1,13 @@
 # LLM Provider Guide
 
-Updated for the provider-neutral integration on 2026-10-20 against API schemas, model/grant
+
+Current form/API instructions were reconciled with the applied source on
+22 October 2026. All 11 JSON examples across the model guides validate against
+the current schemas; app-owned Azure registration and a real guarded native-MCP
+read pass in the final clean image. This does not certify every provider recipe.
+See [the final home results](home-verification-results-2026-10-22.md).
+
+Updated for app-owned main-model registration and the unified form on 2026-10-22 against API schemas, model/grant
 validation, runtime factory, policy assistant and frontend routes. This guide
 separates supported configuration changes from provider development. It does
 not certify that an arbitrary deployment works without a live acceptance test.
@@ -11,6 +18,68 @@ For commands and exact UI entries, follow the
 For every provider/engine named in NVIDIA's supported-model page, use the
 [complete supported-provider setup guide](supported-llm-setup-guide.md).
 
+## Current registration form and API contracts - 22 October 2026
+
+Both roles use Models -> Add model profile, with API Type first. The action is
+at the right of Save model selections. API Type selects Azure OpenAI versus a
+Compatible API / Model Gateway; credential storage is a separate choice.
+
+| Path | Who can use it | Credential field | API | Access after creation |
+| --- | --- | --- | --- | --- |
+| Default app-owned main profile | Linked app developer or admin | Provider API key (actual value, masked) | POST /apps/{app_id}/main-models or its by-client-id alias | Automatic main-only grant for this app; select/save separately |
+| Advanced backend-managed profile | System admin | Credential Environment Variable (NAME only) | POST /llm-configs | No automatic grant; explicitly approve main or classifier access |
+
+For the admin path, expand Advanced credentials and check Use a backend-managed
+credential. The default app-owned path is the same for admins and developers;
+owned profiles cannot become classifiers, including when an admin creates them.
+Developers cannot see advanced credentials, edit classifier selection or manage
+grants. The form submit button is Add model profile in both modes.
+
+Default app-owned creation uses a management JWT and this strict payload:
+
+~~~json
+{
+  "name": "App main model v1",
+  "provider": "openai_compatible",
+  "model_name": "your-tested-model-or-alias",
+  "endpoint": "https://provider.example/v1",
+  "api_key": "replace_privately_with_provider_key"
+}
+~~~
+
+Allowed provider values for this route are azure_openai and openai_compatible.
+Azure model_name is the deployment name and endpoint is the resource origin;
+compatible endpoint is the exact approved API base URL including its path. Do
+not include credential_reference, enabled or owner_app_id in this request. The
+response omits the key and ciphertext. Its main-purpose grant is atomic with
+creation; use the returned ID in PUT /apps/{app_id} with main_llm_config_id to
+activate it. Registration does not select the model automatically.
+
+Backend destination approvals still apply. App-owned storage also needs the
+additive database schema and a private GMS_MODEL_CREDENTIAL_ENCRYPTION_KEY.
+Keep the encryption key; do not regenerate it on restart or model switches.
+Back it up separately from the database. Raw provider keys belong only in the
+masked form/app-owned request, never in Git, URLs or frontend dotenv settings.
+A deliberately unauthenticated local server can use a non-secret placeholder.
+The app-owned request does not need an environment credential reference/name.
+
+The admin-managed route below still uses credential_reference=env:VARIABLE_NAME,
+with an approved backend variable and explicit app/purpose grants. This is the
+path for classifiers. Vault references/native secret-manager adapters are not
+implemented. Both paths preserve the current runtime Azure defaults/API-version
+requirements whenever an Azure role is selected. Policy authoring remains a
+separate backend profile.
+
+For a runtime request, X-App-ID is the app client ID and X-API-Key is the GMS app
+API key, not the provider key or management JWT. Keep existing app keys when
+switching models. Use a fresh conversation ID per independent test: reusing one
+loads stored messages even if the request sends an empty conversation_history.
+Green policy rail badges do not certify factual correctness or tool execution;
+inspect actual tool events and compare the returned result with the answer.
+
+For the complete field-by-field workflow, see
+[Common Steps C](supported-llm-setup-guide.md#common-steps-c-register-approve-and-select-the-profile).
+
 ## What Can Be Switched Today
 
 | Intended change | Current support | Required action |
@@ -18,13 +87,14 @@ For every provider/engine named in NVIDIA's supported-model page, use the
 | Another Azure OpenAI deployment for the main agent | Implemented | Provision approved endpoint/key metadata, grant the app main access, then update its main selection |
 | Another Azure OpenAI deployment for NeMo input/output rails | Implemented | Independently provision/grant guardrail access and have a system admin update the guardrail selection |
 | Environment-default Azure deployment | Implemented | Explicit default grant for each selected purpose; backend environment changes require restart |
-| Local/hosted models exposing standard Chat Completions | Compatible adapter implemented | Approve a base URL and explicit credential reference, grant the profile and test role capabilities |
+| Local/hosted models exposing standard Chat Completions | Compatible adapter implemented | Approve a base URL; register an app-owned main key or provision an admin-managed reference, then test role capabilities |
 | Native vendor APIs (for example Claude, Gemini, Bedrock) | Via a separately deployed compatible gateway | Configure a supported upstream adapter/model at the gateway; GMS selects an approved compatible profile |
 | Policy-authoring AI in Create Policy | Azure defaults or an independent compatible profile | Backend GMS_POLICY_AI_* settings; independently of app model selections |
 
 The provider field selects the API protocol. azure/azure_openai use the existing
 AzureChatOpenAI adapter. openai_compatible uses ChatOpenAI with an approved base
-URL and explicit credential reference, directly or through a model gateway.
+URL and an app-owned encrypted key or an admin-managed credential reference,
+directly or through a model gateway.
 A native vendor URL alone does not translate its protocol. Model-specific tool,
 classification and JSON behavior must be tested; support is not universal across
 every model or feature. See [gateway setup](model-gateway-integration.md).
@@ -53,9 +123,10 @@ not app API keys or app/purpose model grants.
    app_llm_grants. Check the [current handoff](work-computer-handoff.md) before
    any migration; rehearsal and production rollout states are different.
 2. Have a normal management JWT for API calls. A setup-only password JWT cannot
-   perform these management operations. Configuration/grant provisioning needs
-   a system administrator. Linked developers may select only their app's main
-   model; they cannot approve grants or change the guardrail selection.
+   perform these management operations. The global catalogue and grant administration need
+   a system administrator. Linked developers can register their own main profiles
+   (automatic main-only grant) and select their app's main model; they cannot
+   manage grants or change classifier selection.
 3. Identify the existing app's numeric id and client_id through GET /apps.
    Preserve its current model IDs/grants for rollback. For a new app, an admin
    first creates it without named model selections; this creates no model grants.
@@ -69,10 +140,9 @@ not app API keys or app/purpose model grants.
    A deployment incompatible with these parameters needs a code adaptation;
    passing provider validation does not prove model compatibility.
 
-The app detail page now mounts a Models tab. Administrators create profiles,
-approve/revoke app/purpose access and select main/guardrail models. Linked
-developers may select approved main models only. Profile creation grants no
-access. The API instructions below remain useful for automation and handover.
+The Models tab supports both registration paths described above. For the
+admin-managed examples below, catalogue creation grants no access. App-owned
+creation instead grants main access immediately for the owning app.
 
 ## Backend Environment And Approval Rules
 
@@ -86,7 +156,7 @@ Azure path still requires all four settings (including named Azure configuration
 
 When both runtime roles use compatible profiles, none of those Azure settings
 is required. Each compatible profile instead requires its own approved base URL
-and explicit credential reference.
+and an app-owned key or an explicit admin-managed credential reference.
 
 A named Azure model can override endpoint, deployment and credential reference, but
 there is no per-configuration API-version field. AZURE_OPENAI_API_VERSION is
@@ -118,10 +188,11 @@ redirects. Compatible base URLs use the separate exact
 GMS_ALLOWED_COMPATIBLE_LLM_ENDPOINTS list, including the protocol path; see the
 gateway setup for local HTTP restrictions.
 
-Credentials must be references such as env:APP_A_AZURE_KEY. The exact variable
+For admin-managed /llm-configs profiles, credentials must be references such as
+env:APP_A_AZURE_KEY. The exact variable
 name must be approved in GMS_ALLOWED_LLM_CREDENTIAL_ENV_VARS;
-AZURE_OPENAI_API_KEY is automatically approved. Raw LLM keys and vault: references
-are not supported configuration values. Provisioning validates references
+AZURE_OPENAI_API_KEY is automatically approved. Raw LLM keys are not supported on /llm-configs; use the app-owned registration
+route above for encrypted direct-key storage. vault: references remain unsupported. Provisioning validates references
 without resolving their secret values. Malformed approval lists fail closed.
 
 | Named Azure configuration value | Runtime behavior |
@@ -135,7 +206,7 @@ Granting a named configuration explicitly approves its bundled fallbacks too.
 It does not grant the separate null/default selection. Backend default changes
 therefore need operator review of affected configurations and grants.
 
-## Switch An Existing App To Another Azure Deployment
+## Admin-Managed Azure Deployment: Create, Grant And Select
 
 Use a system-admin management JWT for this provisioning example. All management
 requests below use Authorization: Bearer <management-token>. Select the correct
@@ -176,8 +247,9 @@ config_ref with CONFIG_ID. The body must explicitly be:
 
 To use this configuration for guardrails as well, separately call
 PUT /apps/{app_id}/llm-grants/guardrail/{config_ref} with the same body.
-One main grant never authorizes guardrail use, or vice versa. Creating a
-configuration or selecting a model does not create grants automatically.
+One main grant never authorizes guardrail use, or vice versa. Creating an
+admin-managed configuration or selecting a model does not create grants automatically.
+This differs from app-owned creation, which creates its own main grant.
 
 Inspect grants with GET /apps/{app_id}/llm-grants. Read usable choices with
 GET /apps/{app_id}/llm-options?purpose=main or purpose=guardrail. These options
@@ -270,7 +342,8 @@ addresses, the independent policy-authoring role and gateway access controls.
 The GMS adapter uses the already-pinned langchain-openai dependency; installing
 every native provider package in GMS is unnecessary for this gateway approach.
 
-A compatible profile uses the existing management API:
+For a developer main profile, use the app-owned payload above with
+provider=openai_compatible. The admin-managed global profile uses POST /llm-configs:
 
 ~~~json
 {

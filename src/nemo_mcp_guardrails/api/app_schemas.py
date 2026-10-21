@@ -3,7 +3,7 @@ from uuid import uuid4
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 
 
 class AppCreate(BaseModel):
@@ -98,6 +98,7 @@ class LlmConfigRead(BaseModel):
     model_name: str
     endpoint: str | None
     enabled: bool
+    owner_app_id: int | None = None
 
 
 class AppLlmGrantWrite(BaseModel):
@@ -152,6 +153,36 @@ class LlmConfigCreate(BaseModel):
     endpoint: str | None = Field(default=None, max_length=500)
     credential_reference: str | None = Field(default=None, max_length=500)
     enabled: bool = True
+
+
+class AppMainModelCreate(BaseModel):
+    """Accept an app-owned main model without backend environment references."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    name: str = Field(min_length=1, max_length=200)
+    provider: Literal["azure_openai", "openai_compatible"]
+    model_name: str = Field(min_length=1, max_length=200)
+    endpoint: str = Field(min_length=1, max_length=500)
+    api_key: SecretStr = Field(min_length=1, max_length=8192)
+
+    @field_validator("name", "model_name", "endpoint")
+    @classmethod
+    def clean_metadata(cls, value: str) -> str:
+        """Reject empty or control-bearing profile metadata."""
+        value = value.strip()
+        if not value or any(ord(char) < 32 or ord(char) == 127 for char in value):
+            raise ValueError("Profile fields must contain printable text.")
+        return value
+
+    @field_validator("api_key")
+    @classmethod
+    def clean_key(cls, value: SecretStr) -> SecretStr:
+        """Reject blank keys and header control characters without echoing them."""
+        raw = value.get_secret_value()
+        if not raw.strip() or any(ord(char) < 32 or ord(char) == 127 for char in raw):
+            raise ValueError("A valid provider API key is required.")
+        return value
 
 
 class AppConnectorCreate(BaseModel):

@@ -1,5 +1,18 @@
 # Work/Home Computer Handoff
 
+## Latest completed home checks - 22 October 2026
+
+Read [the final home results](home-verification-results-2026-10-22.md) before
+historical pending-test instructions. All four home groups are complete: 35
+offline checks in the final pinned image, 16 PostgreSQL diagnostics, schema
+idempotency/constraints and actual native-MCP image-pair reads passed. The title
+block explanation is corrected and the runtime image no longer includes unused
+pip. Four model setup guides and their API examples match the current form.
+Work-network Azure evidence, policy 210/grant review and conditional gateway/
+production work remain deferred. Transfer reviewed source/docs through the
+normal private workflow; no commit/push or deployment ran in this continuation.
+
+
 ## Current Home Entry Point - 2026-10-21
 
 Start with [the current home handover](home-handoff-2026-10-21.md). Home cannot

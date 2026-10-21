@@ -16,3 +16,6 @@ langchain-openai==1.2.1
 langchain-mcp-adapters==0.2.2
 nemoguardrails==0.21.0
 openai==2.36.0
+
+# Direct dependency for encrypted app-owned model API keys.
+cryptography==50.0.0

@@ -1,5 +1,20 @@
 # Guardrails Management System Target Architecture
 
+## App-owned main-model credentials - 2026-10-22
+
+Approved/applied source adds nullable llm_configs.owner_app_id and
+encrypted_api_key with a check separating app-owned and legacy credential modes.
+An owned profile is usable only for its owning app's main purpose, regardless of
+an accidental cross-app/classifier grant. Registration creates its main grant
+atomically; classifiers remain admin-controlled and per app. Backend destination
+approvals and tool/policy boundaries remain mandatory. Existing global profiles
+retain environment references. Home schema application and private encryption-key setup are user-confirmed.
+The helper's upgrade/idempotency/constraints and the real app-owned model path now
+pass on disposable PostgreSQL and the clean Linux image. New target databases
+still need reviewed schema/key provisioning before the changed API starts. Production secrets-manager selection/rollout remains deferred.
+See [the implementation/verification record](developer-main-model-registration-review.md).
+
+
 ## Confirmed Per-App Classifier Scope - 2026-10-21
 
 After considering a global classifier, the user chose to keep the existing

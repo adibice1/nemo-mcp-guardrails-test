@@ -28,6 +28,8 @@ COPY --from=github_mcp /server/github-mcp-server /usr/local/bin/github-mcp-serve
 COPY --from=python_dependencies /wheels /wheels
 COPY requirements.txt constraints.txt .
 RUN python -m pip install --no-index --find-links=/wheels -r requirements.txt \
+    && python -m pip check \
+    && python -m pip uninstall --yes pip \
     && rm -rf /wheels
 
 COPY config ./config

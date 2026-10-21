@@ -1,5 +1,195 @@
 # Open Work Backlog
 
+## Home verification completed - 22 October 2026
+
+**All four current home verification groups are complete.** The final pinned
+Linux image passes 35 offline checks, with 16 PostgreSQL diagnostics, schema
+idempotency/constraints and a real image-pair guarded GitHub read accepted. The
+legacy block-explanation mismatch is fixed without weakening its assertions.
+Unused vulnerable runtime pip was removed after build-time dependency checking.
+Model guides now match the unified default/Advanced credentials form and both
+API payload contracts; all 11 JSON examples validate against the schemas.
+
+Use [the final results](home-verification-results-2026-10-22.md) as the current
+checkpoint. Temporary containers/networks were removed and the existing home
+app/database/private configuration were preserved. The host venv was not upgraded;
+restart the existing reload=False Windows backend to load the saved code fix.
+Remaining work is Pillow/FastEmbed and development braces findings, the no-tool
+status badge, work-network policy 210/grant/timing follow-up, conditional gateway
+acceptance and deferred production rollout. Older pending home-test descriptions
+below are historical. No commit, push, publication or deployment ran.
+
+
+
+## Reconciled remaining test list - 22 October 2026
+
+Use [the consolidated checklist](remaining-verification-2026-10-22.md): four
+current-home verification groups plus four deferred/work-network/conditional
+release groups. These are groups with multiple checks, not eight single tests
+and not 34 new user-run tasks. It lists completed work and separates unresolved
+fixes/reviews. Older pending descriptions below are superseded where that
+checklist records subsequent acceptance.
+
+
+## Python dependency pins applied - 22 October 2026
+
+After the explanation, the user explicitly approved the exact three-pin diff.
+constraints.txt now pins aiohttp 3.14.5, certifi 2026.10.19 and yarl 1.25.1.
+The applied SHA-256 matches the tested preview and git diff --check passes.
+The 34 offline checks passed across the documented preview runs; no identical
+suite rerun was needed after copying the same candidate bytes. The active home
+venv and running backend retain their existing installed packages. Clean pinned
+backend installation/image verification is next; Pillow remains an open advisory
+finding because published FastEmbed versions require Pillow below 13. See the
+[current dependency review](python-dependency-review-2026-10-22.md). The earlier
+preview-only status below is historical. No database or deployment operation ran.
+
+
+## Compatible Python dependency preview - 22 October 2026
+
+Prepared an exact three-pin constraints preview for aiohttp 3.14.5, certifi
+2026.10.19 and required yarl 1.25.1. All 34 offline checks pass across the initial
+19 successes and 15 successful reruns after fixing preview-only Windows extension
+bootstrapping. Published metadata for all 120 pins has no base dependency conflict
+for Windows/Linux Python 3.12. OSV flags only Pillow in the candidate graph (nine
+advisory IDs); PyPI lists eight. Pillow 13 is incompatible with the current and
+published newer FastEmbed requirements, so its remediation remains open. No pins
+or active environment were changed. Exact-diff approval is the next step. See
+[the dependency review](python-dependency-review-2026-10-22.md) for evidence and
+clean-install/image limitations.
+
+
+## Frontend production build passed - 22 October 2026
+
+The user supplied a successful Next.js 16.4.2 production build after the developer
+model UI changes: compilation, TypeScript, page data, 13 static pages and final
+optimization passed. Registration, model selection and a live expected-name read
+are user-confirmed. Older paragraphs marking those steps pending are historical.
+
+Next review slice: the recorded Python dependency advisories for aiohttp, certifi
+and Pillow. Initial read-only home metadata inspection confirms fastembed 0.8.0
+requires Pillow below 13 for Python 3.12 (also constrained below 13 in its other
+Python markers), so changing only the Pillow constraint to 13.0.0 would conflict.
+Review a compatible remediation before proposing that change. The active virtual
+environment, requirements and constraints remain unchanged. Clean pinned backend
+installation/image verification and the existing explanation diagnostic remain
+open. Production release remains separate.
+
+
+## Developer profile live read acceptance - 22 October 2026
+
+The user reports the newly registered developer main profile now returns the
+expected five repository branch names with Input, Tool guard and Output passed.
+Both the explicit diagnostic prompt and the original prompt succeeded with fresh
+conversation IDs. The initial incorrect empty-branch answer did invoke
+list_branches; its raw result is unavailable. Existing conversation context is
+the leading explanation, not a proven root cause. Use fresh IDs for independent
+manual tests; preserve IDs deliberately for conversation follow-ups. No code or
+database repair was needed. General model reliability, the misleading passed
+badge when no tool is invoked, and other existing backlog items remain separate.
+
+## API-type-first UI applied - 22 October 2026
+
+The user approved the exact one-file form correction with "ok". The applied
+modal matches its reviewed hash. API Type is the first field for both roles;
+default endpoint/API-key fields match. Admin backend-credential selection is
+inside collapsed Advanced credentials, with developer main-only access retained.
+Applied TypeScript and full ESLint passed. Earlier synthetic rendering verified
+matching default forms and hidden/collapsed role-specific controls. No backend,
+database, private environment or model selection operation ran for this change.
+The user previously reported saving the developer Ollama profile; its live
+guarded runtime test remains the next acceptance step. The preview-only section
+below is historical.
+
+
+## API type first for both roles - preview 22 October 2026
+
+The user reported saving the instructed developer Ollama profile. No guarded
+runtime request using that new profile has been reported yet. They then noted
+that the admin credential-source selector appearing before API Type made the
+forms look inconsistent. API protocol and credential source are independent.
+
+A one-file UI preview puts API Type first for both roles and uses identical
+default endpoint/API-key fields. The administrator-only backend credential
+choice moves into collapsed Advanced credentials below those fields. Developer
+main-only permissions and both submission paths are unchanged. This preview is
+not applied. TypeScript, full ESLint and patch applicability pass; rendering
+confirmed that default admin/developer markup matches after removing the admin
+advanced section, which is collapsed and absent for developers. Exact patch and
+review hashes are under .waylog/model-profile-api-type-first-preview-20261022.
+
+
+## Unified model-profile UI applied - 2026-10-22
+
+The user approved the three-file UI consolidation patch with "ok". One
+right-aligned Add model profile action/form is applied; developer main-only
+registration and admin backend-credential classifier provisioning are retained.
+Applied TypeScript, ESLint and two targeted role/API checks passed. Home schema
+and private key setup are user-confirmed. Remaining feature acceptance is the
+refreshed browser layout and actual developer profile creation/use. See
+[the current review](developer-main-model-registration-review.md). Earlier UI
+preview status below is historical; dependency/diagnostic/release findings remain
+open.
+
+
+## Model-profile UI consolidation preview - 2026-10-22
+
+Home schema application and private encryption-key provisioning are user-confirmed;
+the button is visible after the requested restart/refresh. New-profile live
+creation/provider acceptance remains pending. User requested one right-aligned
+Add model profile action, with developers restricted to main-agent registration.
+The three-file frontend preview passes TypeScript, ESLint, two existing role/API
+checks, synthetic developer/admin form rendering and patch applicability. It is
+not applied. See [the current review](developer-main-model-registration-review.md).
+The previously applied 17-file backend/source patch remains in place.
+
+
+## Home schema applied by user - 22 October 2026
+
+The user ran scripts/migrate_app_main_models.py --apply with expected database
+nemo_restore_check_ollama_20261020_153213 and supplied the successful verified-
+rehearsal completion message. Record the home PostgreSQL schema application as
+user-confirmed. This does not establish a second-run idempotency test or a
+production migration. The next step is private encryption-key provisioning;
+the backend is to remain stopped until setup is complete. Older no-migration
+statements below describe the preceding source-only application checkpoint.
+
+
+## Developer main-model source applied - 2026-10-22
+
+The user approved the exact 17-file endpoint/key registration patch with "ok".
+Application source now matches the reviewed candidate bytes. TypeScript, ESLint
+and the no-connection migration preview passed; the applied offline suite passed
+all 34 checks. See [the applied review](developer-main-model-registration-review.md).
+Home schema/key setup and new-form browser/provider acceptance remain open.
+PostgreSQL migration/idempotency and clean pinned-install/image checks remain
+open. No database or private .env change ran. Previous preview-only status below
+is historical. Keep the dependency findings and legacy explanation diagnostic
+open; policy 210/grant review and production/gateway work remain separate.
+
+## Developer main-model registration preview - 2026-10-22
+
+The user chose a form accepting their own endpoint and API key. An isolated
+17-file preview is ready for app-owned encrypted credentials and main-only
+self-registration; all 34 offline checks, TypeScript, ESLint and patch
+applicability passed. See [the review](developer-main-model-registration-review.md).
+The active application source, private environment and databases are unchanged.
+Exact non-doc diffs still require review before application.
+
+## Home verification update - 2026-10-22
+
+The [home handover](home-handoff-2026-10-21.md) now records successful home
+proxy health/authenticated safe read with actual tool execution, policy-options
+lazy loading/reuse, selected-policy GET 200 and Audit entity/outcome filtering.
+User timing samples with Azure selected are 10.13 s after backend restart and
+6.71/5.90 s warm; timing source and Server-Timing details were not supplied.
+Qwen main restoration and the final pagination check were subsequently user-
+confirmed. Warm-stage details and timing attribution were not separately supplied. These local results do not replace work-network Azure evidence.
+The older pending home-manual descriptions below predate this update. Pending
+implementation, dependency findings, policy 210/grant review, gateway acceptance
+and production rollout remain open.
+
+
 ## Home Continuation - 2026-10-21
 
 Subsequent user evidence: online inventory and all three SQL result tables are

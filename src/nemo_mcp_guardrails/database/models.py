@@ -71,6 +71,12 @@ class LlmConfigRecord(Base):
     """Persist one selectable main-agent or guardrail LLM configuration."""
 
     __tablename__ = "llm_configs"
+    __table_args__ = (CheckConstraint(
+        "(owner_app_id IS NULL AND encrypted_api_key IS NULL) OR "
+        "(owner_app_id IS NOT NULL AND encrypted_api_key IS NOT NULL "
+        "AND credential_reference IS NULL AND endpoint IS NOT NULL)",
+        name="ck_llm_configs_owned_credential",
+    ),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(
@@ -78,6 +84,11 @@ class LlmConfigRecord(Base):
         unique=True,
         index=True,
     )
+    owner_app_id: Mapped[int | None] = mapped_column(
+        ForeignKey("apps.id", ondelete="CASCADE", use_alter=True,
+                   name="fk_llm_configs_owner_app"), nullable=True, index=True,
+    )
+    encrypted_api_key: Mapped[str | None] = mapped_column(Text, nullable=True)
     provider: Mapped[str] = mapped_column(String(100))
     model_name: Mapped[str] = mapped_column(String(200))
     endpoint: Mapped[str | None] = mapped_column(String(500), nullable=True)

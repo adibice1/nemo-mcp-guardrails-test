@@ -1,5 +1,20 @@
 # Container Images And Azure Container Instances
 
+## Final home image pair - 22 October 2026
+
+The current source has fresh verified Linux AMD64 images gms-home-be:20261022
+and gms-home-fe:20261022. All 35 offline checks and a real same-network-namespace
+loopback proxy/native-MCP read pass. The frontend runs as nextjs on 80 with only
+NET_BIND_SERVICE on Node; the backend runs as gms on 8000. Its Dockerfile now
+executes pip check after installation, then uninstalls unused runtime pip.
+Dependency installation remains in the builder; runtime python -m pip commands
+are intentionally unavailable. Pillow remains an open advisory finding.
+
+Images are local verification artifacts, not published/released images. Temporary
+test infrastructure was removed; the user's home containers were preserved. See
+[the exact image IDs, checks and remaining rollout requirements](home-verification-results-2026-10-22.md).
+
+
 Latest local verification is in the [21 October acceptance record](work-acceptance-2026-10-21.md):
 fresh Linux AMD64 images and isolated real proxy/backend/PostgreSQL checks passed.
 The package audit now flags three Python pins for review; these images are local

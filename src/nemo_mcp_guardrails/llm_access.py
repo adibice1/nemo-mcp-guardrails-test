@@ -12,6 +12,9 @@ from nemo_mcp_guardrails.llm_security import LlmEndpointError, validate_llm_endp
 from nemo_mcp_guardrails.llm_profiles import AZURE_PROVIDERS, SUPPORTED_PROVIDERS, validate_profile_metadata
 
 
+from nemo_mcp_guardrails.model_credentials import require_owned_profile_scope, validate_owned_profile
+
+
 LlmPurpose = Literal["main", "guardrail"]
 LLM_SELECTION_FIELDS = {"main_llm_config_id": "main", "guardrail_llm_config_id": "guardrail"}
 
@@ -29,6 +32,11 @@ def validate_llm_choice(config: LlmConfigRecord | None) -> None:
     ):
         raise LlmAccessError("LLM selection is unavailable.")
     try:
+        if config is not None and getattr(config, "owner_app_id", None) is not None:
+            validate_owned_profile(config)
+            return
+        if config is not None and getattr(config, "encrypted_api_key", None) is not None:
+            raise LlmCredentialError("App model ownership is unavailable.")
         if config is not None:
             validate_profile_metadata(config.provider, config.endpoint, config.credential_reference)
         if config is None or config.provider.strip().lower() in AZURE_PROVIDERS:
@@ -56,4 +64,8 @@ def require_llm_grant(
     if config_id is not None and config is None:
         raise LlmAccessError("LLM selection is unavailable.")
     validate_llm_choice(config)
+    try:
+        require_owned_profile_scope(config, app_id, purpose)
+    except LlmCredentialError as error:
+        raise LlmAccessError("LLM selection is unavailable.") from error
     return grant, config

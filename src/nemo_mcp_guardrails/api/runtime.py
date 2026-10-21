@@ -1,4 +1,5 @@
 import os
+import re
 import asyncio
 from dataclasses import dataclass
 
@@ -28,6 +29,9 @@ from nemo_mcp_guardrails.llm_access import LlmAccessError
 from nemo_mcp_guardrails.llm_credentials import LlmCredentialError
 from nemo_mcp_guardrails.llm_security import LlmEndpointError
 from nemo_mcp_guardrails.performance import measure_stage
+from nemo_mcp_guardrails.resource_conditions import (
+    ResourceCondition, UnsupportedResourceCondition, parse_resource_condition,
+)
 from nemo_mcp_guardrails.policy_compiler import (
     GITHUB_ACTION_SYNONYMS,
     GITHUB_RESOURCE_SYNONYMS,
@@ -160,8 +164,19 @@ def _matching_input_policy_explanation(
             continue
 
         custom_resource = policy.custom_resource
-        if custom_resource and custom_resource.casefold() not in normalized_message:
-            continue
+        if custom_resource:
+            try:
+                condition = parse_resource_condition(policy.resource, custom_resource)
+            except UnsupportedResourceCondition:
+                continue
+            if (isinstance(condition, ResourceCondition)
+                    and condition.field == "title" and condition.operator == "eq"):
+                custom_resource = str(condition.value)
+                if re.search(r"(?<!\w)" + re.escape(custom_resource.casefold()) + r"(?!\w)",
+                             normalized_message) is None:
+                    continue
+            elif custom_resource.casefold() not in normalized_message:
+                continue
 
         return RuntimeBlockExplanation(
             stage="input",

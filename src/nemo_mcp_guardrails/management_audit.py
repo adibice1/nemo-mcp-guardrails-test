@@ -55,7 +55,9 @@ def classify_management_action(
 
     if "/api-key" in normalized_path:
         return "app.api_key_regenerated", "app"
-    if "/llm-grants/" in normalized_path:
+    if "/main-models" in normalized_path:
+        entity = "llm_config"
+    elif "/llm-grants/" in normalized_path:
         entity = "app_llm_grant"
     elif "/connectors" in normalized_path:
         entity = "app_connector"

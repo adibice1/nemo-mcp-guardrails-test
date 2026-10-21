@@ -1,6 +1,6 @@
 # Exact versions for the reviewed Azure/NeMo runtime dependency closure.
 aiohappyeyeballs==2.6.1
-aiohttp==3.14.3
+aiohttp==3.14.5
 aiohttp-retry==2.9.1
 aiosignal==1.4.0
 annotated-doc==0.0.4
@@ -8,7 +8,7 @@ annotated-types==0.7.0
 annoy==1.17.3
 anyio==4.14.2
 attrs==26.1.0
-certifi==2026.4.22
+certifi==2026.10.19
 cffi==2.0.0
 charset-normalizer==3.4.7
 click==8.3.3
@@ -114,7 +114,7 @@ watchdog==6.0.0
 wcwidth==0.7.0
 win32_setctime==1.2.0; sys_platform == "win32"
 xxhash==3.7.0
-yarl==1.23.0
+yarl==1.25.1
 zstandard==0.25.0
 psycopg==3.2.13
 psycopg-binary==3.2.13

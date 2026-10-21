@@ -12,6 +12,8 @@ from nemo_mcp_guardrails.api.app_schemas import AppLlmGrantRead, AppLlmGrantWrit
 from nemo_mcp_guardrails.database.connection import get_db
 from nemo_mcp_guardrails.database.models import AppLlmGrantRecord, AppRecord, LlmConfigRecord
 from nemo_mcp_guardrails.llm_access import LlmAccessError, LlmPurpose, validate_llm_choice
+from nemo_mcp_guardrails.model_credentials import require_owned_profile_scope
+from nemo_mcp_guardrails.llm_credentials import LlmCredentialError
 from nemo_mcp_guardrails.management_permissions import require_app_route_access, require_system_admin
 
 
@@ -83,7 +85,8 @@ def _options(app_id: int, purpose: LlmPurpose, db: Session) -> dict:
             continue
         try:
             validate_llm_choice(config)
-        except LlmAccessError:
+            require_owned_profile_scope(config, app_id, purpose)
+        except (LlmAccessError, LlmCredentialError):
             continue
         if config is None:
             default_allowed = True
@@ -106,7 +109,8 @@ def _write_grant(
     if enabled:
         try:
             validate_llm_choice(config)
-        except LlmAccessError as error:
+            require_owned_profile_scope(config, app_id, purpose)
+        except (LlmAccessError, LlmCredentialError) as error:
             raise HTTPException(400, "LLM configuration is not available for approval.") from error
     grant = db.scalars(select(AppLlmGrantRecord).where(
         AppLlmGrantRecord.app_id == app_id, AppLlmGrantRecord.purpose == purpose,

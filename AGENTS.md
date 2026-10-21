@@ -1,5 +1,42 @@
 # AGENTS.md
 
+## Latest home verification - 2026-10-22
+
+Under the user's explicit autonomous authority for this continuation, all four
+home verification groups completed. The final clean Linux image passed **35**
+offline checks; 16 PostgreSQL diagnostics plus migration/idempotency/constraint
+checks and real image-pair/native-MCP reads passed. Canonical title explanation
+attribution is fixed; the original HTTP assertion now passes unchanged. The
+backend Dockerfile checks dependencies during build and removes unused runtime
+pip; do not expect python -m pip in the final runtime image. Model setup guides
+now document the shared API Type-first form, app-owned api_key main registration
+and admin Advanced credentials with environment references. Home schema/key setup
+was user-completed; no new production migration, publication or deployment ran.
+See docs/home-verification-results-2026-10-22.md and the current backlog.
+
+
+## Model-profile UI follow-up - 2026-10-22
+
+The user approved and applied the exact three-file unified Add model profile UI
+patch with "ok". Read docs/developer-main-model-registration-review.md. Applied
+TypeScript, ESLint and targeted registration/grant checks passed. The user has
+already applied the home schema and privately configured the encryption key;
+do not regenerate/request the key. Refreshed browser layout and live developer
+profile creation/use remain pending. Earlier source-only no-migration records
+below describe their historical application checkpoint.
+
+
+Developer main-model registration was approved with "ok" and applied on
+2026-10-22. Read docs/developer-main-model-registration-review.md. Linked app
+developers/admins can register their own endpoint/key for an app-owned main model;
+keys are encrypted, ownership/purpose checks exclude other apps and classifiers,
+and backend destination approvals remain mandatory. The offline catalogue now
+contains 34 checks. Existing databases require the reviewed additive helper
+scripts/migrate_app_main_models.py before restarting the changed API. It previews
+without a connection and restricts --apply to an explicitly named restored
+rehearsal database. No database change, private encryption-key provisioning or
+production deployment ran for this source application.
+
 The provider-neutral model integration was approved with "ok" and applied on
 2026-10-20. Read `docs/model-gateway-integration.md`: direct Azure and approved
 `openai_compatible` profiles are implemented; native vendor protocols use a

@@ -1,7 +1,7 @@
 import asyncio
 import os
 from collections import OrderedDict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from time import monotonic
 from typing import Any
 
@@ -45,6 +45,9 @@ from nemo_mcp_guardrails.llm_credentials import (
 )
 from nemo_mcp_guardrails.llm_security import validate_llm_endpoint
 from nemo_mcp_guardrails.llm_profiles import COMPATIBLE_PROVIDER, validate_profile_metadata
+from nemo_mcp_guardrails.model_credentials import (
+    credential_key_version, decrypt_model_key, validate_owned_profile,
+)
 from nemo_mcp_guardrails.github_tool_contract import (
     REVIEWED_MCP_IMAGE, REVIEWED_NATIVE_BINARY, select_reviewed_github_tools,
 )
@@ -97,6 +100,9 @@ class RuntimeLlmConfig:
     endpoint: str | None
     credential_reference: str | None
     enabled: bool
+    owner_app_id: int | None = None
+    encrypted_api_key: str | None = field(default=None, repr=False)
+    credential_key_version: str | None = field(default=None, repr=False)
 
 
 @dataclass(frozen=True)
@@ -235,9 +241,15 @@ def load_runtime_environment(
         "AZURE_OPENAI_DEPLOYMENT": os.getenv("AZURE_OPENAI_DEPLOYMENT"),
     }
     selected = (llm_selection.main_llm_config, llm_selection.guardrail_llm_config) if llm_selection else (None,)
-    if any(config is None or config.provider.strip().lower() in SUPPORTED_AZURE_PROVIDERS for config in selected):
-        if any(not value for value in values.values()):
-            raise LlmCredentialError("Runtime Azure environment is unavailable.")
+    legacy_azure = any(config is None or (
+        config.provider.strip().lower() in SUPPORTED_AZURE_PROVIDERS
+        and getattr(config, "owner_app_id", None) is None
+    ) for config in selected)
+    if legacy_azure and any(not value for value in values.values()):
+        raise LlmCredentialError("Runtime Azure environment is unavailable.")
+    if any(config is not None and config.provider.strip().lower() in SUPPORTED_AZURE_PROVIDERS
+           for config in selected) and not values["AZURE_OPENAI_API_VERSION"]:
+        raise LlmCredentialError("Runtime Azure environment is unavailable.")
 
     azure_api_key = values["AZURE_OPENAI_API_KEY"] or ""
     github_pat = resolve_github_credential(github_credential_reference)
@@ -308,6 +320,10 @@ def _to_runtime_llm_config(
         endpoint=config.endpoint,
         credential_reference=config.credential_reference,
         enabled=config.enabled,
+        owner_app_id=getattr(config, "owner_app_id", None),
+        encrypted_api_key=getattr(config, "encrypted_api_key", None),
+        credential_key_version=(credential_key_version()
+                                if getattr(config, "owner_app_id", None) is not None else None),
     )
 
 
@@ -346,13 +362,20 @@ def build_chat_model(
 ) -> BaseChatModel:
     """Build the chat model for guardrails or main-agent execution."""
 
+    owned = config is not None and config.owner_app_id is not None
+    if owned and purpose not in {"main", "main agent"}:
+        raise LlmAccessError("App-owned profiles cannot classify guardrails.")
     if config is not None and config.provider.strip().lower() == COMPATIBLE_PROVIDER:
         if not config.enabled or not config.model_name.strip():
             raise RuntimeError("Compatible LLM configuration is unavailable.")
-        endpoint, reference = validate_profile_metadata(
-            config.provider, config.endpoint, config.credential_reference,
-        )
-        api_key = resolve_llm_credential(reference)
+        if owned:
+            endpoint = validate_owned_profile(config)
+            api_key = decrypt_model_key(config)
+        else:
+            endpoint, reference = validate_profile_metadata(
+                config.provider, config.endpoint, config.credential_reference,
+            )
+            api_key = resolve_llm_credential(reference)
         model = ChatOpenAI(
             model=config.model_name, base_url=endpoint, api_key=api_key,
             http_client=DefaultHttpxClient(follow_redirects=False),
@@ -379,7 +402,8 @@ def build_chat_model(
         endpoint = config.endpoint or environment.azure_endpoint
     endpoint = validate_llm_endpoint(endpoint, default_endpoint=environment.azure_endpoint)
     reference = validate_llm_credential_reference(config.credential_reference if config else None)
-    api_key = resolve_llm_credential(reference) if reference else environment.azure_api_key
+    api_key = (decrypt_model_key(config) if owned else
+               resolve_llm_credential(reference) if reference else environment.azure_api_key)
     if not api_key or not environment.azure_api_version or not deployment:
         raise LlmCredentialError("Azure LLM configuration is unavailable.")
 

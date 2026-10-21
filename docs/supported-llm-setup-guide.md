@@ -1,5 +1,30 @@
 # Setup Guide For NVIDIA's Supported LLM Providers In This GMS
 
+
+Current form/API instructions were reconciled with the applied source on
+22 October 2026. All 11 JSON examples across the model guides validate against
+the current schemas; app-owned Azure registration and a real guarded native-MCP
+read pass in the final clean image. This does not certify every provider recipe.
+See [the final home results](home-verification-results-2026-10-22.md).
+
+## App-owned main-model registration - 22 October 2026
+
+Applied source now lets linked app developers/admins use Models > Add model profile
+with their own endpoint and API key. Direct Azure and compatible API/gateway
+protocols are supported. A profile gets immediate main-purpose access for that
+app; Save model selections activates it. It cannot be granted to another app or
+used for classification. Existing global catalogue provisioning below remains
+admin-managed.
+
+The endpoint must still satisfy backend destination approvals. For Azure, API
+version remains backend-configured. Provision the dedicated
+GMS_MODEL_CREDENTIAL_ENCRYPTION_KEY privately and apply the additive app-owned
+model schema before restarting an existing backend database. Stored keys are
+encrypted and omitted from responses/log bodies. Keep a protected encryption-key
+backup separate from database backups. The user subsequently confirmed home schema application and private key setup.
+See [the rollout and test record](developer-main-model-registration-review.md).
+
+
 Checked on 2026-10-20. This is an implementation-aware companion to
 [NVIDIA's supported LLM page](https://docs.nvidia.com/nemo/guardrails/about-nemo-guardrails-library/supported-llms),
 not a claim that every listed model has been tested in this project.
@@ -62,8 +87,9 @@ native API/process/authentication requirements as-is.
    configuration, its grant, current app model IDs and app API key for rollback.
    Main-agent tool calling, guardrail classification and policy-authoring JSON
    are three different acceptance targets.
-2. Use a prepared local/rehearsal database and a normal system-admin management
-   account. Provider probes below need no database; profile CRUD, grants, login
+2. Use a prepared local/rehearsal database and a normal management account.
+   Linked app developers can register their own main models; administrators also
+   manage global profiles, grants and classifiers. Provider probes below need no database; profile CRUD, grants, login
    and full runtime do. If the home Azure DB still times out, finish only the
    provider probes and stop before management/runtime steps. Home localhost:5433
    is a separate database; consult work-computer-handoff.md for its state.
@@ -71,7 +97,9 @@ native API/process/authentication requirements as-is.
    container, WSL machine or ACI group may have a different localhost. GMS permits
    remote HTTPS and explicitly approved literal loopback HTTP only. A remote
    http://host.docker.internal or private-IP HTTP URL is not accepted.
-4. Store real secrets only in the ignored ROOT .env/backend secret environment.
+4. Store backend secrets in the ignored ROOT .env/backend secret environment.
+   For an app-owned main profile, enter its provider key in the masked form; the
+   backend encrypts it. Do not put keys in frontend dotenv files, URLs or Git.
    Approval lists contain names/URLs, never keys. Merge new entries into existing
    comma-separated lists, with one definition per setting. Keep the existing
    four Azure defaults if either selected runtime role uses Azure.
@@ -142,8 +170,70 @@ The standalone probe does not apply GMS guardrails or its endpoint allowlist.
 
 ## Common Steps C: Register, Approve And Select The Profile
 
-For each compatible recipe, add the following ROOT .env settings with that
-recipe's actual URL and credential variable NAME. Preserve existing entries.
+API Type and credential storage are separate choices. Both administrators and
+linked developers start with the same API Type-first Add model profile form.
+Use the default app-owned path for a main model with your own provider key.
+
+### Default: app-owned main model (developer or administrator)
+
+1. A backend operator approves the exact destination first. Compatible APIs use
+   GMS_ALLOWED_COMPATIBLE_LLM_ENDPOINTS including /v1 or the recipe's path; Azure
+   uses GMS_ALLOWED_LLM_ENDPOINTS with the resource HTTPS origin. The backend
+   default Azure endpoint is already approved. Preserve existing approvals.
+2. On an existing database, the reviewed app-owned model schema must be present
+   and GMS_MODEL_CREDENTIAL_ENCRYPTION_KEY provisioned privately before backend
+   startup. Home schema/key setup is already complete; keep the existing key.
+   For Azure runtime roles, retain all four AZURE_OPENAI_* defaults as required
+   by the current factory. Restart after backend approval/environment changes.
+3. Start the local frontend using the same-origin proxy:
+
+~~~powershell
+$env:NEXT_PUBLIC_API_BASE_URL = '/api/gms'
+$env:GMS_API_BASE_URL = 'http://127.0.0.1:8000'
+npm.cmd --prefix frontend run dev
+~~~
+
+4. Sign in, open Apps -> your linked app -> Models -> Add model profile (to the
+   right of Save model selections). Set API Type, Profile Name, Model / Gateway
+   Alias (or Azure Deployment Name), API Base URL (or Azure Endpoint), and
+   Provider API key. Enter the actual provider key in the masked field. For a
+   deliberately unauthenticated local server only, a non-secret placeholder
+   such as ollama-local-placeholder is sufficient. An endpoint is required here.
+5. Click Add model profile. The backend encrypts the key and creates this app's
+   main-only grant automatically. Choose the new Main agent and click Save model
+   selections. Registration alone does not change the active selection. Keep the
+   working classifier; developers cannot change it or register classifier models.
+6. In Runtime Test, enter the existing GMS app API key, use a fresh Conversation
+   ID per independent test, and request a permitted read such as list_branches.
+   This is a different key from Provider API key. Verify actual tool execution
+   and expected result names, not only green rail badges. Reusing a conversation
+   ID loads stored history; sending conversation_history=[] does not erase it.
+7. Restore the previous main selection if needed. Save changes without a backend
+   restart. Keep its grant until rollback is verified.
+
+App-owned API automation uses a management JWT and
+POST /apps/{APP_ID}/main-models (or /apps/by-client-id/{CLIENT_ID}/main-models):
+
+~~~json
+{
+  "name": "App main model v1",
+  "provider": "openai_compatible",
+  "model_name": "your-tested-model-or-alias",
+  "endpoint": "https://provider.example/v1",
+  "api_key": "replace_privately_with_provider_key"
+}
+~~~
+
+Use real approved metadata, not provider.example. Do not add credential_reference,
+enabled or owner_app_id to this strict payload. The returned profile has an ID
+and owner_app_id but no plaintext key, ciphertext or credential reference. Select
+it with PUT /apps/{APP_ID} and {"main_llm_config_id": CONFIG_ID}. The main-only
+grant is already created; another app or classifier cannot use this owned model.
+
+### Administrator: backend-managed main/classifier profile
+
+Use this path for a reusable admin-managed profile or a classifier. Provision the
+provider key privately on the backend and approve its variable NAME:
 
 ~~~env
 GMS_ALLOWED_COMPATIBLE_LLM_ENDPOINTS=https://provider.example/v1
@@ -152,54 +242,30 @@ PROVIDER_API_KEY=replace_privately_with_the_actual_credential
 GITHUB_MCP_READ_ONLY=1
 ~~~
 
-Never copy provider.example as a real endpoint. Use the recipe's endpoint.
-For local no-auth servers, use an explicit non-secret placeholder variable only
-when the local server is deliberately unauthenticated. GMS requires an explicit
-credential reference and does not fall back to Azure for compatible profiles.
+Merge existing lists and restart the backend after changes. Open the same Add
+model profile form, choose API Type, expand Advanced credentials, then check
+Use a backend-managed credential. Enter only the variable NAME in Credential
+Environment Variable, without its value or env: prefix. For Azure only, blank
+endpoint/key reference intentionally uses backend defaults. Compatible profiles
+require an explicit approved base URL and credential variable; a local no-auth
+server still uses a non-secret placeholder variable in this mode.
 
-1. Stop the existing backend with Ctrl+C, and restart from the repository root
-   after changing environment settings. Use the terminal with session-only keys
-   if those are being used. Startup invokes prototype table creation on the
-   configured DB, so choose the intended prepared rehearsal/local target first.
+Click Add model profile, then select the new profile and purpose under Approve
+model access for this app and click Approve access. This admin-managed creation
+path grants nothing automatically. Select the granted main/classifier profile
+and Save model selections. The Approve access button is right-aligned below Add
+model profile. Advanced credentials and grant administration are absent for devs.
 
-~~~powershell
-.\.venv\Scripts\python.exe -B scripts/run_api.py
-~~~
+API automation for this mode remains POST /llm-configs with credential_reference
+set to env:PROVIDER_API_KEY, followed by the explicit app/purpose grant PUT and
+selection PUT. Never send a raw api_key field to /llm-configs. Classifiers are
+per-app and admin-only; they must pass the separate yes/no acceptance tests.
 
-2. In another terminal, start the frontend using the local direct backend URL:
-
-~~~powershell
-$env:NEXT_PUBLIC_API_BASE_URL = 'http://127.0.0.1:8000'
-npm.cmd --prefix frontend run dev
-~~~
-
-3. Sign in at http://127.0.0.1:3000/login as an administrator, then open
-   Apps -> your existing test app -> Models -> Add model profile.
-4. Set API Type to Compatible API / Model Gateway; enter a unique configuration
-   name, the exact tested model ID/served alias, the recipe base URL and only
-   its credential environment variable NAME (no key value or env: prefix).
-5. Click Add Configuration. Under Approve model access for this app, choose the
-   new profile, choose Main agent and click Approve access. Creation grants nothing.
-6. Choose the profile in the top Main agent dropdown, preserve the working
-   Guardrail classifier and click Save model selections. If the guardrail choice
-   is unavailable, review its exact existing grant/configuration first.
-7. Open Runtime Test, enter the EXISTING APP API KEY, use a fresh conversation ID
-   and request a permitted read tool, such as listing branches in a permitted
-   repository. Confirm a real tool-call/tool-result round trip; a plausible text
-   answer alone is insufficient. Run an existing policy's matching block case too.
-8. Restore the previous approved main selection to roll back. Leave its grants
-   intact until rollback is verified; revoke unused new grants separately.
-   A previous null Azure default needs its explicit default grant.
-
-Saved selection changes do not need a restart. Backend approval, key-value and
-process-environment changes do; a warm cached client can retain the old key.
-The Models tab controls main/guardrail selections, not policy authoring. Authoring
-uses its independent GMS_POLICY_AI_* backend profile and needs separate JSON tests.
-
-To automate instead of using the UI, POST /llm-configs, admin PUT the exact
-/apps/{APP_ID}/llm-grants/main/{CONFIG_ID} with enabled=true, then PUT
-/apps/{APP_ID} with main_llm_config_id=CONFIG_ID. Use a management JWT for those
-calls. /v1/guardrails/run uses X-App-ID/X-API-Key instead; see llm-provider-guide.md.
+The form clears its provider-key state after submission/closing. Stored keys
+cannot be read back. Keep the backend encryption key backed up separately from
+DB backups. Do not rotate the GMS app API key or encryption key just to switch
+models. The Models tab does not switch policy authoring: it uses independent
+GMS_POLICY_AI_* settings and needs its own JSON acceptance checks.
 
 <a id="azure"></a>
 ## Azure OpenAI: azure And azure_openai
@@ -218,9 +284,9 @@ AZURE_OPENAI_API_VERSION=your_supported_api_version
 AZURE_OPENAI_DEPLOYMENT=your_actual_deployment_name
 ~~~
 
-3. For a different resource/key, append its HTTPS ORIGIN to
-   GMS_ALLOWED_LLM_ENDPOINTS and its key variable NAME to
-   GMS_ALLOWED_LLM_CREDENTIAL_ENV_VARS. Azure origins do not include /v1 or a
+3. For a different resource, append its HTTPS ORIGIN to
+   GMS_ALLOWED_LLM_ENDPOINTS. Only the admin backend-managed path also needs its
+   key variable NAME in GMS_ALLOWED_LLM_CREDENTIAL_ENV_VARS. Azure origins do not include /v1 or a
    deployment path. The configured default Azure origin/key name is already
    approved. Restart the backend after environment changes.
 4. For an independent native API probe, supply the actual deployment/version:
@@ -237,9 +303,11 @@ $azureText = [string]$azureProbe.choices[0].message.content
 [pscustomobject]@{ Model = $azureProbe.model; FinishReason = $azureProbe.choices[0].finish_reason; ExactReady = ($azureText.Trim() -eq 'READY') }
 ~~~
 
-5. Follow Common Steps C for app/grant selection, but choose API Type Azure
-   OpenAI, use the deployment name and resource origin, and enter the approved
-   Azure key variable name or intentionally use its existing default fallback.
+5. Follow Common Steps C, choose API Type Azure OpenAI, and use the deployment
+   name and resource origin. The default app-owned form takes the actual provider
+   key and creates main access automatically. The admin Advanced credentials
+   path instead takes an approved Azure key variable NAME or its default fallback
+   and requires an explicit purpose grant.
    azure and azure_openai are aliases, not two separately provisioned services.
 
 The runtime Azure adapter uses the shared API version and temperature=0; a

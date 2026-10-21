@@ -1,5 +1,65 @@
 # Testing Notes
 
+## Final home image verification - 22 October 2026
+
+Current catalogue: **35 checks**, including the new canonical-title explanation
+regression. The final Linux AMD64 backend image passes all 35 with networking
+disabled. Its 17 direct roots and 117 constrained runtime packages match pins;
+build-time pip check passes, then pip is removed from runtime. The explicit
+16 PostgreSQL diagnostics and app-model migration/idempotency/constraints pass
+on a disposable tmpfs database. Actual port-80 frontend proxy, encrypted owned
+model registration, main-only/cross-app RBAC, native-MCP branch read and input
+block pass using existing provider credentials privately. The frontend production
+audit reports zero; Pillow and the development-only braces findings remain open.
+See [the final evidence and limits](home-verification-results-2026-10-22.md).
+
+
+## API-type-first UI correction - 2026-10-22
+
+The user approved/applied the exact one-file patch with "ok". SHA-256:
+e5e48fe7214c5f6f1d70b5349ada86ab5f685719dff3c1b89dace4d0e6031dfe.
+Applied TypeScript and full ESLint passed. The rendered preview confirmed
+identical primary admin/developer fields, Azure/compatible options for both,
+admin advanced credentials collapsed, and no advanced credentials for developers.
+Browser refresh and live use of the saved developer profile remain pending.
+
+
+## Unified model-profile UI applied - 2026-10-22
+
+The exact three-file UI patch was approved with "ok" and applied unchanged.
+SHA-256: 9fe49c1d0a831a0d44c0b33d4ed00f28562d112948adb57444851d232ccca938.
+Applied TypeScript, full ESLint and the two existing offline app_main_models /
+app_llm_grants_http checks passed. Synthetic preview rendering confirmed no
+backend/classifier creation choice for developers and an admin-only backend
+credential choice. User browser layout/live profile creation is still pending.
+The existing full offline catalogue remains 34 checks; it passed on the prior
+backend application, and no backend source changed in this UI correction.
+
+
+## App-owned main-model source application - 2026-10-22
+
+User approval "ok" applied the reviewed 17-file patch. Every applied file matches
+its candidate SHA-256; patch SHA-256 is
+0facb01e568adb8391aaa5faf3a0afbba186fdb5b733641c981a59e2fa7450d0.
+The actual saved source passed all 34 offline checks, TypeScript, full ESLint and
+git diff --check. The schema helper's default no-connection preview passed.
+Logs/hashes are in ignored .waylog/developer-main-model-preview-20261022; do not
+assume they transfer through Git. Source contains one new offline check plus the
+existing 33; no manual/live test was silently added to the runner.
+
+The database and private .env are unchanged. Backend reload=False means the old
+running process was not restarted by the source application. Root .env still
+names localhost:5433/nemo_restore_check_ollama_20261020_153213; the dedicated model
+encryption-key assignment is absent. Apply the reviewed additive schema before
+restarting the changed backend and provision the encryption key privately before
+registering a new model. Existing profiles retain their environment references.
+Host cryptography is 48.0.0; the direct requirement matches the pre-existing 50.0.0
+constraint, so clean pinned-install/image validation remains open. Actual
+PostgreSQL idempotency and new-form browser/provider checks remain open. No
+production operation, provider request or GitHub write ran for this application.
+See [the applied review](developer-main-model-registration-review.md).
+
+
 ## Work Security/Optimization Testing Resume - 2026-10-22
 
 The [work checklist](work-computer-security-test-checklist.md) resumes the online
