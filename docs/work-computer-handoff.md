@@ -1,5 +1,40 @@
 # Work/Home Computer Handoff
 
+## Resume At Work - Security And Optimization Tests - 2026-10-22
+
+Start with the [security/optimization continuation checklist](work-computer-security-test-checklist.md),
+then the [model-switch checklist](work-computer-model-test-checklist.md). The
+security source work is complete; the missing evidence is online rehearsal/UI,
+controlled PR-creation enforcement, actual grants/legacy definitions and
+performance measurements. Azure rehearsal login/search and the five branch
+conversions were already completed; do not repeat their migrations/manifests.
+
+The Next.js 13 compatibility patch remains unapplied, pending the supervisor's
+decision. Its saved diff targets an older source baseline and must be refreshed
+and reviewed before application. Keep backend security checks moving while
+that decision is pending. No production rollout is included in this checklist.
+
+## Work Model-Test Handoff - 2026-10-22
+
+Follow the [work-computer model-test checklist](work-computer-model-test-checklist.md)
+for the current provider-switch evaluation. Local main-agent use and real GitHub
+reads have been demonstrated; local classifier candidates have not passed.
+Further classifier work and the Llama download are postponed at the user's request.
+Keep Azure classification selected and preserve exact NeMo/tool conditions.
+Home database settings and IDs must not be assumed to exist at work.
+
+## Home Local Testing Override - 2026-10-20
+
+For the current home Ollama evaluation, root `.env` now targets the restored
+local `nemo_restore_check_ollama_20261020_153213` database on localhost:5433.
+Three user-reviewed legacy policies were repaired there, preserving IDs and
+assignments; the four-policy app snapshot and both model grants validate. The
+original home database and Azure targets were not changed. This local copy is
+separate from the Azure rehearsal target below. Restart the backend to load the
+new `.env` target and clear a terminal DATABASE_URL override if present. See
+[repair evidence](testing-notes.md#local-ollama-policy-repair-completed---2026-10-20).
+
+
 ## Resume Here At Home - 2026-10-16
 
 This section supersedes the older dated continuation instructions below. Read

@@ -1,5 +1,13 @@
 # Change Models: Claude And Ollama On Windows
 
+Local-classifier follow-up: qwen2.5:1.5b and qwen2.5:7b were tested on
+2026-10-21 with the real NeMo checks. Neither met acceptance; Azure guardrail
+classification remains selected. See [the measured results](local-classifier-test-results.md).
+
+Follow-up checked on 2026-10-21: a real GitHub branch-read request now passed
+with the selected Qwen2.5 1.5B main profile and Azure classification. See
+[the scoped result and pending acceptance cases](model-switch-test-results.md).
+
 Checked against the applied source and provider documentation on 2026-10-20.
 These are instructions for you to run; this walkthrough did not contact a real
 model, edit your .env, download models, or change database records.
@@ -126,6 +134,17 @@ GMS compatible calls have a 60-second request timeout and the full runtime has
 an outer 120-second timeout. A slow CPU-only model can pass a 180-second direct
 probe and still fail GMS. Warm the model, measure the full tool request and check
 its context capacity; one tiny chat probe does not prove those requirements.
+
+### Observed Home Qwen3 Result - 2026-10-20
+
+The first real GMS attempt passed the Azure input rail but failed in the Ollama
+agent stage at approximately the 60-second client timeout. The installed Qwen3
+4B runs on CPU with 4096 context. Small compatible probes exhausted 128/256
+output-token budgets without a complete requested answer or tool call, including
+/no_think prompts; reasoning_effort=none also did not complete the READY check.
+Do not mark this particular setup as accepted. This is not a universal Qwen3
+incompatibility claim. A smaller non-thinking candidate remains an untested next
+comparison. See [diagnostic evidence](testing-notes.md#local-ollama-agent-timeout-diagnosis---2026-10-20).
 
 ## 2B. Test Claude Without The Database
 

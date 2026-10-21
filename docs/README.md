@@ -1,5 +1,10 @@
 # nemo-mcp-guardrails-test
 
+For work on 22 October, start with the [security/optimization test checklist](work-computer-security-test-checklist.md),
+then the [model-switch test checklist](work-computer-model-test-checklist.md).
+The online rehearsal tests resume from the recorded checkpoint; Next.js 13
+remains a supervisor-dependent, unapplied draft.
+
 Continuing at home: start with the [2026-10-16 handoff checkpoint](work-computer-handoff.md#resume-here-at-home---2026-10-16)
 and [current backlog](open-work-backlog.md#resume-from-home---rehearsal-checkpoint-2026-10-16).
 Azure rehearsal migrations/conversions, login and a real read-only search are

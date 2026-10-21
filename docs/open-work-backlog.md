@@ -1,5 +1,81 @@
 # Open Work Backlog
 
+## Work Rehearsal Continuation - 2026-10-22
+
+Resume the online security/optimization checks paused by the home Azure network
+failure using the [work security checklist](work-computer-security-test-checklist.md).
+It records completed schema/conversion/login/read work separately from pending
+English UI/edit-cancel, invalid app-key, controlled PR creation, actual grant /
+legacy inventory and cold/warm/browser measurements. Model reproduction follows
+that baseline; local classification and the Llama download remain on hold.
+Next.js 13 is a supervisor-dependent, unapplied draft requiring a refreshed
+exact diff against the latest source, not an automatic rollback task.
+
+## Exact NeMo Conditions Retained - 2026-10-21
+
+The user explicitly requires exact conditions to remain checked in NeMo too;
+do not delegate them solely to the tool guard. In-memory prompt/compiler
+variants were not applied: a combined 7B candidate passed 11 original cases
+but only 8/12 new/adversarial cases. A typed extraction prototype had a known
+injection failure. Qwen3 reasoning/non-thinking probes each stopped after two
+45-second diagnostic timeouts. Azure classification remains selected.
+See [follow-up evidence](local-classifier-next-step-review.md). The user postponed
+further classifier work and the proposed Llama 3.1 8B download/test. Continue
+with the [22 October work-computer checklist](work-computer-model-test-checklist.md);
+keep Azure classification selected.
+
+## Local Classifier Follow-Up Completed - 2026-10-21
+
+Qwen2.5 1.5B passed 5/8 final local NeMo cases. The user-authorized 7B
+download completed and its CPU-only matrix passed 8/11 cases with no timeout;
+it still misclassified both conditional branch routes and a safe refusal. An
+in-memory prompt experiment passed 9/11 but did not fix the branch mistakes.
+No candidate was selected for classification. Azure remains selected; 7B was
+unloaded to release RAM and its download retained. See
+[the full classifier results](local-classifier-test-results.md). Further local
+classifier quality work, not a timeout increase, is needed before switching.
+
+## Local Classifier Evaluation - 2026-10-21
+
+Real local NeMo checks for qwen2.5:1.5b passed 5 of 8 final cases. The model
+misclassified a permitted issue title, a synthetic environment-token assignment
+and a safe refusal. It remains a main-agent-only tested profile; no guardrail
+grant/selection changed. The user authorized downloading/testing qwen2.5:7b,
+noting the CPU-only laptop. The subsequent CPU test completed; see the completed follow-up above.
+See [the classifier result record](local-classifier-test-results.md).
+
+## Output-Word Smoke Test Confirmed - 2026-10-21
+
+The user clarified that the branch result included the banned word test. Output
+was blocked with the word policy active and passed after the user removed it.
+The earlier deterministic output block plus subsequent passed traces now count
+as the specific output-word smoke test. Do not keep requesting the same
+artificial word-only test. This does not test the NeMo classifier on prohibited
+output; fixed-model repeatability and the other role/provider evaluations remain
+open. See [the clarified result](model-switch-test-results.md#output-policy-clarification---2026-10-21).
+
+
+## Model Switch-Back Follow-Up - 2026-10-21
+
+The user reports the Azure/Ollama switch-back test passed. Two subsequent reads
+actually ran list_branches and passed both rails; current selection is Ollama
+profile 2. A separate issue-creation case blocked at input before agent/tools.
+Output-word blocking was subsequently confirmed by the user; fixed-model
+repeatability remains open.
+Historical model identity is not logged per call; see the distinction between
+user-reported switching and verified traces in
+[the result record](model-switch-test-results.md#switch-back-follow-up---2026-10-21).
+
+## Local Ollama Main-Agent Smoke Test - 2026-10-21
+
+A real local GMS request now passes input/output rails and actually executes
+GitHub MCP list_branches. App 33 currently selects qwen2.5:1.5b for main and
+Azure default for classification. Record controlled input/output blocks, repeat
+read latency and switching back to Azure before closing model-switch acceptance.
+See [test evidence and pending cases](model-switch-test-results.md). The earlier
+statements below that live Ollama/GMS behavior is entirely unverified are
+superseded for this single read smoke test; other models/roles remain open.
+
 This file tracks unfinished implementation work so active plans do not get lost
 across machines or Codex sessions.
 

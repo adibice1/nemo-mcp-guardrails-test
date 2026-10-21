@@ -1,5 +1,125 @@
 # Testing Notes
 
+## Work Security/Optimization Testing Resume - 2026-10-22
+
+The [work checklist](work-computer-security-test-checklist.md) resumes the online
+rehearsal checks paused by the home Azure TCP timeout, before model reproduction.
+It distinguishes the completed Azure schema/conversions/login/read from pending
+UI/authentication, controlled PR creation, grant/legacy review and performance
+measurements. Next.js 13 remains unapplied pending the supervisor's decision;
+its older draft must be refreshed before source changes. This handoff update
+changed documentation only; no live test, database operation or patch application ran.
+
+## Local Ollama Main-Agent Smoke Test Confirmed - 2026-10-21
+
+The latest app 33 request passed both rails and actually executed GitHub MCP
+list_branches, returning HTTP 200 in approximately 26.27 seconds. Current main
+selection is qwen2.5:1.5b profile 2, with Azure default classification. See
+[the evidence and remaining cases](model-switch-test-results.md). This supersedes
+earlier pending-live-test statements for this single main-agent read smoke test
+only; controlled negative cases, switching back, local classification, authoring
+and production acceptance remain pending.
+
+## Local Ollama Agent Timeout Diagnosis - 2026-10-20
+
+After the user enabled app 33 GitHub connector access on the local rehearsal
+copy, runtime request 660f37a065b14095b94d2ccbdab497f3 passed Azure/NeMo input
+checking in about 1.62 seconds, then the agent stage raised at about 60.03
+seconds. No tool ran and no output rail ran. This timing is consistent with the
+compatible client request timeout, rather than the earlier policy/connector
+configuration failures. Runtime event metadata does not retain the SDK exception
+subtype, so it alone does not prove the exact underlying exception.
+
+Local Ollama API reports version 0.40.6, only qwen3:4b installed, and a loaded
+4096-token-context model with zero GPU memory allocated. Small real compatible
+API probes were run without GitHub actions or displaying model reasoning:
+
+- Default READY prompt, 128 output tokens: 9.6 seconds, length termination, no
+  answer text, separate reasoning present.
+- READY prompt with /no_think, 128 tokens: 8.2 seconds, length termination, no
+  answer text.
+- One harmless tool-definition selection with /no_think, 256 tokens: 18.2
+  seconds, length termination, no tool call or answer text. No tool executed.
+- Explicit reasoning_effort=none READY probe, 128 tokens: 8.7 seconds, length
+  termination and ExactReady false; text was returned, but not the required
+  complete answer. This option is not automatically sent by GMS.
+
+These probes establish HTTP reachability but do not establish usable complete
+answers or live GMS tool compatibility for this installed model/configuration.
+They do not prove Qwen3 universally incompatible. A separate smaller non-thinking
+model such as qwen2.5:1.5b is the next proposed comparison; it has not been
+downloaded, granted or tested here. Keep Azure classification and all policies
+enabled. No source, timeout, .env, database or grant changed for this diagnosis.
+
+## Local Ollama Policy Repair Completed - 2026-10-20
+
+The user explicitly confirmed policy 6 should block issue creation with title
+exactly `test` and approved the other two proposed repairs. A private custom
+PostgreSQL backup was saved under ignored `.waylog/` and restored into
+`nemo_restore_check_ollama_20261020_153213` on localhost:5433. The PostgreSQL 18
+restore client emitted a PostgreSQL 16-unsupported `transaction_timeout` session
+setting; only that SET statement was removed from the in-memory restore stream.
+Restore then succeeded in one transaction. No restore contents were logged.
+
+Using the existing policy update/validation/compiler flow, the restored copy
+retained definitions 5, 6 and 7 and advanced each to version 2. Policy 5 received
+a current compiled secret-output artifact. Policy 6 now stores `title = "test"`
+with resource-condition format 1. Policy 7 now stores
+`source_branch != "staging" AND target_branch = "production"` with format 2.
+Enabled flags, all assignments and model grants were preserved; each repaired
+policy has exactly one enabled compiled artifact. Policy 8 was unchanged.
+
+The committed snapshot validates all four effective policies for app 33. Four
+issue matcher checks and three branch matcher checks passed without GitHub
+operations. Exact issue-title matching follows the existing case-insensitive
+matcher; a longer title containing `test` does not match this rule. Both model
+grants validate, retaining Ollama profile 1 as main and Azure default as
+guardrail. Branch-conditional merges retain their conservative refusal because
+atomic selective merging remains unavailable.
+
+Root `.env` DATABASE_URL now selects the repaired local rehearsal database,
+with all other settings unchanged. The original local nemo_mcp_guardrails
+database remains unchanged, as do Azure targets. Restart the direct backend
+after clearing any terminal DATABASE_URL override, refresh the frontend and use
+a fresh conversation ID before retrying the read-only model test. No live model
+or MCP request was made during this repair; complete GMS/Ollama acceptance
+remains pending.
+
+## Local Ollama Runtime Policy Diagnosis - 2026-10-20
+
+A read-only check of home localhost:5433 / nemo_mcp_guardrails found app 33
+selecting compatible model profile 1 for main and the Azure default for
+guardrails. Its runtime policy snapshot rejects three effective legacy rows:
+policy 5 has mismatched compiled secret-output text; policy 6 stores an
+unversioned issue selector (`test`); policy 7 stores unsupported branch prose
+(target production, source not staging). Effective policy 8 validates.
+
+In-memory previews validated refreshing policy 5, canonicalizing policy 6 to
+exact title equality with format 1, and representing policy 7 as source branch
+not staging AND target production with format 2. No policy definition, artifact,
+assignment or grant was written. User clarification of the issue-title intent is
+pending. Preserve existing IDs, scopes and branch restrictions. The branch
+conversion helper still restricts application to restored nemo_restore_check_*
+databases; do not bypass its target check or disable/recreate definitions.
+
+This failure does not establish live Ollama compatibility. The runtime setup
+error is reproduced by the policy snapshot validator before model execution.
+
+## Local Login Setup - 2026-10-20
+
+The user requested a GMS management account in the separate home PostgreSQL
+database at 127.0.0.1:5433 / nemo_mcp_guardrails. That exact target was verified
+before writing. The existing security-foundation helper added the two missing
+password-state columns and scoped conversation-history index. One local test
+administrator was created using a salted scrypt hash and the existing 24-hour
+setup-only password state. Existing account password hashes were preserved.
+
+The actual management login handler and signed-token verification passed against
+this database. Browser/HTTP login is still to be checked. First login requires a
+replacement password of at least 15 characters before model management is
+available. Account credentials are intentionally excluded from documentation.
+No Azure database, policy, model selection, app grant, or .env value was changed.
+
 ## NVIDIA Supported-Provider Guide - 2026-10-20
 
 Added supported-llm-setup-guide.md against the user-linked NVIDIA Latest page
