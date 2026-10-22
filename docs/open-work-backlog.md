@@ -1,5 +1,19 @@
 # Open Work Backlog
 
+## Additional automation applied - 22 October 2026
+
+The user approved the exact ten-file patch with "ok". Applied source matches all
+tested candidate hashes: actual-decision tool-guard status, an offline synthetic
+policy 210 repair rehearsal, a disposable PostgreSQL runner with cleanup tests,
+and a local GitHub verification workflow. Current offline catalogue: **38**; five
+affected checks pass again from applied source.
+See [the application record and validation](automated-verification-preview-2026-10-22.md).
+The no-tool badge issue is fixed in saved source; restart the existing source
+backend to load it. Hosted CI awaits normal branch publication. Actual policy
+210 repair, work-network checks, dependencies and production rollout remain open.
+Completed home image acceptance below used the earlier 35-check source; cached
+images were not rebuilt or published for this source application.
+
 ## Home verification completed - 22 October 2026
 
 **All four current home verification groups are complete.** The final pinned
@@ -14,8 +28,8 @@ Use [the final results](home-verification-results-2026-10-22.md) as the current
 checkpoint. Temporary containers/networks were removed and the existing home
 app/database/private configuration were preserved. The host venv was not upgraded;
 restart the existing reload=False Windows backend to load the saved code fix.
-Remaining work is Pillow/FastEmbed and development braces findings, the no-tool
-status badge, work-network policy 210/grant/timing follow-up, conditional gateway
+Remaining work is Pillow/FastEmbed and development braces findings,
+work-network policy 210/grant/timing follow-up, conditional gateway
 acceptance and deferred production rollout. Older pending home-test descriptions
 below are historical. No commit, push, publication or deployment ran.
 

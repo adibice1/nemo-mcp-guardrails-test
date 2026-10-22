@@ -1,8 +1,29 @@
 # Testing Notes
 
+## Additional automation applied - 22 October 2026
+
+The user approved the exact ten-file patch with "ok"; all saved files match the
+tested candidate hashes. The current catalogue is **38** checks. It includes the
+actual-decision tool-status regression, synthetic policy 210 repair rehearsal,
+and disposable-runner cleanup tests. Windows/Linux candidate coverage, 16 real
+PostgreSQL diagnostics and frontend command validation pass; the five affected
+checks also pass again from applied source. Exact evidence is in
+[the application record](automated-verification-preview-2026-10-22.md).
+
+```powershell
+python -B scripts/run_security_checks.py
+docker build --tag gms-verification:local .
+python -B scripts/run_postgres_checks.py --run --backend-image gms-verification:local
+```
+
+The database command creates and cleans up a new isolated database; it does not
+use the configured home/work database. Default invocation without --run only
+shows help. The saved CI workflow needs branch publication before a hosted run.
+Existing home acceptance below is complete, not a request to repeat manual tests.
+
 ## Final home image verification - 22 October 2026
 
-Current catalogue: **35 checks**, including the new canonical-title explanation
+At that image checkpoint the catalogue was **35 checks**, including the canonical-title explanation
 regression. The final Linux AMD64 backend image passes all 35 with networking
 disabled. Its 17 direct roots and 117 constrained runtime packages match pins;
 build-time pip check passes, then pip is removed from runtime. The explicit

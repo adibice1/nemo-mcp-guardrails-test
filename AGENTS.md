@@ -1,5 +1,18 @@
 # AGENTS.md
 
+## Automation follow-up applied - 2026-10-22
+
+The user approved the exact ten-file patch with "ok"; all applied files match
+the tested candidate hashes. Read docs/automated-verification-preview-2026-10-22.md.
+The current offline catalogue has 38 checks; five affected checks pass again from
+applied source. Tool-guard status now follows actual current-invocation wrapper
+decisions; text-only/history-only answers report not run. The opt-in
+scripts/run_postgres_checks.py creates/cleans its own internal network/tmpfs
+database and runs schema checks plus 16 diagnostics. The policy 210 fixture is
+synthetic and does not repair the work DB. The verification workflow is saved
+locally, with no commit/push or hosted CI run. Existing cached images predate
+this patch; restarting the existing source backend loads the status fix.
+
 ## Latest home verification - 2026-10-22
 
 Under the user's explicit autonomous authority for this continuation, all four

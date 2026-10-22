@@ -35,6 +35,47 @@ _BUFFER: ContextVar[_EventBuffer | None] = ContextVar(
 )
 
 
+@dataclass
+class ToolGuardObservation:
+    """Track actual guard decisions independently of bounded HTTP trace storage."""
+
+    status: str = "not run"
+    closed: bool = False
+    lock: Any = field(default_factory=Lock, repr=False)
+
+
+_TOOL_GUARD_OBSERVATION: ContextVar[ToolGuardObservation | None] = ContextVar(
+    "gms_tool_guard_observation", default=None
+)
+
+
+@contextmanager
+def observe_tool_guard() -> Iterator[ToolGuardObservation]:
+    """Observe one agent invocation, including its asynchronous tool tasks."""
+    observation = ToolGuardObservation()
+    token = _TOOL_GUARD_OBSERVATION.set(observation)
+    try:
+        yield observation
+    finally:
+        with observation.lock:
+            observation.closed = True
+        _TOOL_GUARD_OBSERVATION.reset(token)
+
+
+def _observe_tool_guard_event(event: str, stage: str, outcome: str) -> None:
+    """Keep failures sticky and ignore callbacks after their invocation closes."""
+    observation = _TOOL_GUARD_OBSERVATION.get()
+    if observation is None or stage != "tool_guard":
+        return
+    status = "error" if event == "tool_guard.raised" else outcome
+    ranks = {"not run": 0, "passed": 1, "blocked": 2, "error": 3}
+    if event not in {"tool_guard.completed", "tool_guard.raised"} or status not in ranks:
+        return
+    with observation.lock:
+        if not observation.closed and ranks[status] > ranks[observation.status]:
+            observation.status = status
+
+
 def _event(
     event: str,
     stage: str,
@@ -79,7 +120,8 @@ def record_runtime_event(
     tool_name: str | None = None,
     reason_code: str | None = None,
 ) -> None:
-    """Append metadata only while an HTTP runtime capture is active."""
+    """Observe guard outcomes and append metadata during an active HTTP capture."""
+    _observe_tool_guard_event(event, stage, outcome)
     buffer = _BUFFER.get()
     if buffer is None:
         return

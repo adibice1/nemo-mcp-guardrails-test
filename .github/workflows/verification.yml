@@ -1,0 +1,49 @@
+name: Verification
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verification-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Build clean pinned backend
+        run: docker build --tag gms-verification:local .
+      - name: Run explicit offline catalogue
+        run: >-
+          docker run --rm --network none
+          --mount type=bind,source="$GITHUB_WORKSPACE/tests",target=/app/tests,readonly
+          --mount type=bind,source="$GITHUB_WORKSPACE/scripts",target=/app/scripts,readonly
+          --mount type=bind,source="$GITHUB_WORKSPACE/Dockerfile",target=/app/Dockerfile,readonly
+          --entrypoint python gms-verification:local -B /app/scripts/run_security_checks.py
+      - name: Run disposable PostgreSQL diagnostics and migration checks
+        run: python3 -B scripts/run_postgres_checks.py --run --backend-image gms-verification:local
+
+  frontend:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Install locked dependencies, lint, type-check and build on pinned Node 24
+        run: >-
+          docker run --rm
+          --mount type=bind,source="$GITHUB_WORKSPACE/frontend",target=/app
+          --workdir /app --env NEXT_TELEMETRY_DISABLED=1
+          --env NEXT_PUBLIC_API_BASE_URL=/api/gms
+          node:24.21.0-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1
+          sh -ec 'npm ci --no-audit; npm run lint; npm exec -- tsc --noEmit; npm run build'

@@ -1,5 +1,12 @@
 # Home verification results - 22 October 2026
 
+Follow-up: the user approved and applied the
+[ten-file automation/status patch](automated-verification-preview-2026-10-22.md).
+Saved source now has 38 offline checks and fixes the no-tool badge; five affected
+checks pass again after application. The 35-check image acceptance below is the
+earlier image checkpoint. Those cached images were not rebuilt for this follow-up;
+hosted CI awaits branch publication. Actual work policy repair remains deferred.
+
 Status: **all four current home verification groups completed**. The user
 explicitly authorized autonomous code changes and documentation updates while
 asleep. This scope did not include production migrations, image publication,
@@ -135,8 +142,9 @@ no audit approval remains pending.
 
 - Pillow 12.3.0 advisories: current and newer published FastEmbed versions still
   require Pillow below 13; no incompatible override/removal was applied.
-- Development-only braces advisory and the misleading no-tool Tool guard passed
-  badge remain separate source/upstream follow-ups.
+- Development-only braces advisory remains an upstream follow-up. The no-tool
+  Tool guard passed badge is fixed in saved source by the approved follow-up
+  linked above; existing source processes need a restart to load it.
 - The earlier incorrect branch answer is not independently root-caused; fresh
   conversation retries worked, but its original raw tool result is unavailable.
 - Work-network Azure timing/log evidence, policy 210 repair/validation and the

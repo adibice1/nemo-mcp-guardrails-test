@@ -20,6 +20,7 @@ OFFLINE_TESTS = (
     "test_runtime_policy_integration", "test_policy_assistant_http", "test_policy_options_capabilities",
     "test_tool_guard", "test_output_guard", "test_runtime_cache", "test_runtime_llm_grants",
     "test_runtime_connector_credentials", "test_runtime_mcp_launch", "test_runtime_llm_selection",
+    "test_runtime_tool_status", "test_policy_210_rehearsal", "test_postgres_check_runner",
     "test_runtime_block_explanations", "test_runtime_debug_privacy", "test_runtime_events", "test_runtime_logs_http", "test_request_timing",
 )
 CHILD = """

@@ -1,5 +1,10 @@
 # LLM Provider Guide
 
+The [approved automation follow-up](automated-verification-preview-2026-10-22.md)
+fixes Tool guard status in saved source: an answer without a current wrapper
+decision reports `not run`; old tool messages in history do not count. Restart
+the existing source backend to load it. Policy compliance does not establish
+answer accuracy. Model forms and registration payloads retain the formats below.
 
 Current form/API instructions were reconciled with the applied source on
 22 October 2026. All 11 JSON examples across the model guides validate against

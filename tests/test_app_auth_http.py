@@ -7,7 +7,7 @@ from _bootstrap import bootstrap_src
 bootstrap_src()
 
 from fastapi.testclient import TestClient
-from langchain_core.tools import ToolException
+from langchain_core.tools import StructuredTool, ToolException
 from nemoguardrails.exceptions import LLMCallException
 from nemoguardrails.rails.llm.options import RailStatus
 from openai import BadRequestError
@@ -24,7 +24,7 @@ from nemo_mcp_guardrails.guarded_execution import (
     GuardedExecutionResult,
     execute_guarded_message,
 )
-from nemo_mcp_guardrails.tool_guard import TOOL_GUARD_REFUSAL, ToolGuardViolation
+from nemo_mcp_guardrails.tool_guard import TOOL_GUARD_REFUSAL, ToolGuardViolation, guard_mcp_tool
 
 
 VALID_API_KEY = "temporary-valid-http-api-key"
@@ -207,10 +207,19 @@ class FakeInputFilterRails:
 
 
 class FakeToolErrorAgent:
-    """Fake agent that simulates a connector tool failure."""
+    """Simulate a connector failure after the real tool wrapper accepts it."""
 
     async def ainvoke(self, payload: object) -> object:
-        raise ToolException("failed to get pull request: 404 Not Found")
+        """Preserve the passed-guard assertion by actually running the guard."""
+        async def missing_pull_request() -> str:
+            """Raise a synthetic connector error without contacting GitHub."""
+            raise ToolException("failed to get pull request: 404 Not Found")
+
+        tool = StructuredTool.from_function(
+            coroutine=missing_pull_request, name="pull_request_read",
+            description="Synthetic missing pull request.",
+        )
+        return await guard_mcp_tool(tool, blocked_tool_names=frozenset()).ainvoke({})
 
 
 class FakeToolGuardBlockedAgent:

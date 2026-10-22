@@ -1,5 +1,14 @@
 # Remaining verification - 22 October 2026
 
+## Automation follow-up applied
+
+[The approved automation patch](automated-verification-preview-2026-10-22.md)
+is applied with all candidate hashes verified. It adds three offline catalogue
+checks (38 total), a repeatable disposable PostgreSQL runner and a saved local CI
+workflow. The no-tool status issue is fixed in saved source. The synthetic policy 210
+rehearsal does not complete group 6 against the actual work database, and local
+workflow command checks do not constitute a hosted CI run. The previously
+completed home groups below retain their accepted status.
 
 ## Completion update
 
@@ -88,7 +97,7 @@ these are not 34 new manual user tests.
 Pillow/FastEmbed compatibility remediation and the development-only braces
 advisory remain open. The legacy explanation fix is complete. Policy 210 repair remains a
 prerequisite for group 6. The misleading Tool guard passed badge when no tool
-is called is a separate source issue. The unused Qwen classifier grant needs an
+is called is fixed by the approved follow-up linked above. The unused Qwen classifier grant needs an
 intent decision. Selective branch merging remains unsupported and fails closed;
 implementing it is future feature work, not a request to execute an allowed merge.
 The initial wrong branch answer is not independently root-caused; general model

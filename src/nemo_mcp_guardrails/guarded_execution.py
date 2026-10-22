@@ -10,7 +10,7 @@ from openai import BadRequestError
 
 from nemo_mcp_guardrails.output_guard import find_blocked_output_phrase
 from nemo_mcp_guardrails.performance import measure_stage
-from nemo_mcp_guardrails.runtime_events import record_runtime_event
+from nemo_mcp_guardrails.runtime_events import observe_tool_guard, record_runtime_event
 from nemo_mcp_guardrails.tool_guard import (
     TOOL_GUARD_REFUSAL, TOOL_GUARD_EVALUATION_RESPONSE, ToolGuardEvaluationError, ToolGuardViolation,
 )
@@ -441,7 +441,7 @@ async def execute_guarded_message(
     )
 
     try:
-        with measure_stage("agent_tools"):
+        with observe_tool_guard() as tool_guard, measure_stage("agent_tools"):
             agent_result = await agent.ainvoke(
                 {
                     "messages": build_agent_messages(
@@ -511,7 +511,7 @@ async def execute_guarded_message(
             input_rail_source=get_rail_source(input_result),
             input_rail_categories=get_rail_categories(input_result),
             output_rail_categories=get_rail_categories(output_result),
-            tool_guard_status="passed",
+            tool_guard_status=tool_guard.status,
             tool_trace=(
                 {
                     "event": "error",
@@ -547,7 +547,7 @@ async def execute_guarded_message(
             input_rail_source=get_rail_source(input_result),
             input_rail_categories=get_rail_categories(input_result),
             output_rail_categories=(),
-            tool_guard_status="passed",
+            tool_guard_status=tool_guard.status,
         )
 
     azure_categories = get_agent_content_filter_categories(agent_result)
@@ -576,7 +576,7 @@ async def execute_guarded_message(
             input_rail_source=get_rail_source(input_result),
             input_rail_categories=get_rail_categories(input_result),
             output_rail_categories=azure_categories,
-            tool_guard_status="passed",
+            tool_guard_status=tool_guard.status,
             tool_trace=extract_tool_trace(agent_result),
         )
 
@@ -626,7 +626,7 @@ async def execute_guarded_message(
         input_rail_source=get_rail_source(input_result),
         input_rail_categories=get_rail_categories(input_result),
         output_rail_categories=get_rail_categories(output_result),
-        tool_guard_status="passed",
+        tool_guard_status=tool_guard.status,
         blocked_output_phrase=blocked_phrase,
         tool_trace=extract_tool_trace(agent_result),
     )
