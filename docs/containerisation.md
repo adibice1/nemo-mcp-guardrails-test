@@ -1,5 +1,16 @@
 # Container Images And Azure Container Instances
 
+## Current deployment checkpoint - 22 October 2026
+
+Read [the final deployment checklist](deployment-checklist-2026-10-22.md) before
+historical pending-build instructions. Source 5f84cffe has passing hosted CI for
+both jobs, 38 offline and 16 PostgreSQL diagnostics. The new local backend tag
+`gms-home-be:20261022-followup` includes the status fix and passes all 38 checks;
+real frontend-proxy plain/read/blocked statuses and synthetic database/key
+recovery pass. See [the image identity and evidence](home-readiness-results-2026-10-22.md).
+No matching release pair has been published/deployed by this continuation.
+Older 35-check image and unverified-native-MCP statements below are historical.
+
 ## Final home image pair - 22 October 2026
 
 The current source has fresh verified Linux AMD64 images gms-home-be:20261022
@@ -242,11 +253,15 @@ The deployment team needs environment values for:
 
 - PostgreSQL connection details or `DATABASE_URL`.
 - `GMS_JWT_SECRET`.
+- `GMS_MODEL_CREDENTIAL_ENCRYPTION_KEY` for encrypted app-owned model profiles;
+  provision/recover it privately and retain the matching key for encrypted data.
 - Azure OpenAI endpoint, API version, deployment, and credential.
 - Optional `GMS_ALLOWED_LLM_ENDPOINTS` for additional exact HTTPS model origins.
   `AZURE_OPENAI_ENDPOINT` is automatically approved. Do not include credentials,
   paths, queries, or fragments. Existing stored LLM endpoints are checked too;
   restart the backend after changes. See `llm-provider-guide.md`.
+- `GMS_ALLOWED_COMPATIBLE_LLM_ENDPOINTS` for exact approved compatible API base
+  URLs, including the path; configure it when deploying those profiles.
 - `GMS_ALLOWED_LLM_CREDENTIAL_ENV_VARS` for additional exact LLM credential
   variable names. `AZURE_OPENAI_API_KEY` is automatically approved. Name approval
   is enforced during management provisioning/selection and runtime resolution
@@ -278,8 +293,9 @@ Do not bake these values into either image.
    backend `8000`, and `GMS_API_BASE_URL=http://127.0.0.1:8000`.
 5. Validate login, policy CRUD, frontend proxy health, and one guarded GitHub
    request in the deployed environment without a URL port suffix.
-6. Add GitHub Actions CI for tests/builds, then CD with GitHub-to-Azure OIDC and
-   immutable commit-SHA image tags.
+6. GitHub Actions verification CI is implemented and passes for the pushed source.
+   Automated CD with GitHub-to-Azure OIDC is a separate future deployment choice;
+   record immutable release image identities regardless of deployment method.
 
 References:
 

@@ -1,9 +1,11 @@
 # LLM Provider Guide
 
 The [approved automation follow-up](automated-verification-preview-2026-10-22.md)
-fixes Tool guard status in saved source: an answer without a current wrapper
-decision reports `not run`; old tool messages in history do not count. Restart
-the existing source backend to load it. Policy compliance does not establish
+fixes Tool guard status: an answer without a current wrapper decision reports
+`not run`; old tool messages in history do not count. The rebuilt backend and
+real Azure/native-MCP proxy checks now verify those statuses; see
+[the live results](home-readiness-results-2026-10-22.md). Older source processes
+need a normal restart to load saved changes. Policy compliance does not establish
 answer accuracy. Model forms and registration payloads retain the formats below.
 
 Current form/API instructions were reconciled with the applied source on

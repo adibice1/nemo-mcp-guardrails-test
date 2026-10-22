@@ -1,5 +1,27 @@
 # Open Work Backlog
 
+## Final work/deployment checklist - 22 October 2026
+
+Use [the five remaining verification groups](deployment-checklist-2026-10-22.md)
+when resuming at work. It separates actual-environment smoke, policy/grants,
+target schema/config, production recovery/rollback and deployed acceptance from
+dependency findings, secret provisioning and release publication/rollout. New
+provider acceptance is conditional. All current home checks remain complete;
+the remaining groups are not five single commands or a production clearance.
+
+## Home readiness follow-up completed - 22 October 2026
+
+All requested unconditional home checks passed for the user's pushed commit
+5f84cffe: the new local backend image passes 38 offline checks, baked source/pins
+match, live proxy plain/read/blocked statuses match actual tool events, and a
+synthetic pg_dump/pg_restore/key-recovery rehearsal passes. The hosted GitHub
+Verification run passes both jobs, including 38 offline and 16 PostgreSQL checks.
+See [the results, CI link and new image identity](home-readiness-results-2026-10-22.md).
+Owned test resources were removed; existing home data/private configuration and
+server processes were preserved. No new source commit/push, registry publication,
+work policy repair or deployment ran. Work-network, conditional provider and
+production-specific acceptance below remain deferred.
+
 ## Additional automation applied - 22 October 2026
 
 The user approved the exact ten-file patch with "ok". Applied source matches all
@@ -9,10 +31,10 @@ and a local GitHub verification workflow. Current offline catalogue: **38**; fiv
 affected checks pass again from applied source.
 See [the application record and validation](automated-verification-preview-2026-10-22.md).
 The no-tool badge issue is fixed in saved source; restart the existing source
-backend to load it. Hosted CI awaits normal branch publication. Actual policy
+backend to load it. The subsequent pushed-commit CI run passes as recorded above. Actual policy
 210 repair, work-network checks, dependencies and production rollout remain open.
-Completed home image acceptance below used the earlier 35-check source; cached
-images were not rebuilt or published for this source application.
+Completed home image acceptance below used the earlier 35-check source. A later
+local 38-check image rebuild is accepted in the follow-up above; no image publication ran.
 
 ## Home verification completed - 22 October 2026
 

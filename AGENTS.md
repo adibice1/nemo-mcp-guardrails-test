@@ -1,5 +1,28 @@
 # AGENTS.md
 
+## Work/deployment checklist - 2026-10-22
+
+Read docs/deployment-checklist-2026-10-22.md for the user's work-machine resume.
+It consolidates five outstanding verification groups and separates conditional
+new-provider testing, unresolved dependency findings and authorized rollout
+actions. Home/CI acceptance remains complete; do not repeat it or declare
+production ready. The new handoff/readiness/checklist docs remain local until
+committed/pushed through the user's normal workflow. A presentation walkthrough
+is separate from production cutover; policy 210 affects app 214, outside app 221's
+captured policy set.
+
+## Home readiness follow-up completed - 2026-10-22
+
+Read docs/home-readiness-results-2026-10-22.md. The user pushed commit 5f84cffe;
+GitHub Verification run 39710898869 passes backend/frontend, 38 offline and 16
+PostgreSQL diagnostics. A new local gms-home-be:20261022-followup image includes
+the exact current source and passes 38 checks. Real proxy plain/read/blocked
+requests verify not-run/passed/not-run statuses and actual tool events. A fully
+synthetic pg_dump/pg_restore and missing/wrong/correct-key recovery rehearsal
+passes. All owned temporary resources were removed. Existing home DB, private
+configuration and host server processes were preserved. Actual work-network,
+new-provider provisioning and production-specific recovery/rollout remain open.
+
 ## Automation follow-up applied - 2026-10-22
 
 The user approved the exact ten-file patch with "ok"; all applied files match
@@ -10,8 +33,9 @@ decisions; text-only/history-only answers report not run. The opt-in
 scripts/run_postgres_checks.py creates/cleans its own internal network/tmpfs
 database and runs schema checks plus 16 diagnostics. The policy 210 fixture is
 synthetic and does not repair the work DB. The verification workflow is saved
-locally, with no commit/push or hosted CI run. Existing cached images predate
-this patch; restarting the existing source backend loads the status fix.
+locally at that checkpoint; the user's subsequent push and successful hosted
+run are recorded above. A new local image is now verified; restarting an older
+source backend process loads the status fix there.
 
 ## Latest home verification - 2026-10-22
 

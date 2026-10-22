@@ -1,5 +1,14 @@
 # Home continuation - 21 October 2026
 
+## Latest readiness follow-up - 22 October 2026
+
+All requested unconditional home checks are complete. The user's pushed source
+passes hosted CI (both jobs, 38 offline and 16 PostgreSQL checks); the rebuilt
+local image, real proxy status smoke and synthetic backup/key-recovery rehearsal
+also pass. See [the latest results and remaining boundaries](home-readiness-results-2026-10-22.md).
+Actual work policy/grant/timing and conditional provider/production checks remain
+separate. Older pending home instructions below are historical.
+
 ## Home verification complete - 22 October 2026
 
 All four current home verification groups are completed under the user's

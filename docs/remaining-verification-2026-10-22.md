@@ -1,13 +1,31 @@
 # Remaining verification - 22 October 2026
 
+## Final deployment view
+
+[The work/deployment checklist](deployment-checklist-2026-10-22.md) is the concise
+current deployment view: five remaining verification groups, plus separate
+release decisions/actions and conditional new-provider acceptance. It expands
+the production-readiness group below into target compatibility, recovery and
+deployed acceptance. These are the same outstanding areas, not five additional
+home test groups. It also lists the short final presentation walkthrough.
+
+## Latest home follow-up completed
+
+The [requested home readiness follow-up](home-readiness-results-2026-10-22.md)
+is complete: new backend image with 38 checks, real frontend-proxy no-tool/read/
+blocked statuses, synthetic database/key recovery, and the first hosted CI run
+all pass. Both hosted jobs pass for the user's pushed commit 5f84cffe. These
+additional checks do not complete the actual work-network or production-specific
+groups below. No original home acceptance needs replaying.
+
 ## Automation follow-up applied
 
 [The approved automation patch](automated-verification-preview-2026-10-22.md)
 is applied with all candidate hashes verified. It adds three offline catalogue
-checks (38 total), a repeatable disposable PostgreSQL runner and a saved local CI
+checks (38 total), a repeatable disposable PostgreSQL runner and a published CI
 workflow. The no-tool status issue is fixed in saved source. The synthetic policy 210
-rehearsal does not complete group 6 against the actual work database, and local
-workflow command checks do not constitute a hosted CI run. The previously
+rehearsal does not complete group 6 against the actual work database. The later
+hosted run is now successful, as linked above. The previously
 completed home groups below retain their accepted status.
 
 ## Completion update

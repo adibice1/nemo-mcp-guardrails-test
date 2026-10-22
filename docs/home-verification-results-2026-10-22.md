@@ -1,11 +1,16 @@
 # Home verification results - 22 October 2026
 
+Latest follow-up: [home readiness results](home-readiness-results-2026-10-22.md)
+record the new 38-check image, real no-tool/read/blocked statuses, synthetic
+database/key recovery and successful hosted CI for the user's pushed source.
+The original image acceptance record below is retained.
+
 Follow-up: the user approved and applied the
 [ten-file automation/status patch](automated-verification-preview-2026-10-22.md).
 Saved source now has 38 offline checks and fixes the no-tool badge; five affected
 checks pass again after application. The 35-check image acceptance below is the
 earlier image checkpoint. Those cached images were not rebuilt for this follow-up;
-hosted CI awaits branch publication. Actual work policy repair remains deferred.
+the subsequent hosted run now passes. Actual work policy repair remains deferred.
 
 Status: **all four current home verification groups completed**. The user
 explicitly authorized autonomous code changes and documentation updates while

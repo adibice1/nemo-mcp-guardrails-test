@@ -1,5 +1,32 @@
 # Work/Home Computer Handoff
 
+## Heading to work: final checklist - 22 October 2026
+
+Start with [the five-group deployment checklist](deployment-checklist-2026-10-22.md).
+All requested home checks and hosted CI are complete. Remaining verification is
+actual work/Azure smoke/logs/timing, affected policy/grants, target schema/config,
+production recovery/rollback, and post-deployment image-pair acceptance. New
+provider acceptance is conditional. Dependency findings and publication/rollout
+are separate release work; this is not a production-ready declaration.
+
+For the presentation, rehearse the intended existing app/setup once. Policy 210
+needs actual repair only if app 214 is included; it is outside app 221's captured
+effective set. Preserve completed browser/model/PR acceptance and read-only mode.
+The new readiness/checklist docs are local changes until committed/pushed for
+the work machine; source commit 5f84cffe already has successful hosted CI.
+
+## Latest home follow-up and hosted CI - 22 October 2026
+
+Read [the current results](home-readiness-results-2026-10-22.md). The user pushed
+commit 5f84cffe; GitHub Verification passes both jobs, including 38 offline and 16
+PostgreSQL diagnostics. A rebuilt local backend image passes all 38 checks and
+real proxy plain/read/blocked status checks. Synthetic database/key recovery
+passes; temporary resources are removed. All requested unconditional home checks
+are complete. Actual Azure work-environment timing, policy 210/app 214 repair and
+app 221 grant decisions still require that environment/scope. New-provider and
+production-specific recovery/rollout remain separate. Do not replay completed
+home/manual tests just because older sections below describe them as pending.
+
 ## Latest completed home checks - 22 October 2026
 
 Read [the final home results](home-verification-results-2026-10-22.md) before

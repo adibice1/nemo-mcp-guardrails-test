@@ -1,5 +1,22 @@
 # Testing Notes
 
+## Final deployment test inventory - 22 October 2026
+
+[The five-group checklist](deployment-checklist-2026-10-22.md) records what remains
+for the actual work/deployment environment. Home/CI checks are complete; actual
+target configuration/data, production recovery and deployed acceptance still
+require their own evidence. Release decisions/actions are listed separately.
+
+## Pushed-commit image/live/recovery verification - 22 October 2026
+
+All requested unconditional home follow-ups pass. The new backend image contains
+the exact current guard fix and passes all 38 offline checks. Real frontend-proxy
+plain/read/blocked requests have the correct tool status and matching events.
+A synthetic pg_dump/pg_restore plus independent-key recovery rehearsal passes.
+Hosted CI also passes both jobs for commit 5f84cffe, including 38 offline and 16
+PostgreSQL diagnostics. See [the results and evidence limits](home-readiness-results-2026-10-22.md).
+Temporary test resources are removed; production-specific recovery remains separate.
+
 ## Additional automation applied - 22 October 2026
 
 The user approved the exact ten-file patch with "ok"; all saved files match the
@@ -18,7 +35,8 @@ python -B scripts/run_postgres_checks.py --run --backend-image gms-verification:
 
 The database command creates and cleans up a new isolated database; it does not
 use the configured home/work database. Default invocation without --run only
-shows help. The saved CI workflow needs branch publication before a hosted run.
+shows help. The user's subsequent branch publication triggered the successful
+hosted run linked above.
 Existing home acceptance below is complete, not a request to repeat manual tests.
 
 ## Final home image verification - 22 October 2026

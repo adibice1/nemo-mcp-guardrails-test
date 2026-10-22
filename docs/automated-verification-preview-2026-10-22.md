@@ -1,5 +1,9 @@
 # Automated verification application record - 22 October 2026
 
+Subsequent follow-up: the user committed/pushed this source, both hosted CI jobs
+passed, and the new local backend image plus live status and synthetic recovery
+checks passed. See [the latest results](home-readiness-results-2026-10-22.md).
+
 Status: **approved and applied**. After reviewing the tested patch contents, the
 user approved application with "ok". All ten saved files match the tested
 candidate SHA-256 values. The applied offline catalogue now has **38 checks**,
@@ -29,8 +33,10 @@ pre-application status; `application-receipt.json` records the applied state and
 `applied-verification.json` records the five passing affected checks.
 
 These private artifacts are ignored by Git; this document preserves the review
-summary for handover. No commit, push, hosted CI run, work policy repair or
-deployment ran.
+summary for handover. No commit/push, hosted CI run, work policy repair or
+deployment ran at the application checkpoint. The user's subsequent push and
+successful hosted run are recorded in the follow-up above; no work policy repair
+or deployment ran in either continuation.
 
 ## Applied behavior
 
@@ -117,10 +123,11 @@ on the same digest-pinned Node 24 image as the frontend Dockerfile. Full advisor
 audits remain separate; the known Pillow/FastEmbed and development braces findings
 are not fixed by this automation.
 
-Hosted CI has not run: the workflow is saved locally. Its YAML structure was
-parsed locally and its underlying commands were exercised locally. Normal branch
-publication is needed before GitHub can run it; a local result is not a hosted
-workflow result.
+At the application checkpoint the workflow was saved locally, with YAML and
+underlying commands verified locally. The user's subsequent branch publication
+triggered [the successful hosted run](https://github.com/adibice1/nemo-mcp-guardrails-test/actions/runs/39710898869),
+which passed both jobs for commit 5f84cffe. Its separate hosted evidence is in the
+follow-up linked above.
 
 ## Validation
 
@@ -160,10 +167,11 @@ patch and hashes. Historical home image acceptance is recorded separately in
 Actual work-network timing/log checks, policy 210 repair/validation, the app 221
 classifier-grant decision, provisioned external-provider acceptance and production
 rollout remain as listed in [the remaining checklist](remaining-verification-2026-10-22.md).
-The no-tool badge is fixed in saved source. Restart the existing source backend
-in its normal verified terminal to load the change. Previously built cached
-images predate this patch and need a normal rebuild before using the change in
-an image-based deployment. The current source commands are:
+The no-tool badge is fixed in saved source. Restart an older source backend
+process in its normal verified terminal to load the change. The original cached
+image predated this patch; the follow-up now verifies the rebuilt local tag
+`gms-home-be:20261022-followup`. Published deployment images still require their
+normal authorized build/publication workflow. The current source commands are:
 
 ```powershell
 python -B scripts/run_security_checks.py
