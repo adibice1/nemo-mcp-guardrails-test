@@ -1,0 +1,5 @@
+GMS live presentation fixture
+Date: 2026-10-22
+Source branch: staging
+Purpose: provide a distinct staging commit for pull-request routing demonstrations.
+This file contains demonstration text only.
