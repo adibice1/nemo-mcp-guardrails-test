@@ -1,5 +1,17 @@
 # Python dependency review - 22 October 2026
 
+## Work virtual environment aligned after presentation
+
+After the user stopped the backend and explicitly approved installation, the
+work Windows venv was updated to the already approved source pins: aiohttp
+3.14.5, certifi 2026.10.19 and yarl 1.25.1. All 120 constraints now match with
+no missing packages; pip check and all 38 offline diagnostics pass. A restarted
+read-only rehearsal backend passes a real Azure/native-MCP branch read through
+the frontend proxy. Source constraints were not changed. See
+[the post-presentation results](post-presentation-verification-2026-10-22.md).
+The historical home-host statement below describes that earlier run only.
+Pillow/FastEmbed compatibility and the development-only braces finding remain open.
+
 ## Clean image follow-up completed
 
 The final Linux image installs all 17 direct roots and 117 constrained runtime

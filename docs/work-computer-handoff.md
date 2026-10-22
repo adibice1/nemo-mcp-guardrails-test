@@ -1,5 +1,126 @@
 # Work/Home Computer Handoff
 
+## Current continuation point - 22 October 2026, after presentation
+
+For the laptop, use the [concise 22 October home handover](home-handoff-2026-10-22.md).
+It distinguishes home-local work from Azure-only follow-ups and preserves the
+separate home/work database and encryption-key settings.
+
+Start with [post-presentation results and the complete test map](post-presentation-verification-2026-10-22.md)
+and [the updated deployment checklist](deployment-checklist-2026-10-22.md).
+This checkpoint supersedes historical pending items below. Azure work access
+was supplied privately for Test app 3, then the temporary access file was removed.
+No secrets belong in this handoff or Git.
+
+- Verified actual target: guardrails-postgresql.postgres.database.azure.com /
+  nemo_restore_check_20261016. Root .env still has a local database default;
+  preserve the verified process override when restarting. Never infer target
+  identity from a healthy login alone.
+- Work venv now uses approved aiohttp 3.14.5, certifi 2026.10.19 and yarl 1.25.1;
+  all 120 constraints match, pip check passes, all 38 offline checks pass and a
+  subsequent real proxy Azure/native-MCP read passes with all stages/tool events.
+- App 221 retains Azure defaults for both roles and its existing grants,
+  including the unused Qwen classifier grant explicitly retained by the user.
+  Fixed-model timings, real tool events, no-tool status, existing input blocks
+  without tool execution and management audit persistence are now verified.
+- Authorized repair: app 214 assignment 190 now references supported policy 212,
+  preserving its ID/label/enabled state. Definitions/compiled rows unchanged;
+  exact snapshot and six matcher cases pass. This approved reuse replaces the
+  earlier proposed in-place repair of 210. Full app 214 HTTP acceptance needs its
+  existing app key or a manual Runtime Test if that app is in release scope.
+- All six authorized rehearsal apps' policy snapshots validate. App 208 lacks
+  usable selected-default-model grants; app 222 selects Qwen for classification,
+  which earlier quality matrices did not accept. Their release intent needs a
+  decision; no automatic grant/selection changes were made.
+- Backend restarted hidden after the approved installation: PID 31988,
+  127.0.0.1:8000, rehearsal target, GITHUB_MCP_READ_ONLY=1. Frontend preserved.
+  Output: .waylog/post-presentation-20261022/backend-after-update.log. Verify PID
+  ownership before stopping it to restart under a terminal. Health/DB health pass.
+- The saved root .env encryption key is preserved. Six synthetic key checks
+  pass; no owned profiles currently exist in the rehearsal. Private key backup
+  remains an operational requirement; do not regenerate a key to repeat a test.
+
+Home can continue source/docs/local synthetic verification; it still cannot
+complete the actual Azure-specific optional follow-ups without connectivity.
+Remaining production groups: exact target schema/configuration, actual target
+backup/key recovery/rollback and deployed image-pair acceptance. They require
+the intended target, release/recovery owners and authorized access. Browser
+rendering can be checked manually if the presentation did not already cover it;
+automated proxy timing and backend persistence are complete. No repeat of the
+whole browser/model/PR suite is requested. Known Pillow/FastEmbed and development
+braces findings remain open; no production deployment/security clearance is claimed.
+
+No application source was edited or committed/pushed in this testing session.
+Transfer the updated docs through the normal Git workflow before switching PCs.
+
+## Historical presentation workflow prepared - 22 October 2026
+
+The user deferred remaining tests and requested a live-demo workflow. Start with
+[the plain-text Notepad runbook](live-demo-2026-10-22.txt). They confirmed the
+repository adibice1/nemo-mcp-guardrails-test. The agent created only two requested
+text fixtures: development commit 21ffd61962aa72f3b6d933551d5740cc510e6690 and
+staging commit 7bb188076f440d00774e6bb6bf7051ebe2f4ce81. Remote reads and compare
+results independently confirm them; staging has one unique commit relative to
+production, development has four. Main/production stayed unchanged; no PR or
+merge was created. The GitHub integration returned 403; the authorized file
+creation used the project's existing credential privately, without changing its
+permissions. No GitHub MCP mode, database, user, app or model selection changed
+as part of this preparation. Remaining tests are deferred, not passed.
+
+Qwen qwen2.5:1.5b is installed; local Ollama catalogue and root endpoint approval
+were checked. The runbook provides only its local non-secret placeholder and
+credential variable names, never real keys. It explicitly explains selective
+merging still fails closed and includes temporary write-mode/cleanup commands
+for the user to run during the authorized presentation.
+
+## Work schema preflight - 22 October 2026
+
+The first DBeaver column query returned zero rows. After migration instructions,
+the user supplied passing schema results: owner_app_id integer nullable and
+encrypted_api_key text nullable; fk_llm_configs_owner_app references apps(id)
+ON DELETE CASCADE; ck_llm_configs_owned_credential enforces the two credential
+modes; ix_llm_configs_owner_app_id is a btree owner index. Record the work
+rehearsal owned-model schema as user-verified, not pending. The recorded target
+is nemo_restore_check_20261016; no production migration is claimed and the agent
+did not execute the migration. Do not rerun it just to repeat completed checks.
+
+The user's backend probe reported `Encryption key: missing`; their rehearsal
+query then confirmed zero rows with encrypted_api_key IS NOT NULL. The agent
+provisioned a separate work-rehearsal Fernet key directly into the existing
+private .env, first checking that it is Git-ignored and untracked. Persistence
+and key format were verified without printing the value; other dotenv settings
+were verified unchanged. No database, home key or production setting changed.
+Private key backup remains the user's operational step; format verification
+does not establish production recovery or live owned-model decryption.
+
+The user then confirmed login works after the instructed backend restart.
+Agent HTTP probes returned 200 for /health and /health/db. These probes establish
+liveness/reachability, not independent database identity or owned-model decryption.
+The initial direct-API frontend configuration caused /api/gms/health to return
+503; instructions then set process variables NEXT_PUBLIC_API_BASE_URL=/api/gms
+and GMS_API_BASE_URL=http://127.0.0.1:8000. Subsequent agent probes now return
+HTTP 200/status ok for both /api/gms/health and /api/gms/health/db. The user
+reported the instructed safe branch read passed Input, Tool guard and Output
+and returned development, feat/add-user-management, main, production and staging.
+Record successful user-reported read plus independent proxy-health evidence;
+the individual request's browser route/tool trace/timing were not supplied.
+Do not claim captured list_branches events solely from the passed badge.
+
+The user subsequently confirmed the development-to-production smoke request was
+blocked and appears in Traffic. Record the blocked outcome/Traffic visibility as
+user-confirmed; individual stage values, block reason and event details were
+not pasted. The successful read's list_branches event names remain unconfirmed.
+
+Next collect fixed-provider cold/warm timings and actual tool-event evidence.
+Keep Azure main/classifier fixed, restart only the backend once in its verified
+read-only rehearsal terminal, and issue three identical safe branch reads with
+fresh conversation IDs. Collect browser duration and the matching backend
+gms_timing line for each /v1/guardrails/run. Server-Timing carries only total
+gms duration; per-stage timings are in stages_ms/backend logs and Traffic events.
+Verify actual list_branches tool.started/tool.returned events, not just badges.
+Policy 210, classifier-grant review and remaining audit evidence remain pending.
+Keep read-only mode and retain the saved private key.
+
 ## Heading to work: final checklist - 22 October 2026
 
 Start with [the five-group deployment checklist](deployment-checklist-2026-10-22.md).

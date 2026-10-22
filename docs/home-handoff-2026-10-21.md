@@ -1,5 +1,13 @@
 # Home continuation - 21 October 2026
 
+## Superseded by the post-presentation handover
+
+Start with [the 22 October home handover](home-handoff-2026-10-22.md).
+Actual work timing/tool/audit verification, the approved app 214 assignment reuse,
+app 221's retain-Qwen decision and work dependency alignment are complete.
+The pending descriptions below are historical, not instructions to repeat those
+actions. Current remaining work and environment boundaries are in the new handover.
+
 ## Latest readiness follow-up - 22 October 2026
 
 All requested unconditional home checks are complete. The user's pushed source

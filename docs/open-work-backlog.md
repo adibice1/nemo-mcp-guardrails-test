@@ -1,5 +1,66 @@
 # Open Work Backlog
 
+## Current post-presentation checkpoint - 22 October 2026
+
+For continuation on the laptop, use the [22 October home handover](home-handoff-2026-10-22.md).
+
+Testing resumed at the user's request. Read the
+[complete verification map and results](post-presentation-verification-2026-10-22.md)
+and [updated deployment checklist](deployment-checklist-2026-10-22.md).
+The work venv now matches all 120 source constraints after the explicitly approved
+three-package install. All 38 offline checks, pip check, proxy health and a real
+post-update Azure/native-MCP read pass. Earlier fixed-model timing samples,
+actual list_branches events, no-tool status, blocked/no-tool evidence and existing
+management audit persistence are captured. Temporary private access is removed.
+
+The user approved reusing policy 212: app 214 assignment 190 was changed from
+210 to 212 with ID/label/enabled state preserved. Definitions/artifacts are
+unchanged; exact snapshot and matcher checks pass. The user chose to retain app
+221's unused Qwen classifier approval; selections unchanged. These completed
+actions supersede the earlier in-place-policy-210 plan and grant-review task.
+
+Remaining: optional browser inspection/literal browser timings; app 214 live
+HTTP input acceptance if that app is in release scope; release-intent decisions
+for app 208's missing selected-model grants and app 222's active Qwen classifier;
+private work-key backup; three production verification groups (target config,
+actual recovery/rollback, deployed image pair). New-provider acceptance remains
+conditional. Pillow/FastEmbed and dev braces findings remain open. No production
+migration, deployment, application-source edit or commit/push ran in this session.
+Older entries below describe their dated checkpoints, not current pending work.
+
+## Historical presentation priority - 22 October 2026
+
+The user explicitly deferred the remaining tests to prepare a live presentation.
+Use [the copyable Notepad runbook](live-demo-2026-10-22.txt) for that walkthrough.
+The presentation-time deferral was lifted by the later testing request above.
+User-confirmed repository:
+adibice1/nemo-mcp-guardrails-test. Two authorized text-only fixture commits are
+created and independently verified on development (21ffd61962aa) and staging
+(7bb188076f44); main/production were unchanged and no PR or merge was created.
+Staging now has one head commit relative to production. The runbook includes
+new-app default-model grants, current Qwen fields, optional model switching,
+creation block/allow cases, honest selective-merge refusal, logs, developer
+membership/first-login password setup and read-only/PR cleanup. It changes no
+product behavior or previously recorded rollout restrictions.
+
+## Work rehearsal schema verified - 22 October 2026
+
+The user supplied the expected nullable owner/key columns, owner foreign key,
+credential consistency constraint and owner index after migration instructions.
+The owned-model schema preflight is user-verified on the recorded work rehearsal;
+do not repeat it. After the missing-key probe, the user confirmed zero encrypted
+profiles. A separate work key is now saved privately in ignored/untracked .env;
+persistence/format passed and other dotenv settings were preserved. Restart the
+backend in its verified rehearsal environment with read-only GitHub mode and no
+stale key override. The user has now confirmed login after restart; backend and
+database health probes passed. Subsequent proxy health and proxy DB health now
+return 200/status ok; the user reports a safe read passing all stages with the
+five expected branch names. The blocked-request smoke and its Traffic entry are
+now user-confirmed. Tool-event/timing and remaining audit evidence are pending.
+Continue those checks and policy/
+grant follow-up. Private key backup remains to arrange; this is not production
+migration, owned-model runtime acceptance or key-recovery verification.
+
 ## Final work/deployment checklist - 22 October 2026
 
 Use [the five remaining verification groups](deployment-checklist-2026-10-22.md)

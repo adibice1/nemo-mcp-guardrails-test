@@ -1,0 +1,384 @@
+GMS LIVE PRESENTATION RUNBOOK - 22 OCTOBER 2026
+============================================================
+Repository: adibice1/nemo-mcp-guardrails-test
+Browser: http://localhost:3000
+Database: Azure rehearsal nemo_restore_check_20261016
+Suggested app name: Presentation Demo 20261022
+Suggested duration: 12-18 minutes; Qwen may take longer than Azure.
+
+This is a presentation workflow. Remaining acceptance/performance tests are
+deferred at the user's request, not marked passed. No production cutover.
+
+IMPORTANT DEMO BEHAVIOR
+------------------------------------------------------------
+PR creation: development -> production is blocked; staging -> production
+can create a real PR if no other effective policy blocks it.
+
+Branch-conditional PR merging: selective merging is currently unavailable.
+development -> production should be blocked by the policy. A staging ->
+production merge is conservatively refused by the execution guard because
+the connector cannot atomically pin the target branch. Do not promise an
+allowed staging merge. An agent refusal without a tool call does not prove
+the tool guard ran; show the actual Traffic events when explaining a stage.
+
+GMS controls its own proxy/tool path. Direct Git/GitHub operations do not pass
+through GMS. Repository-wide GitHub protections are a separate control.
+
+0. BEFORE THE AUDIENCE ARRIVES
+------------------------------------------------------------
+Keep the existing verified Azure rehearsal backend terminal. Do not replace
+DATABASE_URL with root .env's older local database URL. Retain the saved work
+encryption key. Do not switch the running GMS source checkout between branches.
+
+The two requested fixture files are already committed remotely:
+development: demo-fixtures/presentation-20261022-development.txt
+  commit 21ffd61962aa72f3b6d933551d5740cc510e6690
+staging: demo-fixtures/presentation-20261022-staging.txt
+  commit 7bb188076f440d00774e6bb6bf7051ebe2f4ce81
+
+Both were independently read back through the GitHub connection. Compared
+with production, staging now has one unique commit (its text file);
+development has four unique commits (including earlier text fixtures).
+Main and production were unchanged. No PR was created by this preparation.
+Do not repeat the file creation commands merely to make a PR possible.
+
+Have GitHub signed in in a separate tab for PR inspection and cleanup.
+If using the GitHub CLI for the optional fixture/cleanup commands:
+  gh auth status
+If necessary, authenticate privately before presenting:
+  gh auth login --web --git-protocol https
+
+Optional pre-demo fixture for demonstrating the development merge attempt:
+create a DRAFT development -> production PR directly in GitHub before the
+GMS walkthrough. It represents a PR that already existed before the policy.
+First inspect open PRs so you do not create a duplicate:
+  gh pr list --repo adibice1/nemo-mcp-guardrails-test --state open --base production --head development
+
+Only if no equivalent fixture exists and you want this optional merge case:
+  gh pr create --repo adibice1/nemo-mcp-guardrails-test --base production --head development --draft --title "GMS demo existing development PR 20261022" --body "Pre-existing draft fixture for demonstrating blocked merging. Close after the presentation without merging."
+
+Record its actual number as DEV_PR_NUMBER in your private notes. Do not use
+an unrelated PR or a placeholder number in a live prompt. This direct GitHub
+fixture is outside GMS; do not describe it as bypassing an enforced GMS call.
+Without this fixture, demonstrate the development creation block and omit
+the development merge attempt rather than inventing a PR number.
+
+Keep normal startup read-only until the short PR-creation demo window.
+Backend, if a restart is needed (same verified rehearsal terminal):
+  $env:GITHUB_MCP_READ_ONLY = "1"
+  .\.venv\Scripts\python.exe -B scripts/run_api.py
+
+Frontend startup, from the project root in a DIFFERENT terminal:
+  $env:NEXT_PUBLIC_API_BASE_URL = "/api/gms"
+  $env:GMS_API_BASE_URL = "http://127.0.0.1:8000"
+  npm.cmd --prefix frontend run dev
+
+Local Ollama preflight (no download needed; qwen2.5:1.5b is installed):
+  ollama list
+  Invoke-RestMethod http://127.0.0.1:11434/api/tags
+Optional warm-up just before presenting:
+  ollama run qwen2.5:1.5b "Reply with READY only."
+Ollama must be running. If stopped, start the Ollama application, or use
+ollama serve in its own terminal. Do not launch a second server on an occupied port.
+
+Qwen endpoint is approved in the private project configuration:
+  http://127.0.0.1:11434/v1
+These values assume the backend runs directly on this Windows computer.
+Container-local 127.0.0.1 would refer to the container, not this Ollama service.
+
+1. LOG IN AS ADMIN
+------------------------------------------------------------
+Open http://localhost:3000/login and use your existing administrator account.
+Do not put its password, app keys or provider secrets in these notes.
+Narration: "Administrators control applications, shared policy definitions,
+connector provisioning, users and guardrail classifier approvals."
+
+2. SHOW THE APPS
+------------------------------------------------------------
+Open Apps. Briefly show existing applications and their scoped policies/models.
+Narration: "An app is a client consuming GMS. GitHub is a connector, not an app."
+
+3. CREATE A NEW APP
+------------------------------------------------------------
+Apps -> Create App -> name: Presentation Demo 20261022 -> Create.
+If that name was already used in a rehearsal, use a new name for clarity.
+GMS generates its client ID and API key. Copy the key privately before closing.
+Pause screen sharing or hide the secret dialog while copying the generated key.
+The key is needed in this app's Runtime Test, not in the model-profile form.
+
+4. ADD THE PR-CREATION AND MERGE POLICIES TO THIS APP
+------------------------------------------------------------
+Open the NEW app -> Policies -> Create/add policy in this APP scope.
+Do not create a global restriction or edit another app's shared definition.
+Equivalent existing definitions may be reused; that is expected.
+
+Policy A name: Block non-staging PR creation into production
+  Type: Input
+  Connector: GitHub
+  Action: Create
+  Resource: Pull Request
+  Branch controls: Source branch / does not equal / staging
+                   Target branch / equals / production
+  Both conditions are selected and joined by AND.
+  Readable preview: The source branch is not "staging" and the target branch
+                    is "production".
+  Save/assign to this app; leave enabled.
+
+Optional AI authoring sentence for Policy A:
+  Block creation of pull requests into production when the source branch is
+  not staging. Pull requests from staging into production are outside this
+  restriction.
+Review the generated condition and examples before saving. Structured branch
+controls are the predictable fallback if an AI draft asks for clarification.
+
+Policy B name: Block non-staging merges into production
+  Type: Input
+  Connector: GitHub
+  Action: Merge
+  Resource: Pull Request
+  Same source and target branch controls as Policy A.
+  Save/assign to this app; leave enabled.
+Show the selective-merge limitation notice rather than hiding it.
+
+Inherited global credential-output protection should remain visible/enabled.
+Do not assign legacy policy 210 to this demo app or repair it during the demo.
+
+5. SET THE GITHUB CONNECTOR
+------------------------------------------------------------
+New app -> Connectors -> link GitHub.
+Credential reference (copy this NAME, not a token):
+  env:GITHUB_PERSONAL_ACCESS_TOKEN
+Enabled: true -> Save.
+The existing backend credential must have the repository access needed for
+the planned operation. A GMS read-only switch cannot expand GitHub permissions.
+
+6. APPROVE AZURE AND ADD QWEN MAIN
+------------------------------------------------------------
+New app -> Models -> Approve model access for this app.
+New apps do not automatically receive Azure model grants.
+
+Approve these TWO entries separately:
+  Profile: Azure environment default    Purpose: Main agent
+  Profile: Azure environment default    Purpose: Guardrail classifier
+Keep/select Azure environment default in both selectors initially.
+If the selections already equal the defaults, a disabled Save button is normal.
+Azure defaults use existing backend credentials; no Azure secret needs copying.
+
+Then click Add model profile. Use the default app-owned credential form;
+leave the admin Advanced credentials/backend-managed checkbox OFF.
+
+FULL COPYABLE QWEN FORM VALUES:
+  API Type:              Compatible API / Model Gateway
+  Profile Name:          Presentation Qwen Main
+  Model / Gateway Alias: qwen2.5:1.5b
+  API Base URL:          http://127.0.0.1:11434/v1
+  Provider API key:      ollama-local-placeholder
+
+The placeholder is deliberately non-secret for this local unauthenticated
+Ollama server; it is not a GitHub token, Azure key or GMS app API key.
+Registration automatically grants main use to this app only. It does not
+select the profile until you choose it and Save model selections.
+Do not choose Qwen as classifier; keep the accepted Azure classifier.
+
+Show the Azure safe read first. If time permits, select Qwen Main, Save,
+repeat the read with a NEW conversation ID, then select Azure Main and Save
+again before the write demonstration. No backend restart is needed for these
+model-selection switches. Qwen is slower; budget time or skip its live call.
+
+7. RUNTIME SAFE READ
+------------------------------------------------------------
+New app -> Runtime Test -> enter THIS app's API key privately.
+Conversation ID: presentation-azure-read-01
+Prompt:
+List the existing branches in adibice1/nemo-mcp-guardrails-test using list_branches. Return only branch names. Do not create or modify anything.
+
+Expect development, feat/add-user-management, main, production and staging.
+Input, Tool guard and Output should pass when the tool actually runs.
+Show the connector trace and actual tool events, not only green badges.
+Optional Qwen repeat ID: presentation-qwen-read-01
+Use a fresh ID if rehearsing again; do not reuse an old conversation's history.
+
+8. PR CREATION: BLOCKED AND ALLOWED ROUTES
+------------------------------------------------------------
+For a clear actual-creation demonstration, use Azure main and Azure classifier.
+Stop ONLY the backend and restart it in its SAME verified rehearsal terminal:
+  $env:GITHUB_MCP_READ_ONLY = "0"
+  .\.venv\Scripts\python.exe -B scripts/run_api.py
+This is a temporary process-only write window. The committed default stays 1.
+
+Case A - ID: presentation-create-blocked-01
+Prompt:
+Create a pull request in adibice1/nemo-mcp-guardrails-test from development into production, titled GMS presentation blocked route 20261022. Do not change files, push commits, create branches or merge anything.
+
+Expected: Input blocked, later stages not run, no PR created.
+If input passes but a tool guard blocks, report the actual stage instead.
+
+Case B - ID: presentation-create-allowed-01
+Before running, check GitHub for an existing open staging -> production PR.
+If already present, show/reuse it instead of creating a duplicate.
+Prompt:
+Create exactly one pull request in adibice1/nemo-mcp-guardrails-test from staging into production, titled GMS presentation staging PR 20261022. Use existing commits and a non-draft PR. Stop if creation fails. Do not modify files, push commits, create branches, change either branch or merge anything.
+
+Expected: real create_pull_request call/result and a GitHub PR URL.
+The staging fixture provides the previously missing head commit.
+Record its actual number as STAGING_PR_NUMBER privately for the next step.
+If creation errors or times out, check GitHub before retrying: it may exist.
+If an unrelated effective policy blocks it, inspect the reason; do not weaken
+that policy during the presentation or claim creation succeeded.
+
+9. MERGE ATTEMPTS: EXPLAIN CURRENT LIMITS ACCURATELY
+------------------------------------------------------------
+This step attempts existing PRs; it does not merge bare branch names.
+Replace the placeholders below with the actual existing PR numbers.
+Never paste DEV_PR_NUMBER/STAGING_PR_NUMBER literally into Runtime Test.
+Keep both branch policies enabled throughout.
+
+Optional Case C - ID: presentation-merge-development-01
+Use only the pre-demo development fixture PR, if one was prepared.
+Prompt template:
+Attempt to merge pull request #DEV_PR_NUMBER in adibice1/nemo-mcp-guardrails-test, from development into production. Inspect the existing PR; do not create another PR, change its target, push commits or modify files. Stop if blocked or refused.
+Expected: blocked. The source is not staging.
+Do not treat a draft-only/model refusal as proof of tool-guard execution.
+
+Case D - ID: presentation-merge-staging-01
+Prompt template:
+Attempt to merge pull request #STAGING_PR_NUMBER in adibice1/nemo-mcp-guardrails-test, from staging into production. Inspect the existing PR; do not create another PR, change its target, push commits or modify files. Stop if blocked or refused.
+Expected: branch condition does not match, but selective merging is unavailable.
+The execution guard refuses rather than performing the merge. Depending on
+agent behavior, show a controlled tool error/refusal or a model refusal. Only
+actual tool_guard error events establish execution-guard evaluation.
+Narration: "PR creation supports selective branch routing. Selective merging
+needs an atomic target guarantee, so this build conservatively refuses it."
+
+10. SHOW TRAFFIC AND AUDIT LOGS
+------------------------------------------------------------
+Traffic: open this app's safe read, blocked creation and allowed creation.
+Show request ID, app ID, outcome, stage, duration and tool.started/tool.returned.
+A request blocked at input should not execute a connector tool.
+For the merge refusal, distinguish tool_guard error/refusal from a policy match.
+
+Audit Logs: show management actions such as app creation, policy assignment,
+connector provisioning and model-grant/selection changes. Runtime tool calls
+belong in Traffic, not Audit. Do not expose copied keys or passwords.
+
+11. CREATE A DEVELOPER AND LINK THE DEMO APP
+------------------------------------------------------------
+As admin, User Management -> Create User:
+  Name: Presentation Developer
+  Username: presentation-dev-20261022
+  Email: presentation.dev.20261022@example.com
+  System role: Developer
+  Enabled: true
+If already used, choose a fresh suffix instead of resetting another account.
+Copy the one-time temporary password privately; hide its dialog from projection.
+Open the created user's details and LINK Presentation Demo 20261022 to the user.
+Do this before logging out, otherwise their Apps page may correctly be empty.
+
+12. LOG IN AS THE NEW DEVELOPER
+------------------------------------------------------------
+Log out, then sign in using the new account and its temporary password.
+Complete the REQUIRED first-login password change with a private personal
+password. Setup-only sessions cannot access normal management screens.
+
+Show that Apps contains only their linked applications (here, the demo app).
+Open Models: main selection and Add model profile are available; guardrail
+classifier controls are locked and admin grant controls are absent.
+User Management/admin Audit controls are unavailable to this system developer.
+Optional: point out that a developer's new app-owned model would be main-only.
+This final step is an access-control walkthrough, not a repeat of all RBAC tests.
+
+13. CLEANUP AFTER THE DEMO
+------------------------------------------------------------
+In the verified backend terminal, stop the process and restore read-only:
+  $env:GITHUB_MCP_READ_ONLY = "1"
+  .\.venv\Scripts\python.exe -B scripts/run_api.py
+
+Close only PRs created for this presentation, WITHOUT merging. Do not delete
+development/staging/production branches. Keep the fixture files for another demo.
+GitHub UI: each demo PR -> Close pull request, not Merge.
+CLI alternative, after replacing the number with the real demo PR:
+  gh pr close STAGING_PR_NUMBER --repo adibice1/nemo-mcp-guardrails-test
+  gh pr close DEV_PR_NUMBER --repo adibice1/nemo-mcp-guardrails-test
+Skip the second command if no development fixture was created.
+Keep the admin account accessible for the next session. Optional user/app cleanup
+can wait; do not delete shared policy definitions or unrelated user data.
+
+APPENDIX A - COPYABLE GIT/GITHUB COMMANDS (SEPARATE CLONE)
+------------------------------------------------------------
+These are developer commands outside GMS, not guarded Runtime Test operations.
+The source branch files are already prepared. These commands are for inspecting
+them and learning the workflow, not required repeat preparation.
+Run a section at a time, checking results. Do not paste this entire file as code.
+
+A1. Separate inspection clone; keep the running GMS source checkout untouched:
+  Set-Location 'C:\Users\User\Downloads\nemo-mcp-guardrails-test'
+  git clone https://github.com/adibice1/nemo-mcp-guardrails-test.git .waylog/presentation-git-reference-20261022
+  Set-Location .waylog/presentation-git-reference-20261022
+If that clone already exists, enter it and fetch; do not clone over it.
+
+A2. Inspect branches and changes (no remote mutation):
+  git status --short
+  git remote -v
+  git fetch origin
+  git branch
+  git branch -a
+  git log --oneline --graph --decorate --all -15
+  git log --oneline origin/production..origin/staging
+  git diff --stat origin/production...origin/staging
+  git diff --stat origin/production...origin/development
+  git show origin/staging:demo-fixtures/presentation-20261022-staging.txt
+  git show origin/development:demo-fixtures/presentation-20261022-development.txt
+
+A3. First checkout of existing remote branches in that NEW clone:
+  git switch --track origin/development
+  git pull --ff-only origin development
+  git switch --track origin/staging
+  git pull --ff-only origin staging
+After a local branch exists, switch with git switch development / staging.
+
+A4. General add/commit/push example - OPTIONAL extra future development text:
+Do not run this just to repeat the already-completed fixture preparation.
+  git switch development
+  git pull --ff-only origin development
+  New-Item -ItemType Directory -Force demo-fixtures | Out-Null
+  'Optional additional demo note.' | Set-Content -Encoding ascii demo-fixtures/presentation-extra-development.txt
+  git add -- demo-fixtures/presentation-extra-development.txt
+  git diff --cached --stat
+  git commit -m "docs: add optional development presentation note"
+  git push origin development
+Git commits need your normal Git author identity; GitHub push needs your own
+authenticated access. Never paste a PAT into a remote URL or command history.
+
+A5. Understand git merge using a LOCAL scratch branch (no remote merge/push):
+  git fetch origin
+  git switch -c demo/local-merge-20261022 origin/production
+  git merge --no-ff --no-edit origin/staging
+  git log --oneline --graph -8
+This merges staging INTO THE CURRENT LOCAL scratch branch. It does not change
+origin/production. Do not push this branch to production as part of the demo.
+If conflicts occur, stop and inspect git status; abandon only that in-progress
+merge with git merge --abort. Do not use reset --hard or a force push.
+
+A6. Optional GitHub PR inspection:
+  gh pr list --repo adibice1/nemo-mcp-guardrails-test --state open --base production
+  gh pr view STAGING_PR_NUMBER --repo adibice1/nemo-mcp-guardrails-test --web
+The only direct gh pr create command needed for an optional development fixture
+is in section 0. The allowed staging PR should be created through GMS live.
+
+OFFICIAL COMMAND REFERENCES
+  https://git-scm.com/docs/git-switch
+  https://git-scm.com/docs/git-merge
+  https://cli.github.com/manual/gh_pr_create
+  https://cli.github.com/manual/gh_pr_close
+
+SHORT FALLBACK IF TIME IS LIMITED
+------------------------------------------------------------
+Admin login -> existing verified Test app 3 -> safe Azure read -> blocked
+development creation -> Traffic -> developer role view. Use an existing linked
+developer account if there is no time for the required temporary-password flow.
+Skip real PR creation when write access/provider readiness is uncertain; do not
+present a read-only refusal as successful selective enforcement.
+
+PUBLIC FIXTURE LINKS
+  https://github.com/adibice1/nemo-mcp-guardrails-test/blob/development/demo-fixtures/presentation-20261022-development.txt
+  https://github.com/adibice1/nemo-mcp-guardrails-test/blob/staging/demo-fixtures/presentation-20261022-staging.txt

@@ -1,103 +1,107 @@
-# Final deployment checklist - 22 October 2026
+# Deployment checklist - 22 October 2026
 
-Status: **home verification complete; production readiness remains open**.
-There are **five remaining verification groups**, with several checks in each.
-Some are conditional on the apps/providers being deployed; the final group runs
-after an authorized deployment. Publication, migration and deployment are rollout
-actions, not additional passing tests.
+Testing resumed after the presentation. Read the
+[post-presentation results and complete test map](post-presentation-verification-2026-10-22.md)
+first. Work timing/tool events, audit persistence, the approved app 214 repair,
+Test app 3's grant decision and work dependency alignment are now complete.
+Earlier five-group lists are superseded by the three production groups below,
+plus the narrow work decisions/optional checks explicitly listed here.
+
+Status: **home and supplied-access work verification complete; production
+readiness remains open**. Passing tests do not constitute security clearance.
 
 ## Accepted baseline
 
-- Source commit `5f84cffed834eb8c3d2bbd258e1b5b5e2f445a43` is user-pushed.
-- [Hosted Verification](https://github.com/adibice1/nemo-mcp-guardrails-test/actions/runs/39710898869)
-  passes both jobs: backend build, 38 offline checks, 16 PostgreSQL diagnostics,
-  schema checks, frontend lint, TypeScript and production build.
-- The new local backend image passes all 38 checks and matches the current source.
-- Real frontend-proxy Azure/native-MCP plain/read/blocked status checks pass.
-- Synthetic database backup/restore and missing/wrong/correct-key checks pass.
-- Developer model registration, selection/use, model switching and the earlier
-  browser/RBAC/policy workflows are accepted. Do not repeat that whole checklist.
+- Application source `5f84cffed834eb8c3d2bbd258e1b5b5e2f445a43` passed
+  [Hosted Verification](https://github.com/adibice1/nemo-mcp-guardrails-test/actions/runs/39710898869):
+  clean backend build, 38 offline checks, 16 PostgreSQL diagnostics, schema
+  checks, frontend lint, TypeScript and production build. Current HEAD `6a8b355`
+  adds presentation documentation; application source is unchanged.
+- Home Linux image, real Azure/native-MCP proxy plain/read/blocked behavior and
+  synthetic PostgreSQL backup/restore/key-recovery checks are accepted. See
+  [the home image/results](home-readiness-results-2026-10-22.md).
+- Developer main-model registration/use, model switching, classifier access
+  controls, English edit/cancel, branch input routing, controlled PR creation/
+  closure and browser request-count/filter/pagination checks remain accepted.
+- Work schema, saved encryption key format, login, direct/proxy API/database
+  health and valid/invalid app-auth boundaries pass on `nemo_restore_check_20261016`.
+- Four real safe reads have actual persisted `list_branches` start/return events;
+  a plain answer has zero tool starts and Tool guard `not run`. Existing blocked
+  requests have input-block evidence and zero tool starts. Management audit
+  actions are persisted. HTTP timings and one complete matching backend stage
+  record are captured; literal browser timings were not captured.
+- User-approved app 214 assignment 190 now reuses existing policy 212. The
+  assignment label/enabled state and definitions/artifacts are preserved; exact
+  snapshot validation and six matcher cases pass. Test app 3's unused Qwen
+  classifier grant is retained by explicit user choice; selections unchanged.
+- Work venv now matches all 120 constraints after installing the three approved
+  pins; `pip check`, all 38 offline checks and a subsequent real read pass.
+- The temporary private access file was removed. Backend is restored running
+  against the rehearsal with GitHub read-only; see the results for process/logs.
 
-See [the complete home results and image ID](home-readiness-results-2026-10-22.md).
-Those results cover the tested local/CI environments. Actual Azure deployment
-and production backup/key-custody checks still need their own evidence.
+## Narrow work follow-up
 
-## Five remaining verification groups
+These are not a request to rerun the whole accepted feature suite.
+
+| Item | Remaining action |
+| --- | --- |
+| Browser rendering, optional if presentation covered it | Inspect the recorded last request in Traffic and an existing Audit action if not already seen during the presentation. Backend events/persistence are verified. A browser DevTools capture is only needed for a literal browser-duration benchmark; automated proxy HTTP measurements already exist. Browser automation is unavailable. |
+| App 214 full HTTP acceptance, if in release scope | Supply its existing key privately or run the two exact-title/nonmatching input cases in its Runtime Test, read-only. Snapshot/artifact/matcher validation is complete; app 221's key cannot authenticate app 214. Do not regenerate keys or create an issue for this check. |
+| App 208 release intent | Finance bot lacks usable grants for both selected default models. Decide whether this is intentional or approve its intended models before treating it as runnable. No grants were silently enabled. |
+| App 222 classifier intent | App `adsf` actively selects Qwen profile 21 as classifier. Earlier Qwen classifier matrices did not pass acceptance. Decide its intended release scope/classifier; Test app 3's retained approval does not certify this selected classifier. No selection was changed automatically. |
+| Work key custody | Back up the saved work-rehearsal key privately. Synthetic validation is complete; provisioning alone is not backup/recovery acceptance. No stored owned models currently exist in this rehearsal. |
+
+The Azure-specific follow-ups need a connected work backend. The home laptop
+can use accepted synthetic/local PostgreSQL tests and inspect docs/source, but
+cannot complete actual work/production checks without access to those targets.
+
+## Three production verification groups
 
 | # | Group | Target and completion evidence |
 | --- | --- | --- |
-| 1 | **Work/Azure environment smoke and logs** | On the actual work rehearsal, verify proxy/API/database health, login, one safe branch read and one applicable blocked request with fresh conversation IDs. Confirm actual tool events and matching Traffic/Audit evidence. For the outstanding timing record, keep models fixed and record one cold plus two warm safe reads with browser/Server-Timing details. |
-| 2 | **Affected policy and grant validation** | Before enabling affected apps, review/repair policy 210 on app 214 while preserving its ID, intent and assignments; verify loading, current compiled artifact and matching/nonmatching behavior. Review app 221's unused Qwen classifier grant and verify the intended state if changed. The synthetic repair test is already green; the actual database repair has not run. |
-| 3 | **Target schema/configuration compatibility** | Inventory the intended deployment database and rehearse only its required migrations on a controlled restored copy. Verify security-foundation fields/indexes, model-grant schema, owned-model schema, existing policies/compiled versions, explicit selected-model grants and approved endpoint/credential references. Validate management authentication and both model roles against that target configuration. Preserve migration helpers' target restrictions; do not bypass them to run rehearsal-only helpers in production. |
-| 4 | **Production backup, key recovery and rollback** | Verify the intended backup storage/process and separately protected encryption-key custody. In an authorized recovery environment, restore an appropriate target backup, supply its matching key privately, verify applicable owned-model decryption/state and rehearse the reviewed rollback procedure. Synthetic recovery is complete; actual key availability, restore access and deployment rollback still need verification. |
-| 5 | **Deployed image-pair acceptance** | After authorized publication/deployment, record the exact frontend/backend image identities; verify frontend public 80, backend private 8000, same-origin `/api/gms`, database health, valid login, invalid app credentials rejected, one safe real tool read, one applicable blocked request and corresponding logs. Confirm enabled apps can resolve their selected models/connectors. Use the normal read-only GitHub setting. |
+| 1 | **Target schema/configuration compatibility** | Identify the intended production database and release scope. Inventory its differences and rehearse only required migrations on a controlled restored copy. Verify security fields/indexes, model grants, owned-model schema, exact policy/compiled content, selected-model approvals and approved endpoint/credential references. Validate management authentication and both model roles against the target configuration. Preserve helpers' target restrictions; do not bypass rehearsal-only guards. |
+| 2 | **Production backup, key recovery and rollback** | Verify actual backup storage/process and separately protected matching encryption-key custody. In an authorized recovery environment, restore an appropriate target backup, verify applicable owned-model decryption/relationships and rehearse the reviewed rollback procedure. Synthetic recovery has passed; actual custodians, target restore access and deployment rollback still require evidence. |
+| 3 | **Deployed image-pair acceptance** | After authorized publication/deployment, record exact frontend/backend image identities. Verify public frontend 80, private backend 8000, same-origin `/api/gms`, health, login, invalid app credentials rejected, one safe real tool read, one applicable block and corresponding logs. Confirm enabled in-scope apps resolve their selected models/connectors, with normal read-only GitHub mode. |
 
-Group 2's policy 210 repair is relevant to app 214, not to the previously captured
-app 221 effective policy set. It must be resolved before treating app 214 as
-working. Do not disable/delete/recreate the legacy definition as a shortcut.
-Its current assignments and intended exact-title meaning require review at work;
-the earlier inventory capture itself is complete.
+This is an exact target-difference review, not an instruction to run every old
+migration, restore over production, provision blanket grants or regenerate
+existing keys. Production needs controlled provisioning/recovery consistent
+with any encrypted data being restored.
 
-Group 3 is an exact target-difference review. It is not an instruction to apply
-every historical migration, restore over production, provision automatic grants
-or create a new schema design. The home encryption key has already been configured;
-do not regenerate it. Production needs its own controlled provisioning/recovery
-plan consistent with any encrypted data being restored.
+## Release decisions and actions
 
-## Rollout decisions and actions outside the test count
+1. Resolve or explicitly record the release disposition of the known
+   Pillow/FastEmbed compatibility and development-only braces findings. Review
+   [the dependency evidence](python-dependency-review-2026-10-22.md) and
+   [security rollout requirements](security-run-2026-10-16.md) with the release owner.
+2. Agree runtime configuration and recovery ownership: external PostgreSQL,
+   JWT secret, model encryption key, provider/GitHub credentials, endpoint
+   approvals and selected-model grants. The production secrets-manager choice
+   remains deferred. Supply actual values privately, never in docs/images/Git.
+3. Agree source revision, immutable image pair, exact migration plan, deployment
+   owner and rollback plan; publish and perform the authorized rollout. Green
+   CI/local images are not registry publication. Automated CD is a separate
+   future choice, not a missing test to implement now.
 
-1. **Resolve or explicitly record the release disposition of known findings.**
-   The recorded Pillow/FastEmbed compatibility finding and development-only
-   braces finding remain open. Passing tests does not remediate them. Review
-   [the dependency evidence](python-dependency-review-2026-10-22.md) and the
-   [security rollout requirements](security-run-2026-10-16.md) with the release
-   owner; this checklist does not grant security clearance.
-2. **Prepare the actual runtime configuration and recovery ownership.**
-   External persistent PostgreSQL, JWT secret, app-owned-model encryption key,
-   provider/GitHub credentials, endpoint/reference approvals and selected-model
-   grants must be available in the intended environment. The production secrets
-   manager choice/ownership is still deferred. Inject actual values privately;
-   do not place them in docs, images, client-side variables or Git.
-3. **Publish and deploy the reviewed release pair.**
-   Agree the source revision, immutable image identities, exact migration plan,
-   deployment owner and rollback plan; publish to the agreed registry and execute
-   the authorized rollout. Home images and green CI are not registry publication.
-   CI exists and passes; automated CD is a separate future choice, not a missing
-   requirement to rerun CI or implement another pipeline for this presentation.
-
-The current ACI contract and variables are in
-[containerisation.md](containerisation.md). Preserve its single-process backend
-assumption; scaling to multiple workers/replicas needs the separate shared-limit
-design already recorded in the security review. The public-port contract alone
-does not establish an additional TLS/domain/ingress setup.
+Preserve [the ACI contract](containerisation.md): frontend 80, backend private
+8000 and the existing same-origin proxy. Backend scaling beyond one process
+requires the separately recorded shared-limit design. The port contract alone
+does not establish TLS/domain/ingress configuration.
 
 ## Conditional provider acceptance
 
-If deployment introduces a new provider or external gateway, add its role-specific
-live acceptance before enabling it: actual tool-call/results for main agents,
-input/output and invalid classifier decisions, structured authoring when used,
-and timeout/error behavior. This needs the provisioned endpoint and credentials.
-Existing Azure/Ollama results do not certify an unprovisioned provider. It is not
-an extra mandatory provider project when deploying only the already tested models.
+If adding a new provider/gateway, verify its provisioned approved endpoint and
+credentials, actual tool calls/results for main agents, input/output and invalid
+classifier decisions, authoring if used, and timeout/error behavior for its
+intended role. Existing Azure/Ollama evidence does not certify a new provider.
+No new provider project is required when deploying already accepted models.
+Selective branch merging remains unavailable and fails closed.
 
-## Presentation checkpoint
+## Handoff
 
-For the presentation, do one short walkthrough on the actual presentation setup:
-sign in, use the intended existing app/model, show a safe read, show the relevant
-block and its logs. Include model registration/output blocking only if showing
-those features. This rehearses the sequence; the completed feature suite stays
-accepted. Record cold/warm numbers before making performance comparisons.
-
-App 214 needs its real policy repair if it is part of that demonstration. A
-presentation using the verified app/setup does not require production publication,
-production cutover or a new gateway. Keep those milestones distinct.
-
-## Work-machine entry point
-
-Transfer the updated docs through the normal Git workflow before leaving home;
-the readiness/checklist documentation added after commit 5f84cffe is currently
-local until committed/pushed. At work, read this file and
-[the handoff](work-computer-handoff.md), confirm the selected database/model/app
-identity without sharing secrets, and begin with group 1. Do not rerun completed
-PR creation, restore a rehearsal over production, or change read-only mode merely
-to reproduce an earlier acceptance result.
+Use [the current results](post-presentation-verification-2026-10-22.md) and
+[work/home handoff](work-computer-handoff.md), or the
+[concise home continuation guide](home-handoff-2026-10-22.md). Transfer these updated docs through
+the normal Git workflow before continuing elsewhere; no commit/push was made
+by this testing session. The [presentation runbook](live-demo-2026-10-22.txt)
+remains available as a historical/demo aid, not the current pending-test list.

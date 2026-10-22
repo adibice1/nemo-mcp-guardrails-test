@@ -1,10 +1,19 @@
 # nemo-mcp-guardrails-test
 
-Continuing at home: start with the [21 October home handover](home-handoff-2026-10-21.md).
-Azure is unavailable from the home laptop. Database capture is complete; two
-manual groups remain, plus finding resolution and implementation/release work.
-The handover records policy 210's app-specific repair finding and identifies
-what can use home-local PostgreSQL.
+Latest checkpoint: [post-presentation results and complete test list](post-presentation-verification-2026-10-22.md).
+Testing resumed: all 38 work offline checks and the real post-update read pass;
+the approved app 214 assignment repair is verified, work dependencies match,
+and temporary private access is removed. App 221's Qwen approval is retained.
+The [current deployment checklist](deployment-checklist-2026-10-22.md) records
+three production verification groups and narrow work follow-ups/decisions.
+Earlier pending lists below are historical; do not repeat accepted tests.
+The [presentation runbook](live-demo-2026-10-22.txt) remains available.
+
+Continuing at home: start with the [22 October home handover](home-handoff-2026-10-22.md).
+It records completed work verification, the applied assignment repair, remaining
+app decisions and which checks require Azure access. Home PostgreSQL stays on
+5433 with its own private key. The [21 October handover](home-handoff-2026-10-21.md)
+is historical; its pending repair/grant/timing items are superseded.
 
 Latest acceptance checkpoint: [21 October results and remaining manual tests](work-acceptance-2026-10-21.md).
 The Azure rehearsal target is user-verified and Qwen is installed/selected; do

@@ -1,5 +1,16 @@
 # Remaining verification - 22 October 2026
 
+## Superseding work checkpoint
+
+The user resumed testing after the presentation. Use the
+[post-presentation results and full test map](post-presentation-verification-2026-10-22.md)
+and [current deployment checklist](deployment-checklist-2026-10-22.md).
+Work timing/events/audit, the explicitly approved app 214 policy-212 reuse,
+app 221's retain-Qwen decision and work package alignment are complete.
+All 38 offline checks and a real post-update read pass. The earlier pending
+groups below are historical. The current checklist separates three production
+groups from optional browser/app-214 HTTP checks, app-scope decisions and key custody.
+
 ## Final deployment view
 
 [The work/deployment checklist](deployment-checklist-2026-10-22.md) is the concise
