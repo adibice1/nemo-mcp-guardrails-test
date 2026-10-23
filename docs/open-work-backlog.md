@@ -1,5 +1,49 @@
 # Open Work Backlog
 
+## Product guides written - 23 October 2026
+
+The user supplied the SE-EDU AddressBook Level 4 User/Developer Guide formats and
+authorised autonomous documentation work, choosing Markdown. The new
+[User Guide](UserGuide.md) and [Developer Guide](DeveloperGuide.md) follow those
+structures with current GMS workflows, permissions, API/setup, architecture
+diagrams, implementation, testing, operations and appendices. They distinguish
+accepted checks from actual fresh online bootstrap/deployment still pending.
+Guide review by the supervisor and reconciliation with the final deployed
+configuration remain; no template input is outstanding. No application code,
+private configuration, database or deployment changed for these guides.
+
+## Fresh second deployment and final workday - 23 October 2026
+
+Current authority/decisions are in [the final-workday handoff](final-workday-handoff-2026-10-23.md).
+The user selected a fresh database/data set in the existing Azure environment,
+supervisor ownership, admin@gmail.com as initial system admin, existing HTTP
+ingress and permission to release with documented dependency findings. Old app
+208/214/222 questions no longer block this fresh release; preserve the old data.
+Both commit-tagged local images are built and identical to accepted image IDs.
+A disposable fresh schema/catalog/first-admin/password/global-policy rehearsal
+passes. Existing deployed /login and proxy API/DB health are reachable from home;
+direct Azure PostgreSQL TCP 5432 times out before authentication.
+
+Registry read requires authentication; Azure CLI is absent and browser automation
+runtime failed here. Publication/deployment is authorized but not performed.
+Finish authenticated Azure discovery, new database/admin bootstrap, second-deploy
+acceptance and private backup/key/access handover while work access remains.
+The user and developer guides are now written as linked above. App source/private
+settings and existing databases/deployment were not changed in this preparation.
+
+## Automated home review - 23 October 2026
+
+The user's home-automation request now has a completed read-only metadata review
+and a [production configuration/recovery worksheet](production-readiness-worksheet-2026-10-23.md).
+See [the dated findings and automation boundary](home-automation-review-2026-10-23.md).
+FastEmbed's pinned/latest published requirements still exclude Pillow 13;
+braces still has no published patched version in the reviewed advisory. Targeted
+Pillow metadata counts refreshed to 38 OSV/34 PyPI IDs; these supersede older
+package-count snapshots, not the accepted functional tests or a full graph audit.
+The placeholder example has duplicate JWT variables, documented for separate
+review. No source/config/package/private-setting/database change ran. Actual
+target inputs, app release intent and key/release ownership still need decisions.
+
 ## Current post-presentation checkpoint - 22 October 2026
 
 For continuation on the laptop, use the [22 October home handover](home-handoff-2026-10-22.md).

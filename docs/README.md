@@ -1,5 +1,22 @@
 # nemo-mcp-guardrails-test
 
+Product guides: [User Guide](UserGuide.md) for administrators/app developers and
+[Developer Guide](DeveloperGuide.md) for maintainers/operators. These follow the
+user-supplied SE-EDU structures, adapted to GMS browser/API workflows and checked
+against current source on 23 October 2026.
+
+Current release plan: [final-workday handoff and fresh second deployment](final-workday-handoff-2026-10-23.md).
+The user chose fresh data on the existing Azure environment and supervisor
+ownership. Release images and fresh-start rehearsal are ready; actual authenticated
+Azure publishing/deployment and private operational handover remain. The user
+and developer guides are now written in Markdown; supervisor review remains.
+
+23 October home continuation: [automated dependency/template review](home-automation-review-2026-10-23.md)
+is complete, with a [production configuration/recovery worksheet](production-readiness-worksheet-2026-10-23.md)
+prepared. The later fresh-release record above resolves target/app intent and
+ownership decisions; actual provisioning/custody verification remains. No
+private configuration or application source changed in that review.
+
 Latest checkpoint: [post-presentation results and complete test list](post-presentation-verification-2026-10-22.md).
 Testing resumed: all 38 work offline checks and the real post-update read pass;
 the approved app 214 assignment repair is verified, work dependencies match,

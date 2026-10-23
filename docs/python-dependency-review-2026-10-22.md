@@ -1,5 +1,12 @@
 # Python dependency review - 22 October 2026
 
+23 October targeted refresh: [the automated home review](home-automation-review-2026-10-23.md)
+confirms pinned/latest FastEmbed still excludes Pillow 13 for Python 3.12 and
+the braces advisory still lists no patched version. Pillow's exact pinned
+version now has 38 OSV IDs and 34 PyPI IDs in that targeted metadata snapshot;
+older eight/nine-count statements below are historical. This was not a full
+installed-graph audit, package update or exploitability assessment.
+
 ## Work virtual environment aligned after presentation
 
 After the user stopped the backend and explicitly approved installation, the

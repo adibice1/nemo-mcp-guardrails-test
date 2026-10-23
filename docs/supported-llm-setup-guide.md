@@ -1,5 +1,24 @@
 # Setup Guide For NVIDIA's Supported LLM Providers In This GMS
 
+## What adding a model means - 23 October 2026
+
+This guide provides integration recipes across providers. A model can be added
+through the existing form when its deployed endpoint uses the supported Azure
+or compatible chat API contract, or an approved gateway translates it to that
+contract. The server/model must exist, the exact model/deployment ID and key must
+work, and the backend must approve the endpoint. Entries marked EXTRA INTEGRATION
+still require that additional work; a provider name is not an executable adapter.
+
+Main-agent registration is separate from classifier acceptance. Test main-model
+tool calls/results, reliable complete classifier decisions and structured policy
+authoring for the roles actually used. A successful save does not establish all
+three. This is why the guide covers many models while the project only claims
+live acceptance for the specific tested configurations. The supervisor can add
+further appropriately served models using these recipes after handover.
+
+The fresh-release plan and completed user/developer guide links are in
+[the current handoff](final-workday-handoff-2026-10-23.md).
+
 
 Current form/API instructions were reconciled with the applied source on
 22 October 2026. All 11 JSON examples across the model guides validate against

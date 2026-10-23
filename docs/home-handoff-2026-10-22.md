@@ -1,5 +1,18 @@
 # Home continuation - 22 October 2026, after presentation
 
+Latest 23 October decision: [fresh second deployment and final-workday handoff](final-workday-handoff-2026-10-23.md).
+Existing Azure environment, fresh data, supervisor ownership/admin@gmail.com,
+prepared matching images and a passed fresh-start rehearsal supersede old app
+release-scope questions below. Online deployment still needs authenticated work/
+Azure execution. The supplied SE-EDU templates are now applied to
+[UserGuide.md](UserGuide.md) and [DeveloperGuide.md](DeveloperGuide.md).
+
+23 October follow-up: the [automated home review](home-automation-review-2026-10-23.md)
+has completed the fresh read-only dependency/template inspection and prepared a
+[production configuration/recovery worksheet](production-readiness-worksheet-2026-10-23.md).
+It records remaining upstream compatibility issues and the actual target/owner
+inputs needed. Private settings, keys, packages and databases were unchanged.
+
 Read this first on the home laptop, then the
 [complete test results](post-presentation-verification-2026-10-22.md) and
 [current deployment checklist](deployment-checklist-2026-10-22.md).

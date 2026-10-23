@@ -1,5 +1,25 @@
 # Work/Home Computer Handoff
 
+## Final working-day priority and fresh deployment - 23 October 2026
+
+Start with [the latest release/handoff plan](final-workday-handoff-2026-10-23.md).
+The user confirmed an existing deployed service and wants its second deployment
+with a fresh database, not legacy apps/data. Supervisor takes over GMS/admin,
+release, secret/key and recovery ownership; initial admin email/username is
+admin@gmail.com. User has a backup to transfer privately and permits release
+with the recorded dependency findings. Both local release images are ready;
+fresh-start rehearsal passes. Actual registry/Azure authentication is unavailable
+on this home setup, so nothing was published/redeployed or provisioned online.
+
+At work, capture actual Azure resource/image/database identities, create/bootstrap
+the fresh target, complete supervisor first login, publish/deploy the verified
+pair, check the actual release and confirm private backup/key/access handover.
+Direct home SQL access times out at TCP, but the supplied deployed URL and its
+proxy DB health are reachable. Do not substitute keys, clear the old DB or apply
+the superseded policy-210 plan. The supplied SE-EDU templates are now applied to
+[UserGuide.md](UserGuide.md) and [DeveloperGuide.md](DeveloperGuide.md); review
+them with the supervisor and final deployed configuration.
+
 ## Current continuation point - 22 October 2026, after presentation
 
 For the laptop, use the [concise 22 October home handover](home-handoff-2026-10-22.md).

@@ -1,5 +1,33 @@
 # AGENTS.md
 
+## User and developer guides - 2026-10-23
+
+The user supplied SE-EDU AddressBook Level 4 guide templates and authorised
+autonomous writing, choosing Markdown. docs/UserGuide.md and
+docs/DeveloperGuide.md now follow those structures with original current GMS
+content. Keep UI/API permissions, model forms, protocol/credential distinctions,
+fresh setup, diagrams and test/operations appendices aligned with source.
+They do not establish completed fresh online bootstrap/deployment; actual
+supervisor review, operational handover and deployed acceptance remain.
+
+## Current fresh-release authority and deadline - 2026-10-23
+
+Read docs/final-workday-handoff-2026-10-23.md first. The user says their next
+working day is the last and authorizes building/deploying a second release on
+the existing Azure environment with a fresh database/data set. Supervisor takes
+over; initial GMS admin email/username admin@gmail.com. Legacy app 208/214/222
+scope questions are superseded for this release; preserve old databases/keys.
+User allows release with the documented unresolved dependency findings. Existing
+ingress is HTTP. Both local commit-tagged images build and match accepted IDs;
+fresh PostgreSQL/catalog/first-admin/setup/global-policy rehearsal passes.
+The supplied deployed URL and API/DB health respond 200; direct home SQL TCP
+5432 times out. Registry authentication is missing, Azure CLI absent and browser
+runtime unavailable here. Publication/deployment is authorized but has not run;
+do not claim an actual fresh database/admin was created. Finish online-dependent
+work and private backup/key/access handover while work access remains. User/dev
+guides now follow the supplied templates as recorded above. Model recipes require
+the supported protocol and role acceptance; no every-model certification claim.
+
 ## Work/deployment checklist - 2026-10-22
 
 Read docs/deployment-checklist-2026-10-22.md for the user's work-machine resume.

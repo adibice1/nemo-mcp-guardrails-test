@@ -1,5 +1,22 @@
 # Deployment checklist - 22 October 2026
 
+## Current release decision - 23 October 2026
+
+Read [the final-workday handoff](final-workday-handoff-2026-10-23.md) first.
+The user chose a fresh database/data set on the existing Azure environment,
+supervisor ownership and admin@gmail.com as first system-admin identity, and
+authorized the second deployment. Both local release images are built; actual
+publication/deployment awaits authenticated registry/Azure access. Existing
+public health endpoints pass, while direct home TCP 5432 times out.
+
+Legacy app 208/214/222 release-scope questions below no longer block this fresh
+release; do not migrate those app records or alter their old rehearsal data.
+Remaining target work is fresh schema/catalog/admin/bootstrap, private backup/
+key/rollback handover and acceptance of the actual replacement deployment.
+The user permits release with the recorded dependency findings; they remain
+open. The supplied SE-EDU formats are applied to [UserGuide.md](UserGuide.md)
+and [DeveloperGuide.md](DeveloperGuide.md); review them for operational handover.
+
 Testing resumed after the presentation. Read the
 [post-presentation results and complete test map](post-presentation-verification-2026-10-22.md)
 first. Work timing/tool events, audit persistence, the approved app 214 repair,
@@ -7,16 +24,17 @@ Test app 3's grant decision and work dependency alignment are now complete.
 Earlier five-group lists are superseded by the three production groups below,
 plus the narrow work decisions/optional checks explicitly listed here.
 
-Status: **home and supplied-access work verification complete; production
-readiness remains open**. Passing tests do not constitute security clearance.
+Earlier checkpoint: **home and supplied-access work verification complete;
+production acceptance remains open**. Current release direction is above.
 
 ## Accepted baseline
 
 - Application source `5f84cffed834eb8c3d2bbd258e1b5b5e2f445a43` passed
   [Hosted Verification](https://github.com/adibice1/nemo-mcp-guardrails-test/actions/runs/39710898869):
   clean backend build, 38 offline checks, 16 PostgreSQL diagnostics, schema
-  checks, frontend lint, TypeScript and production build. Current HEAD `6a8b355`
-  adds presentation documentation; application source is unchanged.
+  checks, frontend lint, TypeScript and production build. Current release commit
+  `fa76f78ba62d9fff6d97c6587a61b9984a373955` adds documentation; application
+  source is unchanged. The commit-tagged local images match the accepted image IDs.
 - Home Linux image, real Azure/native-MCP proxy plain/read/blocked behavior and
   synthetic PostgreSQL backup/restore/key-recovery checks are accepted. See
   [the home image/results](home-readiness-results-2026-10-22.md).
@@ -39,9 +57,11 @@ readiness remains open**. Passing tests do not constitute security clearance.
 - The temporary private access file was removed. Backend is restored running
   against the rehearsal with GitHub read-only; see the results for process/logs.
 
-## Narrow work follow-up
+## Historical rehearsal follow-up
 
-These are not a request to rerun the whole accepted feature suite.
+These describe the old rehearsal. Fresh-release scope above supersedes the old
+app inclusion/grant/classifier questions; preserve the old data and completed
+acceptance. Do not rerun the whole feature suite for the new handoff.
 
 | Item | Remaining action |
 | --- | --- |
@@ -59,7 +79,7 @@ cannot complete actual work/production checks without access to those targets.
 
 | # | Group | Target and completion evidence |
 | --- | --- | --- |
-| 1 | **Target schema/configuration compatibility** | Identify the intended production database and release scope. Inventory its differences and rehearse only required migrations on a controlled restored copy. Verify security fields/indexes, model grants, owned-model schema, exact policy/compiled content, selected-model approvals and approved endpoint/credential references. Validate management authentication and both model roles against the target configuration. Preserve helpers' target restrictions; do not bypass rehearsal-only guards. |
+| 1 | **Fresh target bootstrap/configuration** | Create and identify a new empty database; initialize current schema, seed the platform catalogue, bootstrap the supervisor admin and mandatory global credential policy. Blank-database rehearsal has passed; actual online provisioning remains. Verify forced password setup, intended model approvals, endpoint/credential references and connector links for acceptance. Preserve the old database. Existing-data migrations are conditional on a future scope change; preserve helper restrictions. |
 | 2 | **Production backup, key recovery and rollback** | Verify actual backup storage/process and separately protected matching encryption-key custody. In an authorized recovery environment, restore an appropriate target backup, verify applicable owned-model decryption/relationships and rehearse the reviewed rollback procedure. Synthetic recovery has passed; actual custodians, target restore access and deployment rollback still require evidence. |
 | 3 | **Deployed image-pair acceptance** | After authorized publication/deployment, record exact frontend/backend image identities. Verify public frontend 80, private backend 8000, same-origin `/api/gms`, health, login, invalid app credentials rejected, one safe real tool read, one applicable block and corresponding logs. Confirm enabled in-scope apps resolve their selected models/connectors, with normal read-only GitHub mode. |
 
@@ -70,16 +90,18 @@ with any encrypted data being restored.
 
 ## Release decisions and actions
 
-1. Resolve or explicitly record the release disposition of the known
-   Pillow/FastEmbed compatibility and development-only braces findings. Review
+1. The user explicitly permits release with the known Pillow/FastEmbed
+   compatibility and development-only braces findings. Keep them open and review
    [the dependency evidence](python-dependency-review-2026-10-22.md) and
    [security rollout requirements](security-run-2026-10-16.md) with the release owner.
-2. Agree runtime configuration and recovery ownership: external PostgreSQL,
+2. Supervisor ownership is confirmed. Provision/verify runtime configuration:
+   external PostgreSQL,
    JWT secret, model encryption key, provider/GitHub credentials, endpoint
    approvals and selected-model grants. The production secrets-manager choice
    remains deferred. Supply actual values privately, never in docs/images/Git.
-3. Agree source revision, immutable image pair, exact migration plan, deployment
-   owner and rollback plan; publish and perform the authorized rollout. Green
+3. The source revision, built image pair and fresh-data direction are recorded
+   in the final-workday handoff. Capture current Azure resource/configuration
+   identities and rollback evidence, then publish and perform the authorized rollout. Green
    CI/local images are not registry publication. Automated CD is a separate
    future choice, not a missing test to implement now.
 
