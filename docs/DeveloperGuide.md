@@ -90,6 +90,11 @@ Review [configuration](#37-configuration) before startup. Offline checks need no
 
 ### 1.3. Initialising a fresh database
 
+**Current handover:** `nemo_gms_release_20261023` already exists with its admin,
+completed password setup and global baseline. Do not repeat this bootstrap on
+that populated target. [The work execution record](workday-online-execution-2026-10-23.md)
+lists actual results, private deployment artifacts and pending public cutover.
+
 This section applies only to a deliberately **new empty database**. The current release decision is fresh data on the existing Azure environment, preserving the old database for rollback. The PostgreSQL database itself must be created by an authorised operator; application startup does not create it.
 
 1. Confirm the server and exact new database name with the operator. Verify the target has no existing application tables/data. Use a database identity query rather than relying solely on a healthy API.
@@ -118,7 +123,7 @@ This section applies only to a deliberately **new empty database**. The current 
    | `must_change_password` | `True` |
    | `temporary_password_expires_at` | Current timezone-aware UTC time + 24 hours |
 
-   Generate a high-entropy temporary password using the existing `gms-` plus `secrets.token_urlsafe(24)` convention. Deliver it privately once; do not pass it in a shell argument, include it in Git or capture it in an execution report. For this handover the intended email/username is `admin@gmail.com`; no actual account/password has been provisioned here.
+   Generate a high-entropy temporary password using the existing `gms-` plus `secrets.token_urlsafe(24)` convention. Deliver it privately once; do not pass it in a shell argument, include it in Git or capture it in an execution report. For the current release, `admin@gmail.com` is already provisioned and the user privately completed its password replacement; this step is a procedure for other genuinely fresh targets, not an instruction to recreate that account.
 6. Have the administrator log in, replace the password and log in again. Verify setup credentials cannot access `/apps`, and that the old setup token is invalid after replacement. Normal subsequent users are created through User Management.
 7. Establish the mandatory global credential-output policy through authenticated normal policy/assignment APIs or the UI. For operator/API use, the following policy body is accepted by the current schema:
 

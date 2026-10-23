@@ -1,5 +1,25 @@
 # Open Work Backlog
 
+## Actual online preparation and publication - 23 October 2026
+
+Use [the work execution record and supervisor commands](workday-online-execution-2026-10-23.md).
+The named fresh Azure database and supervisor admin are provisioned; user
+password replacement passes. A current old-data dump actually restores with
+matching tables/counts/constraints. The work-built release pair is published by
+versioned tag/digest after image/package/source/offline checks. Mandatory global
+output baseline is assigned and a real image-pair read passes. An exact-title
+input classifier case did not block; preserve its failed evidence and focused
+diagnosis. ACI update cannot run with registry credentials alone; supervisor is
+unavailable in the remaining window, so concrete private YAML and operator
+instructions are prepared. No live public-service change during 11:30–14:00.
+Actual deployed acceptance and protected backup/key/password transfer remain.
+The initialized fresh-database archive has now also been restored/verified,
+including admin-session/password-state compatibility and the restored purpose
+constraint's behavior after equivalent cast normalization. Temporary recovery
+DBs, acceptance app/policies/containers, operator server and credential handoff
+files are removed. Required private files/hash manifest remain for transfer.
+Source application unchanged; do not rerun completed provisioning or full suites.
+
 ## Product guides written - 23 October 2026
 
 The user supplied the SE-EDU AddressBook Level 4 User/Developer Guide formats and

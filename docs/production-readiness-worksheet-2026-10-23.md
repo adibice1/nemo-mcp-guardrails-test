@@ -1,5 +1,12 @@
 # Production configuration and recovery worksheet - 23 October 2026
 
+Later work execution: [fresh online preparation and supervisor deployment record](workday-online-execution-2026-10-23.md).
+The selected new database/admin are now initialized; user password replacement,
+baseline policy assignment, old-data backup recovery and registry publication
+are complete. Supervisor ACI execution/custody/deployed acceptance remain. New
+title-specific input-classifier findings are recorded without claiming a fix.
+The planning states below describe their earlier checkpoint.
+
 Status: **release direction confirmed; authenticated Azure execution pending**.
 The user selected the existing Azure environment, a fresh database/data set and
 supervisor ownership, and authorized building/deploying the second release.

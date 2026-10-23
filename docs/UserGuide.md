@@ -4,7 +4,7 @@ Maintained by: GMS project maintainers
 Last reviewed: 23 October 2026  
 Companion document: [Developer Guide](DeveloperGuide.md)
 
-This guide follows the organisation of the [SE-EDU AddressBook Level 4 User Guide](https://se-education.org/addressbook-level4/UserGuide.html), adapted to a browser application. Its instructions describe the current repository. The second Azure deployment and its fresh database are still pending; see the [release record](final-workday-handoff-2026-10-23.md) for operational status.
+This guide follows the organisation of the [SE-EDU AddressBook Level 4 User Guide](https://se-education.org/addressbook-level4/UserGuide.html), adapted to a browser application. Its instructions describe the current repository. The fresh online database/admin are initialized, but the second public Azure deployment is still pending; see the [actual work execution record](workday-online-execution-2026-10-23.md) for status and the recorded title-specific input-classifier finding. The public website continues using its existing deployment until the supervisor performs cutover.
 
 ## Contents
 

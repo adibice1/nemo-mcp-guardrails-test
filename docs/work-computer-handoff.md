@@ -1,5 +1,29 @@
 # Work/Home Computer Handoff
 
+## Actual work execution - 23 October 2026
+
+Start with [the actual online results and supervisor deployment instructions](workday-online-execution-2026-10-23.md).
+The new online database `nemo_gms_release_20261023` and admin now exist; user
+password replacement is complete, mandatory global output policy assigned,
+current old-data backup actually restored/verified, and the new work image pair
+published by digest. Existing public service is untouched. Registry credentials
+do not authorize ACI updates; supervisor will execute deployment later. Keep
+11:30–14:00 free of public-service changes. Title-specific classifier cases failed
+input-block acceptance; broad issue creation blocks with zero tool starts.
+Private bundle/custody and deployed acceptance remain; do not claim every test
+passed or repeat the fresh initialization against this now-populated database.
+Both old and initialized-new database archives have now actually restored and
+passed their recorded checks. The new archive's restored admin session/state
+passes; zero owned profiles means stored-profile decryption was not applicable.
+Temporary recovery DBs/acceptance containers/operator server and access-token/
+connection handoff files are removed. Private deployment YAML/settings, old/new
+archives, preserved work key and hash manifest remain in the recorded private
+folder for protected transfer. The public website still uses its old deployment.
+The current rehearsal was also independently archived/restored at 14:05: seven
+users and six apps, with later policy/model/grant work. Do not confuse that archive
+with the six-user original application backup. Neither is imported into the
+one-admin fresh release. Details and file hashes are in the execution record.
+
 ## Final working-day priority and fresh deployment - 23 October 2026
 
 Start with [the latest release/handoff plan](final-workday-handoff-2026-10-23.md).

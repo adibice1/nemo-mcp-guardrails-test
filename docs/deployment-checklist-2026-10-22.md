@@ -1,5 +1,15 @@
 # Deployment checklist - 22 October 2026
 
+## Actual work execution update - 23 October 2026
+
+See [the online execution record and supervisor steps](workday-online-execution-2026-10-23.md).
+Fresh online database/admin, first password replacement, global baseline, actual
+old-backup restore and versioned image publication are complete. Public ACI is
+unchanged; supervisor Azure execution, final private custody and actual deployed
+acceptance remain. Title-specific input classifier false negatives are retained
+as an open runtime finding; broad issue-creation input blocking passes. Earlier
+home-only preparation and legacy app questions below are historical checkpoints.
+
 ## Current release decision - 23 October 2026
 
 Read [the final-workday handoff](final-workday-handoff-2026-10-23.md) first.

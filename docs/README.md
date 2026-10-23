@@ -1,5 +1,11 @@
 # nemo-mcp-guardrails-test
 
+Latest work execution: [fresh online database, published images and supervisor deployment steps](workday-online-execution-2026-10-23.md).
+Database/admin setup and actual old-backup restore verification are complete;
+the versioned image pair is published. Existing service remains unchanged.
+ACI deployment, final private custody and an input-classifier finding remain
+for the recorded follow-up. Older home-only preparation notes are historical.
+
 Product guides: [User Guide](UserGuide.md) for administrators/app developers and
 [Developer Guide](DeveloperGuide.md) for maintainers/operators. These follow the
 user-supplied SE-EDU structures, adapted to GMS browser/API workflows and checked

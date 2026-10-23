@@ -1,5 +1,19 @@
 # AGENTS.md
 
+## Actual online execution - 2026-10-23
+
+Read docs/workday-online-execution-2026-10-23.md before older home preparation.
+Fresh online nemo_gms_release_20261023 and admin@gmail.com are initialized; user
+password replacement passes, mandatory global output policy is assigned, old
+online database backup actually restored/verified, and work-built release pair
+is published as fa76f78ba62d-work20261023 with recorded digests. Existing public
+service/old databases are preserved. Supervisor Azure session is unavailable;
+ACI deployment remains for their later execution. Do not interrupt 11:30-14:00.
+Two title-specific input-classifier cases failed; broad issue creation blocks
+with zero tool starts. Preserve that finding and do not claim all acceptance
+passed. Current docs list private artifacts, pending custody and deployed checks.
+Do not rerun fresh bootstrap on this already-initialized target.
+
 ## User and developer guides - 2026-10-23
 
 The user supplied SE-EDU AddressBook Level 4 guide templates and authorised

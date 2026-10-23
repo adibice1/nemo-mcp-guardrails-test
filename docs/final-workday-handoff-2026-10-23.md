@@ -1,5 +1,15 @@
 # Final workday handoff and second deployment - 23 October 2026
 
+## Later work-machine execution
+
+Read [the actual online execution and supervisor deployment record](workday-online-execution-2026-10-23.md)
+first. The fresh online database/admin now exist, the user completed password
+replacement, the current old database backup was restored/verified, and the
+work-built pair is published under versioned tags. Actual ACI deployment remains
+pending supervisor Azure access. A focused input-classifier acceptance finding
+is retained there. The earlier home-preparation statements below describe that
+checkpoint only and no longer mean online provisioning/publication is pending.
+
 This is the current release decision record. The user says the next working day
 is their last and wants online-database work finished while work access is still
 available. It supersedes the earlier questions about carrying legacy rehearsal
@@ -129,6 +139,13 @@ their own backups; importing encrypted records later requires their matching
 key. Do not overwrite a home/work key to perform this release.
 
 ## Priority sequence while work access remains
+
+Current work-machine access collection is in the
+[manual access intake and copyable commands](workday-access-intake-2026-10-23.md).
+Azure CLI is installed at work but not logged in; Docker responds and only
+`latest` release tags are listed locally. PostgreSQL 18 tools and the venv exist.
+The user requested collection of manual inputs before automated provisioning;
+no database/deployment changes ran for this access preflight.
 
 1. **Capture the existing deployment before changing it.** From an authenticated
    supervisor/work Azure session, discover subscription, resource group, actual
